@@ -1,0 +1,16 @@
+print(" -- Calling main({'/usr/sbin/apache2','-X'}) from apache2\n")
+
+
+a = balloc(10)
+bset(a,0,"/usr/sbin/apache2")
+bset(a,1,"-X")
+
+setenv("APACHE_LOCK_DIR", "/tmp/", 1)
+setenv("APACHE_PID_FILE", "/tmp/foobar.pid", 1)
+setenv("APACHE_RUN_USER", "jonathan", 1)
+setenv("APACHE_RUN_GROUP", "users", 1)
+setenv("APACHE_LOG_DIR", "/tmp/", 1)
+
+
+main(2,a, 0)
+

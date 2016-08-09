@@ -1,0 +1,134 @@
+	-- prepapre test context
+
+	arg1rec = xalloc(1024, 0, 1)
+	arg2rec = xalloc(1024, 0, 1)
+	arg3rec = xalloc(1024, 0, 1)
+	arg4rec = xalloc(1024, 0, 1)
+	arg5rec = xalloc(1024, 0, 1)
+	arg6rec = xalloc(1024, 0, 1)
+
+	arg1r = ralloc(100,0x41);
+	arg2r = ralloc(100,0x42); 
+	arg3r = ralloc(100,0x43); 
+	arg4r = ralloc(100,0x44); 
+	arg5r = ralloc(100,0x45); 
+	arg6r = ralloc(100,0x46); 
+
+
+
+function swap(array, index1, index2)
+    array[index1], array[index2] = array[index2], array[index1]
+end
+
+function shuffle(array)
+    local counter = #array
+    while counter > 1 do
+        local index = math.random(counter)
+        swap(array, index, counter)
+        counter = counter - 1
+    end
+end
+
+function fuzzargs(a,b,c,d,e,f, seed, rate)
+--	math.randomseed(seed)
+--	math.randomseed(os.time())
+
+	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, 2, 5, 13, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s" }
+
+	aout,bout,cout,dout,eout,fout = a,b,c,d,e,f
+
+	if math.random(100) < rate then aout = rargs[math.random(40)]; end
+	if math.random(100) < rate then bout = rargs[math.random(40)]; end
+	if math.random(100) < rate then cout = rargs[math.random(40)]; end
+	if math.random(100) < rate then dout = rargs[math.random(40)]; end
+	if math.random(100) < rate then eout = rargs[math.random(40)]; end
+	if math.random(100) < rate then fout = rargs[math.random(40)]; end
+
+	return aout,bout,cout,dout,eout,fout
+end
+
+function annotate(fun,a,b,c,d,e,f, seed, rate)
+
+	-- prepare fuzzed arguments if needed
+        if seed ~= 0 then a,b,c,d,e,f = fuzzargs(a,b,c,d,e,f, seed, rate); end
+
+	-- Make the call, with a max timeout
+	ret,ctx=fun(a,b,c,d,e,f)
+
+--	storerun(ctx)
+--	alarm(0);
+end
+
+function testfunc(f, num)
+
+	local n, maxnum
+
+	-- polute .bss
+--	bsspolute()
+
+	arg1s = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	arg2s = "/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	arg3s = "/cccccccccccccccccccccccccccccccc"
+	arg4s = "/dddddddddddddddddddddddddddddddd"
+	arg5s = "/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+	arg6s = "/ffffffffffffffffffffffffffffffff"
+
+	testarg = {
+		arg1 = { 0x41414141, arg1rec, arg1s, arg1r, arg1s },
+		arg2 = { 0x42424242, arg2rec, arg2s, arg2r, arg2s },
+		arg3 = { 0x43434343, arg3rec, arg3s, arg3r, arg3s },
+		arg4 = { 0x44444444, arg4rec, arg4s, arg4r, arg4s },
+		arg5 = { 0x45454545, arg5rec, arg5s, arg5r, arg5s },
+		arg6 = { 0x46464646, arg6rec, arg6s, arg6r, arg6s }
+	}
+
+	-- Run determinist test cases
+	for n=1,5 do
+		    annotate(f, testarg.arg1[n], testarg.arg2[n], testarg.arg3[n], testarg.arg4[n], testarg.arg5[n], testarg.arg6[n], 0, 0)
+	end
+
+	-- Run random test cases
+        math.randomseed(os.time())
+	maxnum = 0
+	if num ~= nil then maxnum = num end
+	for n=0,maxnum do
+		    annotate(f, testarg.arg1[math.random(6)], testarg.arg2[math.random(6)], testarg.arg3[math.random(6)], testarg.arg4[math.random(6)], testarg.arg5[math.random(6)], testarg.arg6[math.random(6)], math.random(1000), 50)
+	end
+
+	print(" [*] all tests done (" .. maxnum + 5 .. " calls)")
+--	alarm(0);
+end
+
+function testlib(name, num)
+	local world = functions("",name,1)
+	math.randomseed(os.time())
+	shuffle(world)
+	for x,v in pairs(world) do
+		print(" [*] Testing", x, v)
+		testfunc(v, num)
+	end
+end
+
+function retest(hash)
+	local h = runs[hash]
+	print(h.alibcall .. "()")
+end
+
+-- testfunc(gzclose_w)
+-- testfunc(gzwrite)
+
+-- testfunc(snprintf)
+
+-- testfunc(execlp)
+
+-- testfunc()
+
+-- testfunc(memcpy)
+
+-- testfunc(sprintf)
+
+-- testfunc(sscanf)
+
+-- testfunc(execlp)
+
+

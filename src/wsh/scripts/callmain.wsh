@@ -1,0 +1,10 @@
+	a = array.new(1000)
+
+	for i=1,array.size(a) do
+		array.set(a, i, 0x41)
+	end
+
+	printf("0x%02x\n" , array.get(a, 10))
+
+hexdump(a,1000)
+	exit(0)

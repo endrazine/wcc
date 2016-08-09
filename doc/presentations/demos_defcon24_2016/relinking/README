@@ -1,0 +1,18 @@
+This directory contains proof of concept code as demoed at the Defcon 24
+Conference.
+
+It requires the Witchcraft Compiler Collection to be installed.
+
+This directory contains C code that is compiled with gcc (or clang), then
+transformed back to a relocatable object file using wcc, and relinked into
+an executable using gcc and gnu ld. When run, the original executable and the 
+final one provide the same output.
+
+This has been tested using x86_64 versions of both clang and gcc. Some
+relocation handling might be required to get this to work on other
+architectures or if compiled with certain compiler flags. Feel free to
+contribute your patches back to WCC if you implement new types of relocations
+:)
+
+endrazine-
+

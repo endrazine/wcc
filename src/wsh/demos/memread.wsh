@@ -1,0 +1,28 @@
+
+-- allocate 100 bytes
+a = calloc(100,1)
+print(" [*] allocated 100 bytes at 0x", a)
+memory:hex(a,100)
+
+-- get address of buffer
+b = memory:addr(a)
+print(string.format(" [*] buffer is at 0x%x", b))
+
+-- set those bytes to 0x41 using memset
+print(" [*] set content to 0x41 * 100")
+memset(a, 0x41, 100)
+
+-- set memory of buffer to 0x42
+print(" [*] set content to 0x42 * 20")
+local j
+for j=1,20 do memory[b+j]=0x42 end
+print(" [*] set content to foobar")
+memory[b] = "foobar"
+memory:hex(b,100)
+
+
+-- read content to string of 40 bytes
+s=memory:read(b,100)
+print(" [*] read memory as a string")
+
+memory:hex(s,100)

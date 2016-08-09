@@ -1,0 +1,18 @@
+Usage: wsh [script] [options] [binary1] [binary2] ... [-x] [script_arg1] [script_arg2] ...
+
+Options:
+
+    -x, --args                Optional script argument separator.
+    -v, --verbose
+    -V, --version
+
+Script:
+
+    If the first argument is an existing file which is not a known binary file format,
+    it is assumed to be a lua script and gets executed.
+
+Binaries:
+
+    Any binary file name before the -x tag gets loaded before running the script.
+    The last binary loaded is the main binary analyzed.
+

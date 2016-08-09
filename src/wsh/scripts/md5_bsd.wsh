@@ -1,0 +1,21 @@
+-- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
+
+function str2md5(input)
+
+	out = calloc(33, 1)
+  	ctx = calloc(1024, 1)
+
+	MD5Init(ctx)
+	MD5Update(ctx, input, strlen(input))
+	MD5Final(out, ctx)
+
+--	free(ctx)
+	return out
+end
+
+
+input = "Message needing hashing\n"
+hash = str2md5(input)
+hexdump(hash,16)
+
+

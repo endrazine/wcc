@@ -1,0 +1,88 @@
+-- memory 
+
+function memindex(t, pos)
+--	print("arg: " , tostring(t) ,pos)
+	return memory:read(pos,1)
+end
+
+
+function memnewindex(t, pos, data)
+	if type(pos) == "number" then
+		if type(data) == "string" then
+--			print(string.format("writting at:0x%x data:%s (string)", pos, data))
+			return rawmemwrite(pos, data, string.len(data))
+		elseif type(data) == "number" then
+			if data >= 0 and data < 256 then
+--				print(string.format("writting at:0x%x data:0x%x (byte)", pos, data))
+				return rawmemwrite(pos, string.format("%c", data) , 1)
+			else
+--				print(string.format("writting at:0x%x data:0x%x (ptr) len:%d", pos, data, string.len(tostring(data))))
+				print(string.format("ERROR: Data too large (over 1 byte) when writting at:0x%x data:0x%x %s (ptr)", pos, data, tostring(data)))
+--				local n = string.format("%x", data)
+--				return rawmemwrite(pos, n , 4)
+			end
+		end
+	end
+	return 0
+end
+
+mt1 = {
+	__len = function() return 0 end,
+	__newindex = memnewindex,
+	__index = memindex
+}
+
+memory = {}
+
+
+-- display memory usage
+function memory:usage()
+	return rawmemusage()
+end
+
+-- display hexadecimal of len bytes from address addr
+function memory:hex(addr, len)
+	local nlen
+	if not len then nlen = 1 else nlen = len end
+	hexdump(addr, nlen)
+end
+
+-- return a pointer to the object passed as argument (shall be a string/userdata/...)
+function memory:addr(addr)
+	return rawmemaddr(addr)
+end
+
+
+-- read len bytes from memory at address addr and return them as a string
+function memory:read(addr, len)
+	local nlen
+	if not len then nlen = 1 else nlen = len end
+	return rawmemread(addr, nlen)
+end
+
+
+-- write len bytes of data at addr
+function memory:write(addr, data, len)
+	local nlen
+	if not len then nlen = 1 else nlen = len end
+	return rawmemwrite(addr, data, nlen)
+end
+
+-- read a string (null terminated) from addr
+function memory:tostring(addr)
+	return rawmemstr(addr)
+end
+
+-- return string length of data at addr
+function memory:strlen(addr)
+	return rawmemstrlen(addr)
+end
+
+
+function memory.__index(k)
+	print("no index" .. k)
+	return 4
+end
+
+setmetatable( memory, mt1 )
+

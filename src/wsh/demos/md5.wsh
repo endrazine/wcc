@@ -1,0 +1,27 @@
+#!/usr/bin/wsh
+
+-- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
+
+function str2md5(input)
+
+        out = calloc(33, 1)
+	ctx = calloc(1024, 1)
+
+--	out = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+--	ctx = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+	MD5_Init(ctx)
+	MD5_Update(ctx, input, strlen(input))
+	MD5_Final(out, ctx)
+
+	free(ctx)
+	free(out)
+	return out
+end
+
+input = "Message needing hashing\n"
+hash = str2md5(input)
+print(" [*] Computed md5 hash:")
+hexdump(hash,16)
+
+-- exit(0)

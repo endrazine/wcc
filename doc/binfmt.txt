@@ -1,0 +1,13 @@
+You can register and binary format so that
+all the .wsh scripts will be executed with
+/usr/bin/wsh as an interpreter.
+
+See man update-binfmts
+
+jonathan@blackbox:~$ cat /proc/sys/fs/binfmt_misc/wsh 
+enabled
+interpreter /usr/bin/wsh
+flags: 
+extension .wsh
+jonathan@blackbox:~$ 
+

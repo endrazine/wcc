@@ -1,0 +1,14 @@
+The code in this directory demonstrates how to link C code against an ELF 
+binary compiled as Position Independent Code (PIE).
+In this case we link against apache2 and call a function within this binary as
+if it was a shared library (which it really is in addition to being an 
+executable).
+
+This requires apache to be compiled with -rdynamic compilation flag to expose
+the relevant symbols in the dynamic symbol table, as well as the -pie -fPIE
+flags to be passed at compile time to enable full ASLR and allow the binary
+to be mapped with any base address (both should be default if your binary is 
+shipped with a recent Linux distribution). The binary can be stripped.
+
+endrazine-
+

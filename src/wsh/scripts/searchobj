@@ -1,0 +1,22 @@
+
+function searchobj(pattern,b)
+	count = 0
+	for n,v in pairs(_G)
+	do
+
+		if(string.find(n,pattern)) then
+			if type(v)~="function" then
+				print("object:", n)
+				count = count + 1
+			end
+		end
+	end
+
+	print("")
+	print(" -- ", count, "object match")
+end
+
+
+-- search("getenv")
+
+

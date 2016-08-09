@@ -1,0 +1,7 @@
+breakpoint(reflect_setenv, 5)
+breakpoint(reflect_getenv, 10)
+b=getenv("PATH")
+s=setenv("PATH_COPY", b, 1)
+printf(" -- total Breakpoint points: %u\n", bp_points)
+exit(bp_points)
+

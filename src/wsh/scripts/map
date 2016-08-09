@@ -1,0 +1,6 @@
+	path = calloc(1, 100)
+	mem = calloc(1, 40960)
+	snprintf(path, 99, "/proc/%u/maps", getpid())
+	fd = open(path)
+	read(fd, mem, 40959)
+	printf("%s", mem)

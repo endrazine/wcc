@@ -1,0 +1,13 @@
+#!/home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wsh/wsh
+
+ fname="/etc/passwd"
+ printf("\n ** Reading file %s\n", fname)
+-- mem = malloc(1024)
+ mem = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+ nread = read(open(fname), mem, 100) -- Composition works
+--   fd = open(fname)
+--   nread = read(fd, mem, 100)
+
+ printf(" ** Displaying content (%u bytes) of file %s:\x0a\x0a%s\n", nread, fname, mem)
+-- free(mem)
+ c = close(fd)

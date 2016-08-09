@@ -1,0 +1,9 @@
+print(" -- Calling main({'/usr/bin/whatever','--version'}) from ls\n")
+
+a = alloccharbuf(10)
+setcharbuf(a,0,"/usr/bin/whatever")
+setcharbuf(a,1,"--version")
+
+libcall(0x4028c0, 2, a, 0)	-- call main() for /bin/ls
+
+

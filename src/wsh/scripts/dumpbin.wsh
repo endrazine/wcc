@@ -1,0 +1,17 @@
+
+f = io.open("/bin/pwd", "rb")
+block = 48
+totbytes = 0
+while true do
+  bytes = f:read(block)
+  if not bytes then break end
+  io.write(string.format("0x%08x: ", totbytes))
+  totbytes = totbytes + block
+  for b in string.gmatch(bytes, ".") do
+    io.write(string.format("%02X ", string.byte(b)))
+  end
+  io.write(string.rep("   ", block - string.len(bytes) + 1))
+  io.write(string.gsub(bytes, "%c", "."), "\n")
+end
+
+exit(0)

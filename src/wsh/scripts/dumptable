@@ -1,0 +1,153 @@
+function pairsByKeys (t, f)
+      local a = {}
+      if not t then return a end
+      for n in pairs(t) do table.insert(a, n) end
+      table.sort(a, f)
+      local i = 0      -- iterator variable
+      local iter = function ()   -- iterator function
+        i = i + 1
+        if a[i] == nil then return nil
+        else return a[i], t[a[i]]
+        end
+      end
+      return iter
+end
+
+----- set runs and metadata
+runs = {}
+runsidx = {}
+
+mt = {
+	__index = runsidx
+}
+
+setmetatable(runs, mt)
+---------
+
+
+function dumptable(t)
+    local indexes = {}
+    local i = 1
+--  table.sort(t)
+--  for x,v in pairs(t) do print(x,v) end
+	for x,v in pairsByKeys(t) do print(x,v) ; indexes[i] = x; i = i+1 ; end
+        return indexes
+end
+
+
+function dt(t)
+	return dumptable(t)
+end
+
+
+
+
+-- Print contents of `tbl`, with indentation.
+-- `indent` sets the initial level of indentation.
+
+-- There are 8 primitive types: nil, boolean, number, string, function, userdata, thread, and table. 
+
+function dtt (tbl, indent, rec)
+  if not tbl then return ; end
+  if not indent then indent = 1 end
+  if not rec then rec = 0 end
+  local res = ""
+  local ncount = 0
+  if rec == 0 then res = "{\n" end
+  for k, v in pairsByKeys(tbl) do
+    local formatting = ""
+    if type(k) == "number" then
+        formatting = string.rep("  ", indent) .. "[" .. k .. "]" .. "="
+    else
+        formatting = string.rep("  ", indent) .. k .. "="
+    end
+ 
+   ncount = ncount + 1
+    if type(v) == "table" then
+      res = res .. formatting .. "{\n" .. dtt(v, indent + 1, rec + 1) .. "\n" .. string.rep("  ", indent) .. "},\n"
+    elseif type(v) == "number" then
+      res = res .. string.format("%s0x%x,\n",formatting, v)
+    elseif type(v) == "boolean" then
+      res = res .. formatting .. tostring(v) .. ",\n"
+    elseif type(v) == "string" then
+      res = res .. formatting .. "\"" .. v .. "\",\n"
+    else
+      res = res .. formatting .. tostring(v) .. ",\n"
+    end
+  end
+  res = res:sub(1, -3)
+  if rec == 0 then if res ~= "" then res = res .. "\n" .. "}\n-- total:" .. ncount  end print(res) end
+  return res
+end
+
+
+function dts (tbl, indent, rec)
+  if not indent then indent = 0 end
+  if not rec then rec = 0 end
+  res = ""
+  if rec == 0 then res = "{" end
+  for k, v in pairsByKeys(tbl) do
+    formatting = string.rep("  ", indent) .. k .. "="
+    if type(v) == "table" then
+      res = res .. formatting .. "{" .. dts(v, indent, rec + 1) .. "},"
+    elseif type(v) == "number" then
+      res = res .. string.format("%s0x%x,",formatting, v)
+    elseif type(v) == "boolean" then
+      res = res .. formatting .. tostring(v) .. ","
+    elseif type(v) == "string" then
+      res = res .. formatting .. "\"" .. v .. "\","
+    else
+      res = res .. formatting .. tostring(v) .. ","
+    end
+  end
+  res = res:sub(1, -2)
+--  if rec == 0 then print(res) end
+  if rec == 0 then res = res .. "}" end
+  return res
+end
+
+function rchecksum(t)
+	input = string.format("%s:%u:%s:%s:%s:%s:%s:%x:%s:%1.f",t.alibcall,t.argnum,t.signal,t.mode,t.sicode,t.errnostr,t.caller,t.calleraddr&0xfff,tostring(t.faultaddr ~= 0),math.log(tonumber(t.retval),16))
+	hash = sha256(input)
+--	print("rchecksum:  " .. input .. " --> " .. hash)
+
+	hash = "run" .. hash -- prepend a string to hash so it doesn't look like a number to lua
+	return hash
+end
+
+function reindexhash()
+  local i=1; for x,v in pairs(runs) do runsidx[i] = runs[x]; i=i+1; end
+end
+
+function storerun(t)
+--	print("within storerun")
+	if not t then print(" !! missing input table") end
+--	print(t)
+	hash = rchecksum(t)
+	-- do not overwrite if already present
+	if runs[hash] == nil then runs[hash] = t ; reindexhash() ; end
+end
+
+function tablemerge(t1, t2)
+    for k,v in pairs(t2) do
+    	if type(v) == "table" then
+    		if type(t1[k] or false) == "table" then
+    			tablemerge(t1[k] or {}, t2[k] or {})
+    		else
+    			t1[k] = v
+    		end
+    	else
+    		t1[k] = v
+    	end
+    end
+    return t1
+end
+
+
+function tableinvert(t)
+   local s={}
+   for k,v in pairs(t) do
+     s[v]=k
+   end
+   return s
+end

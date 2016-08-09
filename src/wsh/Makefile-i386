@@ -1,0 +1,49 @@
+CC := gcc-4.8
+#CC := "gcc-4.8 -m32" # trick to compile liblua.a in 32bits mode
+
+CFLAGS := -masm=intel -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now -m32 #--sanitize=address
+
+all::
+#	cd openlibm && make CFLAGS="-pie -fpie -fPIC -m32" ARCH=i386
+#	cd lua && make linux CFLAGS="-pie -fpie -fPIC -m32 -static-libgcc -lgcc" CC=$(CC)
+	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -ldl -lreadline -pie -fpie -fPIC
+	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -ldl -lreadline -pie -fpie -fPIC
+	$(CC) $(CFLAGS) helper.c -o helper.o -c -pie -fpie -fPIC
+	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -pie -fpie -fPIC
+	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
+	ar cr libwitch.a wsh.o helper.o linenoise.o
+	$(CC) $(CFLAGS)  wsh.o helper.o linenoise.o wshmain.o -o wsh-i386 ./lua/src/liblua32.a  -lgsl -lgslcblas /usr/lib32/libc.so -lm -ldl /usr/lib/i386-linux-gnu/libiberty.a
+
+#../../../../musl//lib/libc.a
+
+# ../musl/lib/libc.a
+# -static
+# -ldl
+#-static
+# -llua5.2 
+#./liblua.a
+
+#	$(CC) $(CFLAGS) wsh2.c -o wsh2.o -c -ldl
+#	$(CC) $(CFLAGS) wsh2.o -o wsh2 -T script.lds ./liblua.a  -liberty -ldl -lm 
+
+
+	cp wsh-i386 ../../bin/
+
+clean::
+	rm wsh-i386 helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o -f
+	cd openlibm && make clean
+	cd lua && make clean
+
+deepclean:
+	cd openlibm && make clean
+	cd lua && make clean
+	make clean
+
+install::
+	mkdir -p /usr/share/wcc/
+	cp -r ./scripts /usr/share/wcc/
+	cp wsh-i386 /usr/bin/wsh-i386
+
+uninstall::
+	rm -rf /usr/share/wcc/
+	rm -f /usr/bin/wsh-i386

@@ -1,0 +1,13 @@
+This directory contains proof of concept code to transform /usr/sbin/proftpd
+(assumed to not be compiled as Position Independant Code - else see the
+apache directory in the upper directory instead).
+
+The code is then used as a shared library from demo C code than call
+a function within proftpd to return its current version number as a string.
+
+This requires a custom linker script to make sure gcc (or clang) assigns
+our code a different base address than the one of our "non relocatable shared
+library" proftpd.
+
+endrazine-
+

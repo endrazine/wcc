@@ -1,0 +1,34 @@
+function string.starts(String,Start)
+   return string.sub(String,1,string.len(Start))==Start
+end
+
+function string.ends(String,End)
+   return End=='' or string.sub(String,-string.len(End))==End
+end
+
+function search(pattern,b)
+--	print("searching", pattern)
+--	print("")
+	count = 0
+	for n,v in pairs(_G)
+	do
+-- print(n)
+--		if(n == pattern) then
+
+		if(string.find(n,pattern)) then
+			if type(v)=="function" then
+			if string.starts(n,"reflect_") then
+				print(v, "\t", string.sub(n,9))
+				count = count + 1
+			end
+			end
+		end
+	end
+	print("")
+	print(" -- ", count, "functions match")
+end
+
+
+-- search("getenv")
+
+

@@ -1,0 +1,11 @@
+The Witchcraft Compiler Collection
+was written by the following authors:
+  Jonathan Brossard
+
+
+For third party depedencies licenses,
+see LICENSE.
+
+linenoise, lua, lua-jit, openlibm are
+copyrights of their respective owners.
+

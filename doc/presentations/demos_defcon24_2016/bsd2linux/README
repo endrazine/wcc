@@ -1,0 +1,38 @@
+This directory demonstrates how to relink an OpenBSD binary in order to
+run it natively under Linux.
+
+This works because the binary doesn't call system calls directly (only
+the functions within the shared library it is making use of -eg: printf() - do
+themselves perform the system calls).
+
+This relinking process can be done either by patching the binary directly or
+by placing the dynamic linker and shared libraries where the binary is trying
+to find them (those are hardcoded in the interpreter section for the former
+and the names of the shared libraries and their versions are encoded in the
+.dynamic and the .gnu.version and .gnu.version_r sections respectively, the two
+later being gcc extensions). See Makefile and shell scripts for examples
+of both techniques.
+
+Finally, the binary is looking for a atexit() function that is not exposed
+in my linux libc. Since this function is called only when exit() is called to
+possibly call destructors(), we can safely ignore it ; we create an empty
+library call with this name, link it within a new shared library and
+pass it to the dynamic linker via LD_PRELOAD. This is good enough to run
+the binary natively.
+
+Note: An other way to achieve this would be to copy the original libraries
+(eg: chroot like), including the BSD dynamic linker, and perform the
+system call number translation using a ptrace() based tracer :
+
+  ptrace(PTRACE_ATTACH, ...)
+  ptrace(PTRACE_SYSCALL, ...)
+
+and then uppon each system call the BSD process is attempting to make:
+
+  ptrace(PTRACE_GETREGS, ...); // get the registers in BSD process
+  // ... translate system call number in Intel registers
+  ptrace(PTRACE_SETREGS, ...); // set back the translated registers in BSD process
+  ptrace(PTRACE_CONT, ...)
+
+endrazine-
+
