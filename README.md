@@ -12,14 +12,14 @@ taking binary files as an input.
  -- Commands:
 
 * wcc : The Witchcraft Compiler.
-        Takes binaries (ELF, PE, ...) as an imput
+        Takes binaries (ELF, PE, ...) as an input
         and creates valid ELF binaries (eg: relocatable
         objects or shared libraries) that can be later
         compiled and linked with using regular compilers
         (eg: gcc/clang).
 
 * wld : The Witchcraft Linker.
-        Takes a valid ELF (32/64) binary as an imput
+        Takes a valid ELF (32/64) binary as an input
         and changes its ELF class to ELF_DYN.
 
 * wsh : The Witchcraft Loader and Dynamic Linker.
