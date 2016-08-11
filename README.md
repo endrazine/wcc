@@ -299,7 +299,7 @@ Then to install wcc, type:
 
     sudo make install
 
-#### Building the WCC documentation
+#### Building the WCC documentation (Optional)
 WCC makes use of doxygen to generate its documentation. From the root wcc directory, type
 
     make documentation
