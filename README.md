@@ -189,7 +189,7 @@ The following example illustrates how to display the main wsh help from the inte
 
 	> 
 
-#### Extending wsh with Wichcraft Shell Scripts
+#### Extending wsh with Witchcraft Shell Scripts
 The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow to call any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerfull combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
 Scripts in Punk C can be invoked by specifying the full path to wsh in the magic bytes of a wsh shell. 
 The following command displays the content of a Witchcraft shell script:
