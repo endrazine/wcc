@@ -65,6 +65,7 @@
 #include <nametolink.h>
 #include <nametoinfo.h>
 #include <arch.h>
+#include <inttypes.h>
 
 #include <config.h>
 
