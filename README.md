@@ -5,11 +5,10 @@
 Welcome to the Witchcraft Compiler Collection !
 
 ## Purpose
+WCC is a collection of compilation tools to perform binary black magic on the GNU/Linux and other POSIX plateforms.
 
-WCC is a collection of compilation tools to perform witchcraft on the GNU/Linux and other POSIX plateforms.
-
-
-## Commands
+## Core commands
+The following commands constitute the core of the Witchcraft Compiler Collection.
 
 ### wld : The Witchcraft Linker.
 wld takes an ELF executable as an input and modifies it to create a shared library.
@@ -116,8 +115,157 @@ apache to retreive its banner and displays it within the wsh intterpreter.
 	> print(a)
 	Apache/2.4.7
 	> 
+	
+To get help at any time from the wsh interpreter, simply type help. To get help on a particular topic, type help("topic").
+
+The following example illustrates how to display the main wsh help from the interpreter and how to get detailed help on the grep command by calling help("grep") from the wsh interpreter.
+
+	> help
+	  [Shell commands]
+
+		help, quit, exit, shell, exec, clear
+
+	  [Functions]
+
+	 + basic:
+		help(), man()
+
+	 + memory display:
+		 hexdump(), hex_dump(), hex()
+
+	 + memory maps:
+		shdrs(), phdrs(), map(), procmap(), bfmap()
+
+	 + symbols:
+		symbols(), functions(), objects(), info(), search(), headers()
+
+	 + memory search:
+		grep(), grepptr()
+
+	 + load libaries:
+		loadbin(), libs(), entrypoints(), rescan()
+
+	 + code execution:
+		libcall()
+
+	 + buffer manipulation:
+		xalloc(), ralloc(), xfree(), balloc(), bset(), bget(), rdstr(), rdnum()
+
+	 + control flow:
+		 breakpoint(), bp()
+
+	 + system settings:
+		enableaslr(), disableaslr()
+
+	 + settings:
+		 verbose(), hollywood()
+
+	 + advanced:
+		ltrace()
+
+	Try help("cmdname") for detailed usage on command cmdname.
+
+	> help("grep")
+
+		WSH HELP FOR FUNCTION grep
+
+
+	NAME
+
+		grep
+
+	SYNOPSIS
+
+		table match = grep(<pattern>, [patternlen], [dumplen], [before])
+
+	DESCRIPTION
+
+		Search <pattern> in all ELF sections in memory. Match [patternlen] bytes, then display [dumplen] bytes, optionally including [before] bytes before the match. Results are displayed in enhanced decimal form
+
+	RETURN VALUES
+
+		Returns 1 lua table containing matching memory addresses.
+
+
+	> 
+
+#### Extending wsh with Wichcraft Shell Scripts
+The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow to call any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerfull combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
+Scripts in Punk C can be invoked by specifying the full path to wsh in the magic bytes of a wsh shell. 
+The following command displays the content of a Witchcraft shell script:
+
+	jonathan@blackbox:/usr/share/wcc/scripts$ cat md5.wsh
+	#!/usr/bin/wsh
+
+	-- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
+
+	function str2md5(input)
+
+		out = calloc(33, 1)
+		ctx = calloc(1024, 1)
+
+		MD5_Init(ctx)
+		MD5_Update(ctx, input, strlen(input))
+		MD5_Final(out, ctx)
+
+		free(ctx)
+		return out
+	end
+
+	input = "Message needing hashing\n"
+	hash = str2md5(input)
+	hexdump(hash,16)
+
+	exit(0)
+	jonathan@blackbox:/usr/share/wcc/scripts$ 
+
+
+To run this script using the API made available inside the address space of sshd, simply run:
+
+	jonathan@blackbox:/usr/share/wcc/scripts$ ./md5.wsh /usr/sbin/sshd 
+	0x43e8b280    d6 fc 46 91 b0 6f ab 75 4d 9c a7 58 6d 9c 7e 36    V|F.0o+uM.'Xm.~6
+	jonathan@blackbox:/usr/share/wcc/scripts$ 
+
+
+
 #### Limits of wsh
-wsh can only load sharde libraries and ET_DYN dynamically linked ELF executables directly. This means ET_EXEC executables may need to be libified using wld before use in wsh.
+wsh can only load shared libraries and ET_DYN dynamically linked ELF executables directly. This means ET_EXEC executables may need to be libified using wld before use in wsh. Binaries in other file formats might need to be turned into ELF files using wcc.
+
+#### Note: Analysing and Executing ARM/SPARC/MIPS binaries "natively" on Intel x86_64 cpus via JIT binary translation
+wsh can be cross compiled to ARM, SPARC, MIPS and other plateforms and used in association with the qemu's user space emulation mode to provide JIT binary translation on the fly and analyse shared libraries and binaries from other cpus without requiring emulation a full operating system in a virtual machine. On the the analyzed binaries are translated from one CPU to an other, and the analysed binaries, the wsh cross compiled analyser and the qemu binary translator share the address space of a single program. This significantly diminishes the complexity of analysing binaries accross different hardware by seemingly allowing to run ARM or SPARC binaries on a linux x86_64 machine natively and transparently.
+
+## Other commands
+
+The following auxiliary commands are available with WCC. They are typically simple scripts built on top of WCC.
+
+### wldd : print shared libraries compilation flags
+When compiling C code, it is often required to pass extra arguments to the compiler to signify which shared libraries should explicitely linked against the compile code. Figuring out those compilation parameters can be cumbersome. The wldd commands displays the shared libraries compilation flags given at compile time for any given ELF binary.
+
+#### wldd command line options
+
+	jonathan@blackbox:~$ wldd 
+	Usage: /usr/bin/wldd </path/to/bin>
+
+	  Returns libraries to be passed to gcc to relink this application.
+
+	jonathan@blackbox:~$ 
+
+#### Example usage of wldd
+The following command displays shared libraries compilation flags as passed to gcc when compiling /bin/ls from GNU binutils:
+
+	jonathan@blackbox:~$ wldd /bin/ls
+	-lselinux -lacl -lc -lpcre -ldl -lattr 
+	jonathan@blackbox:~$
+
+### wcch : generate C headers from binaries
+The wcch command takes an ELF binary path as a command line, and outputs a minimal C header file declaring all the exported global variables and functions from the input binary. This automates prototypes declaration when writting C code and linking with a binary for which C header files are not available.
+
+#### Example usage of wcch
+
+The following command instructs wcch to generate C headers from the apache2 executable and redirects the output from the standard output to a file named /tmp/apache2.h ready for use as a header in a C application.
+
+	jonathan@blackbox:~$ wcch /usr/sbin/apache2 >/tmp/apache2.h
+	jonathan@blackbox:~$ 
 
 ## Downloading the source code
 The official codebase of the Witchcraft Compiler Collection is hosted on github at https://github.com/endrazine/wcc/ . It uses git modules, so some extra steps are needed to fetch all the code including depedencies. To download the source code of wcc, in a terminal, type:
@@ -129,7 +277,7 @@ The official codebase of the Witchcraft Compiler Collection is hosted on github 
 
 This will create a directory named wcc and fetch all required source code in it.
 
-## Pre-requisits
+## Prerequisites
 
 ### Installing requirements
 The Witchcraft Compiler Collection requires the following software to be installed:
@@ -155,6 +303,16 @@ Then to install wcc, type:
 WCC makes use of doxygen to generate its documentation. From the root wcc directory, type
 
     make documentation
+
+## Greetings
+The Witchcraft Compiler Collection uses the following amazing Open Source third party software:
+
+  - Capstone, a lightweight multi-platform, multi-architecture disassembly framework http://www.capstone-engine.org/
+  - Linenoise, A small self-contained alternative to readline and libedit https://github.com/antirez/linenoise
+  - Openlibm, High quality system independent, portable, open source libm implementation http://www.openlibm.org
+  - Lua, The Programming Language Lua https://www.lua.org/
+  - LuaJit, a Just-In-Time Compiler for Lua http://luajit.org/
+  - Qemu, in particular its user space mode : http://wiki.qemu.org/download/qemu-doc.html#QEMU-User-space-emulator
 
 ## Licence
 The Witchcraft Compiler Collection is published under the MIT License.
