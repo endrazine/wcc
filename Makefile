@@ -1,4 +1,5 @@
 all:
+	mkdir -p bin
 	cd src && make
 
 documentation:
