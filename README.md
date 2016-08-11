@@ -7,6 +7,10 @@ Welcome to the Witchcraft Compiler Collection !
 ## Purpose
 WCC is a collection of compilation tools to perform binary black magic on the GNU/Linux and other POSIX plateforms.
 
+## User manual
+
+The WCC user manual is available online at : https://github.com/endrazine/wcc/wiki
+
 ## Core commands
 The following commands constitute the core of the Witchcraft Compiler Collection.
 
