@@ -4641,6 +4641,12 @@ int wsh_getopt(wsh_t * wsh1, int argc, char **argv)
 		{NULL, 0, NULL, 0}
 	};
 
+
+	if(argc < 2){
+		printf("ERROR: not enough arguments !\nTry --help for help.\n");
+		_Exit(EXIT_FAILURE);
+	}
+
 	wsh->opt_hollywood = 1;	// Set sane default
 
 	while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
