@@ -283,15 +283,26 @@ This will create a directory named wcc and fetch all required source code in it.
 
 ## Prerequisites
 
-### Installing requirements
+### Installation Requirements
 The Witchcraft Compiler Collection requires the following software to be installed:
 
-        Glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl.
+    capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make
 
-### Installing requirements on Ubuntu/Debian
-Under ubuntu/debian those dependancies can be installed with the following command:
+### Installation Requirements on Ubuntu/Debian
+Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 14.04):
 
-    sudo apt-get install clang libbfd-dev uthash-dev libelf-dev libcapstone-dev libreadline6 libreadline6-dev libiberty-dev libgsl-dev
+    # Add repo for clang
+    sudo add-apt-repository ppa:kxstudio-team/builds
+    sudo apt-get update
+
+    # Install dependencies
+    sudo apt-get install binutils-dev clang libelf-dev libgsl0-dev libiberty-dev libreadline6 libreadline6-dev make uthash-dev
+
+    # Install latest capstone and capstone-dev from "Ubuntu 14.04 - DEB packages" http://www.capstone-engine.org/download.html
+    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
+    sudo dpkg -i libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
+    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
+    sudo dpkg -i libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
 
 ## Building and Installing:
 #### Building WCC
