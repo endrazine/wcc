@@ -328,6 +328,7 @@ The Witchcraft Compiler Collection uses the following amazing Open Source third 
   - Lua, The Programming Language Lua https://www.lua.org/
   - LuaJit, a Just-In-Time Compiler for Lua http://luajit.org/
   - Qemu, in particular its user space mode : http://wiki.qemu.org/download/qemu-doc.html#QEMU-User-space-emulator
+  - Uthash and Utlist, Hash tables and linked list implemented as C headers https://troydhanson.github.io/uthash/
 
 ## Licence
 The Witchcraft Compiler Collection is published under the MIT License.
