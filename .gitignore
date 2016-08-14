@@ -1,0 +1,9 @@
+# any bin directory
+bin/
+
+# compiled object files and shared libraries
+*.o
+*.so
+
+# temporary files created by some text editors
+*~
