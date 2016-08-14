@@ -43,9 +43,9 @@ clean:
 	rm -f wcc a.out wcc.o core wcc32 ls.o ls.so
 
 install:
-	cp wcc /usr/bin/wcc
-#	cp wcc32 /usr/bin/wcc32
+	cp wcc $(DESTDIR)/usr/bin/wcc
+#	cp wcc32 $(DESTDIR)/usr/bin/wcc32
 
 uninstall:
-	rm /usr/bin/wcc -f
-#	rm /usr/bin/wcc32 -f
+	rm $(DESTDIR)/usr/bin/wcc -f
+#	rm $(DESTDIR)/usr/bin/wcc32 -f

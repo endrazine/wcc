@@ -44,13 +44,13 @@ deepclean:
 	make clean
 
 install::
-	mkdir -p /usr/share/wcc/
-	cp -r ./scripts /usr/share/wcc/
-	cp wsh /usr/bin/wsh
+	mkdir -p $(DESTDIR)/usr/share/wcc/
+	cp -r ./scripts $(DESTDIR)/usr/share/wcc/
+	cp wsh $(DESTDIR)/usr/bin/wsh
 
 uninstall::
-	rm -rf /usr/share/wcc/
-	rm -f /usr/bin/wsh
+	rm -rf $(DESTDIR)/usr/share/wcc/
+	rm -f $(DESTDIR)/usr/bin/wsh
 
 binfmt:
 	sudo update-binfmts --install wsh /usr/bin/wsh --extension wsh
