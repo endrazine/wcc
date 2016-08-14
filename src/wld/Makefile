@@ -31,9 +31,9 @@ clean:
 	rm -f wld wld32 a.out
 
 install:
-	cp wld /usr/bin/wld
-#	cp wld32 /usr/bin/wld32
+	cp wld $(DESTDIR)/usr/bin/wld
+#	cp wld32 $(DESTDIR)/usr/bin/wld32
 
 uninstall:
-	rm /usr/bin/wld -f
-#	rm /usr/bin/wld32 -f
+	rm $(DESTDIR)/usr/bin/wld -f
+#	rm $(DESTDIR)/usr/bin/wld32 -f

@@ -17,12 +17,12 @@ clean:
 	rm ../../bin/wcch -f
 
 install:
-	cp wldd /usr/bin/wldd
-	cp wcch /usr/bin/wcch
+	cp wldd $(DESTDIR)/usr/bin/wldd
+	cp wcch $(DESTDIR)/usr/bin/wcch
 
 uninstall:
-	rm /usr/bin/wldd -f
-	rm /usr/bin/wcch -f
+	rm $(DESTDIR)/usr/bin/wldd -f
+	rm $(DESTDIR)/usr/bin/wcch -f
 
 
 

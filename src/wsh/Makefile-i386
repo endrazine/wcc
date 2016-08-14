@@ -49,10 +49,10 @@ deepclean:
 	make clean
 
 install::
-	mkdir -p /usr/share/wcc/
-	cp -r ./scripts /usr/share/wcc/
-	cp wsh-i386 /usr/bin/wsh-i386
+	mkdir -p $(DESTDIR)/usr/share/wcc/
+	cp -r ./scripts $(DESTDIR)/usr/share/wcc/
+	cp wsh-i386 $(DESTDIR)/usr/bin/wsh-i386
 
 uninstall::
-	rm -rf /usr/share/wcc/
-	rm -f /usr/bin/wsh-i386
+	rm -rf $(DESTDIR)/usr/share/wcc/
+	rm -f $(DESTDIR)/usr/bin/wsh-i386
