@@ -1,3 +1,13 @@
+#
+# This file is part of the Witchcraft Compiler Collection
+# Copyright 2016 Jonathan Brossard
+#
+# Homepage: https://github.com/endrazine/wcc/
+#
+# This file is licensed under MIT License.
+#
+
+# Note:
 # You will need to provide your own 32b static library for libbfd if you 
 # want to cross compile to 32b intel from amd64. Simply installing
 # the 32b library on top of a 64b system using apt-get breaks ubuntu.

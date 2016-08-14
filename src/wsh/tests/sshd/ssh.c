@@ -1,3 +1,12 @@
+/**
+* Test code for the Witchcraft Compiler Collection
+*
+* Copyright 2016 Jonathan Brossard.
+*
+* This file is licensed under the MIT License.
+*
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

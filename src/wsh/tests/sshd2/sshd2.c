@@ -1,11 +1,14 @@
 /**
 * Test code for the Witchcraft Compiler Collection
 *
+* Copyright 2016 Jonathan Brossard.
+*
+* This file is licensed under the MIT License.
+*
+* Note:
 * The whole trick to call main() within sshd after
 * linking against /usr/sbin/sshd is to have our
 * main() function really called __main(Ã)
-*
-* endrazine // August 2016
 *
 */
 #include <stdio.h>

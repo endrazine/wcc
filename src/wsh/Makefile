@@ -1,3 +1,12 @@
+#
+# This file is part of the Witchcraft Compiler Collection
+# Copyright 2016 Jonathan Brossard
+#
+# Homepage: https://github.com/endrazine/wcc/
+#
+# This file is licensed under MIT License.
+#
+
 CC := gcc
 
 CFLAGS := -masm=intel -rdynamic -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #--sanitize=address
