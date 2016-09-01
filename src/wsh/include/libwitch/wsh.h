@@ -121,16 +121,17 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <linenoise.h>
-//#include <functions_list.h>
 #include "helper.h"
 #include <colors.h>
-//#include <sigs.h>
 #include <ucontext.h>
 #include <config.h>
 #include <utlist.h>
+#include <uthash.h>
 
 #define DEFAULT_SCRIPT		"/usr/share/wcc/scripts/debug"
 #define DEFAULT_SCRIPT_INDEX	"/usr/share/wcc/scripts/INDEX"
+#define DEFAULT_WSHRC		".wshrc"
+#define DEFAULT_WSH_PROFILE	".wsh_profile"
 #define PROC_ASLR_PATH		"/proc/sys/kernel/randomize_va_space"
 
 #define DEFAULT_LEARN_FILE "./learnwitch.log"
@@ -339,91 +340,94 @@ extern char *__progname_full;
 /**
 * Forward prototypes declarations
 */
-int do_loadlib(char *libname);
-int empty_phdrs(void);
-int empty_shdrs(void);
+static struct link_map *do_loadlib(char *libname);
+static int empty_phdrs(void);
+static int wsh_appear(lua_State * L);
+static int wsh_hide(lua_State * L);
+static int empty_shdrs(void);
 //int getarray(lua_State * L);
-int getsize(lua_State * L);
-int newarray(lua_State * L);
-int print_functions(lua_State * L);
-int print_libs(lua_State * L);
-int print_objects(lua_State * L);
-int print_phdrs(void);
-int print_shdrs(void);
-int entrypoints(lua_State * L);
-int print_symbols(lua_State * L);
-int print_version(void);
-int setarray(lua_State * L);
-int usage(char *name);
-void set_align_flag(void);
-void set_branch_flag(void);
-void set_trace_flag(void);
-void singlebranch(lua_State * L);
-void singlestep(lua_State * L);
-void traceunaligned(lua_State * L);
-void unset_align_flag(void);
-void unset_branch_flag(void);
-void unset_trace_flag(void);
-void unsinglebranch(lua_State * L);
-void unsinglestep(lua_State * L);
-void untraceunaligned(lua_State * L);
-void unverbosetrace(lua_State * L);
-void verbosetrace(lua_State * L);
-void xfree(lua_State * L);
+static int getsize(lua_State * L);
+static int newarray(lua_State * L);
+static int print_functions(lua_State * L);
+static int print_libs(lua_State * L);
+static int print_objects(lua_State * L);
+static int print_phdrs(void);
+static int print_shdrs(void);
+static int entrypoints(lua_State * L);
+static int print_symbols(lua_State * L);
+static int print_version(void);
+static int setarray(lua_State * L);
+static int usage(char *name);
+static void set_align_flag(void);
+static void set_branch_flag(void);
+static void set_trace_flag(void);
+static void singlebranch(lua_State * L);
+static void singlestep(lua_State * L);
+static void traceunaligned(lua_State * L);
+static void unset_align_flag(void);
+static void unset_branch_flag(void);
+static void unset_trace_flag(void);
+static void unsinglebranch(lua_State * L);
+static void unsinglestep(lua_State * L);
+static void untraceunaligned(lua_State * L);
+static void unverbosetrace(lua_State * L);
+static void verbosetrace(lua_State * L);
+static void xfree(lua_State * L);
 
-void systrace(lua_State * L);
-void rtrace(lua_State * L);
-void unsystrace(lua_State * L);
-void unrtrace(lua_State * L);
+static void systrace(lua_State * L);
+static void rtrace(lua_State * L);
+static void unsystrace(lua_State * L);
+static void unrtrace(lua_State * L);
 
 
-int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
-void segment_add(unsigned long int addr, unsigned long int size, char *perms, char *fname, char *ptype, int flags);
+static int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
+static void segment_add(unsigned long int addr, unsigned long int size, char *perms, char *fname, char *ptype, int flags);
 
-int alloccharbuf(lua_State * L);
-int bfmap(lua_State * L);
-int breakpoint(lua_State * L);
-int execlib(lua_State * L);
-int getcharbuf(lua_State * L);
-int grep(lua_State * L);
-int grepptr(lua_State * L);
-int help(lua_State * L);
-int hollywood(lua_State * L);
-int info(lua_State * L);
-int libcall(lua_State * L);
-int loadbin(lua_State * L);
-int man(lua_State * L);
-int map(lua_State * L);
-int phdrs(lua_State * L);
-int priv_memcpy(lua_State * L);
-int priv_strcat(lua_State * L);
-int priv_strcpy(lua_State * L);
-int rdnum(lua_State * L);
-int rdstr(lua_State * L);
-int setcharbuf(lua_State * L);
-int shdrs(lua_State * L);
-int verbose(lua_State * L);
-int xalloc(lua_State * L);
-int ralloc(lua_State * L);
+static int alloccharbuf(lua_State * L);
+static int bfmap(lua_State * L);
+static int teletype(lua_State * L);
+static int breakpoint(lua_State * L);
+static int execlib(lua_State * L);
+static int getcharbuf(lua_State * L);
+static int grep(lua_State * L);
+static int grepptr(lua_State * L);
+static int help(lua_State * L);
+static int hollywood(lua_State * L);
+static int info(lua_State * L);
+static int libcall(lua_State * L);
+static int loadbin(lua_State * L);
+static int man(lua_State * L);
+static int map(lua_State * L);
+static int phdrs(lua_State * L);
+static int priv_memcpy(lua_State * L);
+static int priv_strcat(lua_State * L);
+static int priv_strcpy(lua_State * L);
+static int rdnum(lua_State * L);
+static int rdstr(lua_State * L);
+static int setcharbuf(lua_State * L);
+static int shdrs(lua_State * L);
+static int verbose(lua_State * L);
+static int xalloc(lua_State * L);
+static int ralloc(lua_State * L);
 
-int headers(lua_State * L);
-int prototypes(lua_State * L);
-int bsspolute(lua_State * L);
+static int headers(lua_State * L);
+static int prototypes(lua_State * L);
+static int bsspolute(lua_State * L);
 
-unsigned int ltrace(void);
-int procmap_lua(void);
-void rescan(void);
-void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len);
-int disable_aslr(void);
-int enable_aslr(void);
-void script(char *path);
+static unsigned int ltrace(void);
+static int procmap_lua(void);
+static void rescan(void);
+static void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len);
+static int disable_aslr(void);
+static int enable_aslr(void);
+static int run_script(char *name);
 
-int enable_core(lua_State * L);
-int disable_core(lua_State * L);
-int gencore(lua_State * L);
+static int enable_core(lua_State * L);
+static int disable_core(lua_State * L);
+static int gencore(lua_State * L);
 
-char *signaltoname(int signal);
-char *sicode_strerror(int signal, siginfo_t * s);
+static char *signaltoname(int signal);
+static char *sicode_strerror(int signal, siginfo_t * s);
 
 /*
 int memmap (lua_State *L);
@@ -433,12 +437,12 @@ int setmemmap(lua_State * L);
 int memmapsize(lua_State * L);
 */
 
-int rawmemread  (lua_State *L);
-int rawmemwrite (lua_State *L);
-int rawmemstr   (lua_State *L);
-int rawmemusage (lua_State *L);
-int rawmemaddr  (lua_State *L);
-int rawmemstrlen(lua_State *L);
+static int rawmemread  (lua_State *L);
+static int rawmemwrite (lua_State *L);
+static int rawmemstr   (lua_State *L);
+static int rawmemusage (lua_State *L);
+static int rawmemaddr  (lua_State *L);
+static int rawmemstrlen(lua_State *L);
 
 /**
 * Internal representation of an ELF
@@ -547,7 +551,7 @@ typedef struct symbols_t {
 } symbols_t;
 
 typedef struct eps_t {
-	unsigned long int addr;
+	unsigned long long int addr;
 	char *name;
 
 	struct eps_t *prev;	// utlist.h
@@ -562,18 +566,22 @@ typedef struct wsh_t {
 
 	// State
 	lua_State *L;
-	FILE *scriptfile;
-	char *scriptname;
+	char *luabuff;
+	unsigned int luabuffsz;
 
+	char *selflib;
 	char *learnlog;
 	FILE *learnfile;
 
-	unsigned int opt_verbose;
-	unsigned int opt_hollywood;	// Default = 1;
-	unsigned int mainhandle;
-	unsigned int opt_rescan;
+	unsigned long long int mainhandle;	// This is really a struct link_map *
 
+	unsigned int opt_verbose;
+	unsigned int opt_quiet;
+	unsigned int opt_hollywood;	// Default = 1;
+
+	unsigned int opt_rescan;
 	unsigned int opt_verbosetrace;	// Display verbose trace
+	unsigned int opt_appear;	// Display ourselves or hide ourselves ?
 
 	unsigned int firsterrno;
 	unsigned int firstsicode;
@@ -636,11 +644,30 @@ typedef struct wsh_t {
 
 } wsh_t;
 
+/**
+* The next structure define
+* how prototypes are learned
+* by analysing runtime experiences
+*/
 typedef struct tuple_t{
 	void *addr;
 	char *name;
 } tuple_t;
 
+typedef struct learn_key_t{
+
+	char ttype[10];
+	char tlib[200];
+	char tfunction[200];
+	char targ[20];
+	char tvalue[200];
+}learn_key_t;
+
+typedef struct learn_t{
+	learn_key_t key;
+	char toffset[20];
+	UT_hash_handle hh;
+} learn_t;
 
 int wsh_init(void);
 int wsh_getopt(wsh_t * wsh1, int argc, char **argv);

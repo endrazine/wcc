@@ -31,6 +31,7 @@
 
 #include <libwitch/wsh.h>
 #include <libwitch/wsh_functions.h>
+#include <libwitch/wsh_help.h>
 #include <libwitch/sigs.h>
 #include <uthash.h>
 
@@ -65,6 +66,7 @@
 #define ELFMACHINE  EM_X86_64
 #define CS_MODE     CS_MODE_64
 #define RELOC_MODE  RELOC_X86_64
+#define EXTRA_VDSO  "linux-vdso.so.1"
 #else           // Generic 32b
 #define Elf_Ehdr    Elf32_Ehdr
 #define Elf_Shdr    Elf32_Shdr
@@ -87,7 +89,10 @@
 #define ELFMACHINE  EM_386
 #define CS_MODE     CS_MODE_32
 #define RELOC_MODE  RELOC_X86_32
+#define EXTRA_VDSO  "linux-gate.so.1"
 #endif
+
+learn_t *protorecords = NULL;
 
 /**
 * Main wsh context
@@ -161,29 +166,10 @@ void fatal_error(lua_State * L, char *msg)
 }
 
 /**
-* Run a script
-*/
-void script(char *path)
-{
-	if (wsh->opt_verbose) {
-		printf(" -- Running lua script %s\n", path);
-	}
-
-	if (luaL_loadfile(wsh->L, path)) {
-		fatal_error(wsh->L, "luaL_loadfile() failed");	/* Error out if file can't be read */
-	}
-
-	if (lua_pcall(wsh->L, 0, 0, 0)) {
-		fatal_error(wsh->L, "lua_pcall() failed");
-	}
-}
-
-/**
 * Simple hexdump routine
 */
 void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len)
 {
-
 	size_t i, j;
 
 	for (j = 0; j < size; j += 16) {
@@ -232,7 +218,6 @@ void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len)
 			else
 				putchar(' ');
 		}
-
 		putchar('\n');
 	}
 }
@@ -242,7 +227,6 @@ void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len)
 */
 static unsigned long int resolve_addr(char *symbol, char *libname)
 {
-
 	unsigned long int ret = 0;
 	struct link_map *handle;
 	Dl_info dli;
@@ -278,7 +262,6 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 */
 char *symbol_tobind(int n)
 {
-
 	switch (n) {
 	case 0:
 		return "Local";
@@ -302,7 +285,6 @@ char *symbol_tobind(int n)
 */
 char *symbol_totype(int n)
 {
-
 	switch (n) {
 	case 0:
 		return "Notype";
@@ -337,13 +319,13 @@ unsigned int ltrace(void)
 */
 int scan_symbol(char *symbol, char *libname)
 {
-	unsigned long int ret = 0;
-	int retv = 0;
 	struct link_map *handle;
 	Dl_info dli;
 	Elf_Sym *s;
-	unsigned int stype, sbind, i;
 	char *htype = 0, *hbind = 0;
+	unsigned long int ret = 0;
+	unsigned int stype, sbind;
+	int retv = 0;
 
 	handle = dlopen(libname, BIND_FLAGS);
 	if (!handle) {
@@ -355,7 +337,7 @@ int scan_symbol(char *symbol, char *libname)
 
 	ret = (unsigned long int) dlsym(handle, symbol);
 
-	if (dladdr1(ret, &dli, (void **) &s, RTLD_DL_SYMENT)) {
+	if ((dladdr1((void*)ret, &dli, (void **) &s, RTLD_DL_SYMENT))&&(s)) {
 
 		stype = ELF_ST_TYPE(s->st_info);
 		htype = symbol_totype(stype);
@@ -380,8 +362,8 @@ void completion(const char *buf, linenoiseCompletions * lc)
 	* We want to add the next word uppon 'tab' completion,
 	* exposing all the internally available keywords dynamically
 	*/
-	unsigned int n, i;
 	char *opt, *word = 0;
+	unsigned int n, i;
 	unsigned int p, w = 0;
 
 	n = strlen(buf);
@@ -486,55 +468,6 @@ int enable_aslr(void)
 	return 0;
 }
 
-typedef struct help_t{
-	char *name;
-	char *proto;
-	char *descr;
-	char *protoprefix;
-	char *retval;
-}help_t;
-
-help_t cmdhelp[] ={
-//	{"help", "[topic]","Display general help."},
-	{"quit", "", "Exit wsh.", "", "Does not return : exit wsh\n"},
-	{"exit", "", "Exit wsh.", "", "Does not return : exit wsh\n"},
-	{"shell", "[command]", "Run a /bin/sh shell.", "", "None. Returns uppon shell termination."},
-	{"exec", "<command>", "Run <command> via the system() library call.", "", "None. Returns uppon <command> termination."},
-	{"clear", "", "Clear terminal.", "", "None."},
-};
-
-help_t fcnhelp[] ={
-	{"help", "[topic]","Display help on [topic]. If [topic] is ommitted, display general help.", "", "None"},
-	{"man", "[page]", "Display system manual page for [page].", "", "None"},
-	{"hexdump", "<address>, <num>", "Display <num> bytes from memory <address> in enhanced hexadecimal form.", "", "None"},
-	{"hex", "<object>", "Display lua <object> in enhanced hexadecimal form.", "", "None"},
-	{"phdrs", "", "Display ELF program headers from all binaries loaded in address space.", "", "None"},
-	{"shdrs", "", "Display ELF section headers from all binaries loaded in address space.", "", "None"},
-	{"map", "", "Display a table of all the memory ranges mapped in memory in the address space.", "", "None"},
-	{"procmap", "", "Display a table of all the memory ranges mapped in memory in the address space as displayed in /proc/<pid>/maps.", "", "None"},
-	{"bfmap", "", "Bruteforce valid mapped memory ranges in address space.", "", "None"},
-	{"symbols", "[sympattern], [libpattern], [mode]", "Display all the symbols in memory matching [sympattern], from library [libpattern]. If [mode] is set to 1 or 2, do not wait user input between pagers. [mode] = 2 provides a shorter output.", "", "None"},
-	{"functions","[sympattern], [libpattern], [mode]", "Display all the functions in memory matching [sympattern], from library [libpattern]. If [mode] is set to 1 or 2, do not wait user input between pagers. [mode] = 2 provides a shorter output.", "table func = ", "Return 1 lua table _func_ whose keys are valid function names in address space, and values are pointers to them in memory."},
-	{"objects","[pattern]", "Display all the functions in memory matching [sympattern]", "", "None"},
-	{"info", "[address] | [name]", "Display various informations about the [address] or [name] provided : if it is mapped, and if so from which library and in which section if available.", "", "None"},
-	{"search", "<pattern>", "Search all object names matching <pattern> in address space.", "", "None"},
-	{"headers", "", "Display C headers suitable for linking against the API loaded in address space.", "", "None"},
-	{"grep", "<pattern>, [patternlen], [dumplen], [before]","Search <pattern> in all ELF sections in memory. Match [patternlen] bytes, then display [dumplen] bytes, optionally including [before] bytes before the match. Results are displayed in enhanced decimal form", "table match = ", "Returns 1 lua table containing matching memory addresses."},
-	{"grepptr", "<pattern>, [patternlen], [dumplen], [before]","Search pointer <pattern> in all ELF sections in memory. Match [patternlen] bytes, then display [dumplen] bytes, optionally including [before] bytes before the match. Results are displayed in enhanced decimal form", "table match = ", "Returns 1 lua table containing matching memory addresses."},
-	{"loadbin","<pathname>","Load binary to memory from <pathname>.", "", "None"},
-	{"libs", "", "Display all libraries loaded in address space.", "table libraries = ", "Returns 1 value: a lua table _libraries_ whose values contain valid binary names (executable/libraries) mapped in memory."},
-	{"entrypoints", "", "Display entry points for each binary loaded in address space.", "", "None"},
-	{"rescan", "", "Re-perform address space scan.", "", "None"},
-	{"libcall", "<function>, [arg1], [arg2], ... arg[6]", "Call binary <function> with provided arguments.", "void *ret, table ctx = ", "Returns 2 return values: _ret_ is the return value of the binary function (nill if none), _ctx_ a lua table representing the execution context of the library call.\n"},
-	{"enableaslr", "", "Enable Address Space Layout Randomization (requires root privileges).", "", "None"},
-	{"disableaslr", "", "Disable Address Space Layout Randomization (requires root privileges).", "", "None"},
-	{"verbose", "<verbosity>", "Change verbosity setting to <verbosity>.", "", "None"},
-	{"breakpoint", "<address>, [weight]", "Set a breakpoint at memory <address>. Optionally add a <weight> to breakpoint score if hit.", "", "None"},
-	{"bp", "<address>, [weight]", "Set a breakpoint at memory <address>. Optionally add a <weight> to breakpoint score if hit. Alias for breakpoint() function.", "", "None"},
-	{"hollywood", "<level>", "Change hollywood (fun) display setting to <level>, impacting color display (enable/disable).", "", "None"},
-};
-
-
 /**
 * Display detailed help
 */
@@ -573,7 +506,7 @@ int detailed_help(char *name)
 */
 int help(lua_State * L)
 {
-	void *arg;
+	const char *arg;
 	if (lua_isstring(L, 1)) {
 		arg = luaL_checkstring(L, 1);
 		detailed_help((char *) arg);
@@ -601,10 +534,10 @@ int help(lua_State * L)
 */
 char *decode_flags(unsigned int flags)
 {
+	char message[20];
 	unsigned int pf_x = (flags & 0x1);
 	unsigned int pf_w = (flags & 0x2);
 	unsigned int pf_r = (flags & 0x4);
-	char message[20];
 
 	memset(message, 0x00, 20);
 	if (pf_r){
@@ -671,7 +604,7 @@ char *decode_type(unsigned int type)
 	default:
 		;
 		char *ret = calloc(1, 200);
-		snprintf(ret, 199, "Unknown: %llx\n", type);
+		snprintf(ret, 199, "Unknown: 0x%x\n", type);
 		return ret;	// leak
 		break;
 	}
@@ -682,11 +615,11 @@ char *decode_type(unsigned int type)
 */
 int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 {
-	int j;
+	char *pflags = 0, *ptype = 0;
+	const char *fname = 0;
 	Elf_Phdr *p;
-	char *pflags = 0;
-	char *ptype = 0;
-	char *fname = 0;
+	int j;
+
 	for (j = 0; j < info->dlpi_phnum; j++) {
 		p = (Elf_Phdr *) &info->dlpi_phdr[j];
 
@@ -707,7 +640,6 @@ int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 
 		// Save segment
 		segment_add(info->dlpi_addr + p->p_vaddr, p->p_memsz, pflags, fname, ptype, p->p_flags);
-
 	}
 
 	return 0;
@@ -721,7 +653,7 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 	symbols_t *si, *stmp, *res = 0;
 
 	s = calloc(1, sizeof(symbols_t));
-	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return; }
+	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return -1; }
 	s->addr = addr;
 	s->symbol = strdup(symbol);
 	s->size = size;
@@ -732,7 +664,6 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 
 	// search this element in linked list
 	DL_FOREACH_SAFE(wsh->symbols, si, stmp) {
-//		if((si->addr <= addr)&&(si->addr + si->size >= addr)){
 		// same symbol name
 		if((!strncmp(si->symbol,s->symbol,strlen(si->symbol)))&&(strlen(si->symbol) == strlen(s->symbol))){
 			res = si;
@@ -780,13 +711,12 @@ void segment_add(unsigned long int addr, unsigned long int size, char *perms, ch
 	s->type = strdup(ptype);
 
 	DL_APPEND(wsh->phdrs, s);
-
 }
 
 /**
 * Add an entry point to linked list
 */
-void entry_point_add(unsigned long int addr, char *fname){
+void entry_point_add(unsigned long long int addr, char *fname){
 
 	eps_t *s;
 
@@ -814,7 +744,6 @@ void scan_section(Elf_Shdr * shdr, char *strTab, int shnum, char *fname, unsigne
 	}
 }
 
-
 /**
 * Parse all sections from an ELF
 */
@@ -829,8 +758,8 @@ int scan_sections(char *fname, unsigned long int baseaddr)
 	fd = open(fname, O_RDONLY);
 	data = mmap(NULL, lseek(fd, 0, SEEK_END), PROT_READ, MAP_SHARED, fd, 0);
 	elf = (Elf_Ehdr *) data;
+	if(elf == -1){ return -1; }
 
-//	printf("Entry: %llx\t%s\n", elf->e_entry + baseaddr, fname);
 	entry_point_add(elf->e_entry + baseaddr, fname);
 
 	shdr = (Elf_Shdr *) (data + elf->e_shoff);
@@ -849,8 +778,7 @@ int shdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 		return 0;
 	}
 
-	scan_sections(info->dlpi_name, info->dlpi_addr);
-	return 0;
+	return scan_sections(info->dlpi_name, info->dlpi_addr);
 }
 
 /**
@@ -859,7 +787,6 @@ int shdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 int phdrs(lua_State * L)
 {
 	print_phdrs();
-
 	return 0;
 }
 
@@ -874,7 +801,6 @@ sections_t *section_from_addr(unsigned long int addr){
 			res = s;
 		}
 	}
-
 	return res;
 }
 
@@ -889,7 +815,6 @@ segments_t *segment_from_addr(unsigned long int addr){
 			res = s;
 		}
 	}
-
 	return res;
 }
 
@@ -904,7 +829,6 @@ sections_t *symbol_from_addr(unsigned long int addr){
 			res = s;
 		}
 	}
-
 	return res;
 }
 
@@ -912,16 +836,14 @@ sections_t *symbol_from_addr(unsigned long int addr){
 * Return a symbol from its name
 */
 sections_t *symbol_from_name(char *fname){
-	symbols_t *s, *stmp, *res = 0;
+	symbols_t *s, *stmp;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
 		if(!strncmp(fname,s->symbol,strlen(fname))){
-//			res = s;
 			return s;
 		}
 	}
-
-	return res;
+	return NULL;
 }
 
 
@@ -953,7 +875,6 @@ int headers(lua_State * L)
 			}
 		}
 	}
-
 
 	/**
 	* generate forward prototypes for imported functions
@@ -1211,7 +1132,7 @@ int print_functions(lua_State * L){
 
 					if(returnall < 2){
 
-						printf("%s ", s->libname);
+						printf("%s ", strlen(s->libname) ? s->libname : wsh->selflib);
 						for (i = strlen(s->libname); i < 40; i++)
 							printf(" ");
 						printf("%s ", s->symbol);
@@ -1225,7 +1146,6 @@ int print_functions(lua_State * L){
 
 					/* Add function to Lua table */
 					lua_pushstring(L, s->symbol);		/* push key */
-	//			        lua_pushcfunction(L, s->addr);		/* push value */
 					lua_getglobal(L, s->symbol);		/* get pointer to global with this name : keep it as value on top of stack */
 					lua_settable(L, -3);
 
@@ -1277,9 +1197,11 @@ int print_objects(lua_State * L){
 		if((!libname)||(strstr(s->libname, libname))){
 
 			if(!strncmp(s->htype,"Object",6)){
+				char *sname = 0;
+				sname = strlen(s->libname) ? s->libname : wsh->selflib;
 				scount++;
-				printf("%s ", s->libname);
-				for (i = strlen(s->libname); i < 40; i++)
+				printf("%s ", sname);
+				for (i = strlen(sname); i < 40; i++)
 					printf(" ");
 				printf("%s ", s->symbol);
 				for (i = strlen(s->symbol); i < 30; i++)
@@ -1291,7 +1213,6 @@ int print_objects(lua_State * L){
 
 				pcnt++;
 				if(pcnt == LINES_MAX){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
-
 			}
 		}
 	}
@@ -1307,7 +1228,7 @@ int print_objects(lua_State * L){
 */
 int print_libs(lua_State * L){
 
-	char *lastlib = "";
+	char *lastlib = "none";
 	sections_t *s, *stmp;
 	unsigned int scount = 0;
 
@@ -1329,6 +1250,29 @@ int print_libs(lua_State * L){
 			lastlib = s->libname;
 	}
 
+	/**
+	* Define vdso
+	*/
+	printf("%s\n", EXTRA_VDSO);
+	scount++;
+	// Add function to Lua table //
+	lua_pushnumber(L, scount);
+	lua_pushstring(L, EXTRA_VDSO);
+	lua_settable(L, -3);
+
+	/* add self and vdso as shared library */
+/*	if(wsh->opt_appear){
+		// self
+		scount++;
+		printf("%s\n",wsh->selflib);
+
+		// Add function to Lua table //
+		lua_pushnumber(L, scount);
+	        lua_pushstring(L, wsh->selflib);
+	        lua_settable(L, -3);
+
+	}
+*/
 	printf("\n");
 	printf(" -- Total: %u libraries\n", scount);	
 
@@ -1419,6 +1363,7 @@ int print_eps(void){
 	DL_FOREACH_SAFE(wsh->eps, s, stmp) {
 		printf("%012llx\t%s\n", s->addr, s->name);
 	}
+	return 0;
 }
 
 /**
@@ -1456,7 +1401,7 @@ int reload_elfs(void){
 /**
 * Display section headers (ELF Sections)
 */
-int shdrs(lua_State * L)
+static int shdrs(lua_State * L)
 {
 	print_shdrs();
 	return 0;
@@ -1495,14 +1440,14 @@ int man(lua_State * L)
 int info(lua_State * L)
 {
 	void *symbol = 0;
-	unsigned long int ret = 0;
+	unsigned long long int ret = 0;
 	Dl_info dli;
 	char *error = 0;
 	Elf_Sym *s = 0;
 	unsigned int stype, sbind, i;
 	char *htype = 0, *hbind = 0;
 
-	unsigned long int n = lua_tonumber(L, 1);
+	unsigned long long int n = lua_tonumber(L, 1);
 
 	if(msync(n & ~0xfff, 4096, 0) == 0){	// if read as a number, destination address is mapped
 
@@ -1684,7 +1629,7 @@ int luaopen_array(lua_State * L)
 */
 
 /**
-* Run minimal LUA shell
+* Run minimal lua shell
 */
 int run_shell(lua_State * L)
 {
@@ -1693,13 +1638,15 @@ int run_shell(lua_State * L)
 
 	if (wsh->is_stdinscript) {	// Execute from stdin. don't display promt, read line by line
 		for (;;) {
-			if (fgets(shell_prompt, sizeof(shell_prompt), stdin) == 0 || strcmp(shell_prompt, "cont\n") == 0)
+			if (fgets(shell_prompt, sizeof(shell_prompt), stdin) == 0 || strcmp(shell_prompt, "cont\n") == 0){
 				return 0;
+			}
+
 			if (luaL_loadbuffer(wsh->L, shell_prompt, strlen(shell_prompt), "=(shell)") || lua_pcall(L, 0, 0, 0)) {
 				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
 				lua_pop(L, 1);	// pop error message from the stack 
 			}
-			lua_settop(L, 0);	// remove eventual returns 
+			lua_settop(L, 0);	// remove eventual return values
 		}
 	} else {
 		/**
@@ -1785,7 +1732,7 @@ int run_shell(lua_State * L)
 				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
 				lua_pop(L, 1);	// pop error message from the stack 
 			}
-			lua_settop(L, 0);	// remove eventual returns 
+			lua_settop(L, 0);	// remove eventual return values
 
 			free(input);
 		}
@@ -1804,6 +1751,7 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 	long int offset = 0;
 	unsigned int i, j;
 	unsigned int argn = 0;
+	symbols_t *s = 0;
 
 	if(!reason) { return 0; }		// No error
 	if(!faultaddr) { return 0; }		// No Address
@@ -1843,7 +1791,7 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 	if(arg[argn] == 0xffffffff){ return 0; }
 	if(arg[argn] == 0x7fffffff){ return 0; }
 
-	symbols_t *s = symbol_from_addr(arg[0]);
+	s = symbol_from_addr(arg[0]);
 
 //	printf("LEARN: %s argument%u (%s at %p base:%p offset:%ld)\n", tag, argn, vreason, faultaddr, arg[argn], offset);
 
@@ -1854,26 +1802,8 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 	fprintf(wsh->learnfile, "TAG %s %s argument%u %s %d\n", s->libname, s->symbol, argn, tag, offset);
 	fflush(wsh->learnfile);
 
-//if(offset){ alarm(0); getchar(); }
 	return 0;
 }
-
-typedef struct learn_key_t{
-
-	char ttype[10];
-	char tlib[200];
-	char tfunction[200];
-	char targ[20];
-	char tvalue[200];
-}learn_key_t;
-
-typedef struct learn_t{
-	learn_key_t key;
-	char toffset[20];
-	UT_hash_handle hh;
-} learn_t;
-
-learn_t *protorecords = NULL;
 
 int sort_learnt(learn_t *a, learn_t *b){
 	return memcmp(&a->key, &b->key, sizeof(learn_key_t));
@@ -2084,13 +2014,13 @@ void print_syscall(pid_t child, int syscall_req) {
 * Main wrapper around a library call.
 * This function returns 9 values: ret (returned by library call), errno, firstsignal, total number of signals, firstsicode, firsterrno, faultaddr, reason, context
 */
-int libcall(lua_State * L)
+static int libcall(lua_State * L)
 {
 	unsigned long int *arg[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	unsigned int i = 0;
 	void *(*f) () = 0;
 	void *ret = 0;
-
+	int callerrno = 0;
 	int argnum = 0;
 
 	alarm(3);
@@ -2229,11 +2159,12 @@ do_tracee:
 		printf("Execution hash: u:%016llx\n", wsh->sigbus_hash);
 	}
 
+	callerrno = errno;
 
 	/**
 	* Analyse return value
 	*/
-	n = is_mapped(ret);
+	n = !msync((long int)ret & (long int)~0xfff, 4096, 0);
 	notascii = 0;
 	if (n) {
 		//      printf("mapped: %p (len:%u)\n", ret, n);
@@ -2257,10 +2188,9 @@ do_tracee:
 		lua_pushinteger(L, ret);	// Push as a number
 	}
 
-	if (errno) {
-		fprintf(stderr, "ERROR: (%u)	%s\n", errno, strerror(errno));
+	if (callerrno) {
+		fprintf(stderr, "ERROR: %s (%u)\n", strerror(callerrno), callerrno);
 	}
-
 
 	/**
 	* Learn prototypes
@@ -2281,14 +2211,14 @@ do_tracee:
 	* Push errno to lua table
 	*/
 	lua_pushstring(L, "errno");		/* push key */
-	lua_pushinteger(L, errno);
+	lua_pushinteger(L, callerrno);
         lua_settable(L, -3);
 
 	/**
 	* Push strerror(errno) to lua table
 	*/
 	lua_pushstring(L, "errnostr");		/* push key */
-	lua_pushstring(L, strerror(errno));		/* push key */
+	lua_pushstring(L, strerror(callerrno));		/* push key */
         lua_settable(L, -3);
 
 	/**
@@ -2496,12 +2426,45 @@ do_tracee:
 
 	lua_getglobal(L, "storerun");
 	lua_pushvalue(L,-2);
-	lua_pcall(L, 1, 1, 0);
+	if(lua_pcall(L, 1, 1, 0)){
+		if(wsh->opt_verbose){
+			printf("ERROR: calling function storerun() in libcall() %s\n", lua_tostring(L, -1));
+		}
+	}
 	lua_pop(L,1);
 
 	alarm(0);
 
 	return 2;
+}
+
+/**
+* Append a command to internal lua buffer
+*/
+int luabuff_append(char *cmd){
+	/**
+	* Allocate wsh->luabuff if it hasn't been initialized
+	*/
+	if(!wsh->luabuff){
+		wsh->luabuff = calloc(1, 4096);
+		wsh->luabuffsz = 4096;
+	}
+
+	/**
+	* Extend wsh->luabuff by one page if necessary
+	*/
+	if(strlen(wsh->luabuff) + strlen(cmd) >= wsh->luabuffsz){
+		wsh->luabuff = realloc(wsh->luabuff, wsh->luabuffsz + 4096);
+		wsh->luabuffsz += 4096;
+	}
+
+	/**
+	* Append buffer
+	*/
+	strcat(wsh->luabuff, cmd);
+
+//printf("Appending %s\n", cmd);
+	return 0;
 }
 
 void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
@@ -2511,14 +2474,14 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 	unsigned long int address = 0;
 	char *demangled = 0, *symname = 0;
 	unsigned int func = 0;
-
 	unsigned int j;
 	unsigned skip_bl;
+	char newname[1024];
 
 	/**
 	* Walk symbol table
 	*/
-	while (sym) {
+	while ((sym)&&(!msync((long unsigned int)sym &~0xfff,4096,0))) {
 		func = 0;
 		if (sym->st_name >= sz) {
 			break;
@@ -2526,7 +2489,9 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 		cnt++;
 		symname = dynstr + sym->st_name;
 
-		// Extract type
+		/**
+		* Extract Symbol type
+		*/
 		switch (ELF_ST_TYPE(sym->st_info)) {
 		case STT_FUNC:
 			htype = "Function";
@@ -2550,15 +2515,19 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 			break;
 		}
 
-		// Resolve address
+		/**
+		* Resolve address
+		*/
 		if (symname) {
 			address = resolve_addr(symname, libname);
 		} else {
 			address = (unsigned long int) -1;
 		}
 
-		// Demangle symbol if possible
-		demangled = cplus_demangle(symname, DMGL_PARAMS);
+		/**
+		* Demangle symbol if possible
+		*/
+		demangled = cplus_demangle(symname, DMGL_ANSI/*DMGL_PARAMS*/);
 
 		// Skip if symbol has no name or no type
 		if (strlen(symname) && (htype) && (address != (unsigned long int) -1) && (address)) {
@@ -2587,23 +2556,40 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 				printf(" * blacklisted function name: %s\n", symname);
 #endif
 			} else if (func) {
-				// Make C function available from lua
-				char newname[1024];
-
+				/*
+				* Make C function available from lua
+				*/
 				memset(newname, 0x00, 1024);
 				snprintf(newname, 1023, "reflect_%s", symname);
 				lua_pushcfunction(wsh->L, (void *) address);
 				lua_setglobal(wsh->L, newname);
 
 
-				// Create a wrapper function with the original name
-				fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n",
-					symname, newname);
+				/**
+				* Create a wrapper function with the original name
+				*/
+				char *luacmd = calloc(1, 1024);
+				snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", symname, newname);
+				luabuff_append(luacmd);
+				free(luacmd);
+				// Add function/object to linked list
+				scan_symbol(symname, libname);
 
 				/**
-				* Add function/object to linked list
+				* Handle demangled symbols
 				*/
-				scan_symbol(symname, libname);
+/*
+				if(demangled){
+					printf(" -- demangled: %s\n", demangled);
+					luacmd = calloc(1, 1024);
+					snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
+					luabuff_append(luacmd);
+					free(luacmd);
+					// Add function/object to linked list
+					scan_symbol(demangled, libname);
+
+				}
+*/
 
 			} else {
 				/**
@@ -2721,31 +2707,82 @@ void parse_dyn(struct link_map *map)
 }
 
 
-void parse_link_map_dyn(struct link_map *map)
+int parse_link_map_dyn(struct link_map *map)
 {
 	if (!map) {
-		fprintf(stderr, "ERROR: No binary to execute\n");
-		_Exit(EXIT_FAILURE);
+		if(!wsh->opt_quiet){
+			fprintf(stderr, "WARNING: No binary loaded in memory. Try loadbin(). For help type help(\"loadbin\").\n");
+		}
+		return -1;
 	}
+
 	// go to first in linked list...
 	while ((map) && (map->l_prev)) {
 		map = map->l_prev;
 	}
 
 	// skip first entries in an attempt to not display the libs we load for ourselves...
-	if (map->l_next) {
-		map = map->l_next;
-	}
-	if (map->l_next) {
-		map = map->l_next;
+
+	if(!wsh->opt_appear){
+		if (map->l_next) {	// Leave libdl.so apparent in verbose mode
+			map = map->l_next;
+		}
+		if (map->l_next) {	// expose ourselved
+			map = map->l_next;
+		}
+
 	}
 
 	while (map) {
 		parse_dyn(map);
 		map = map->l_next;
 	}
+
+	return 0;
 }
 
+/**
+* Execute internal lua buffer
+*/
+int exec_luabuff(void){
+	int err = 0;
+
+	if(wsh->luabuffsz == 0){ return 0; }
+
+	/**
+	* Load buffer in lua
+	*/
+	if ((err = luaL_loadbuffer(wsh->L, wsh->luabuff, strlen(wsh->luabuff), "=Wsh internal lua buffer")) != 0) {
+		printf("ERROR: Wsh internal lua initialization (%s)\n", lua_strerror(err), lua_tostring(wsh->L, -1));
+		fatal_error(wsh->L, "Wsh internal lua initialization failed");
+	}
+
+	/**
+	* Execute buffer
+	*/
+	if(lua_pcall(wsh->L, 0, 0, 0)){
+		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+	}
+
+	/**
+	* Release internal lua buffer
+	*/
+//	printf(" -- Executing internal buffer:\n%s\n",wsh->luabuff);
+
+	free(wsh->luabuff);
+	wsh->luabuff = 0;
+	wsh->luabuffsz = 0;
+
+	return 0;
+}
+
+void parse_link_vdso(void){
+	// add extra vdso
+	struct link_map *vdso = 0;
+	vdso = dlopen(EXTRA_VDSO, RTLD_NOW);
+	if(wsh->opt_verbose){ printf(" -- Adding extra (arch specific) vdso library: %s at %p\n", EXTRA_VDSO, vdso); }
+	parse_link_map_dyn(vdso);
+}
 /**
 * Rescan address space
 */
@@ -2756,7 +2793,9 @@ void rescan(void)
 	empty_symbols();
 	wsh->opt_rescan = 1;
 	parse_link_map_dyn(wsh->mainhandle);
+//	parse_link_vdso();
 	wsh->opt_rescan = 0;
+	exec_luabuff();
 }
 
 /**
@@ -3615,6 +3654,21 @@ int test_stdin(void)
 	return 0;
 }
 
+int wsh_appear(lua_State * L)
+{
+	wsh->opt_appear = 1;
+	rescan();
+	parse_link_vdso();
+	return 0;
+}
+
+int wsh_hide(lua_State * L)
+{
+	wsh->opt_appear = 0;
+	rescan();
+	return 0;
+}
+
 int verbose(lua_State * L)
 {
 	void *arg;
@@ -3711,14 +3765,14 @@ int map(lua_State * L)
 */
 int bsspolute(lua_State * L){
 	sections_t *s, *stmp;
-	char poison = 0;
+	char poison = 0xff;
 	unsigned int num = 0;
 	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
 		if((s->name)&&(!strncmp(s->name,".bss",4))){
 			num++;
 			if(num >= 4){
-				printf("[%02u] 0x%012llx-0x%012llx    %s:%s\t%02x\t%s:%u\t\t\n",num, s->addr, s->addr + s->size, s->name, s->perms, ++poison, s->libname, s->size);
-				memset(s->addr, poison, s->size);
+				printf("[%02u] 0x%012llx-0x%012llx    %s:%s\t%02x\t%s:%u\t\t\n",num, s->addr, s->addr + s->size, s->name, s->perms, poison, s->libname, s->size);
+				memset(s->addr, poison--, s->size);
 			}
 		}
 		s = s->next;
@@ -4056,6 +4110,11 @@ int loadbin(lua_State * L)
 	char *libname = 0;
 
 	read_arg1(libname);
+	if(!libname){
+		printf("ERROR: missing name of binary to load\n");
+		return 0;
+	}
+
 	do_loadlib(libname);
 	rescan();
 	
@@ -4227,7 +4286,7 @@ int breakpoint(lua_State * L)
 	/**
 	* Make sure destination address is mapped
 	*/
-	if ((!arg1) || (!is_mapped(arg1))) {
+	if ((!arg1) || (msync((long int)arg1 & (long int)~0xfff, 4096, 0))) {
 		fprintf(stderr, "ERROR: Address %p is not mapped\n", arg1);
 		return 0;
 	}
@@ -4293,40 +4352,33 @@ void declare_internals(void)
 
 	declare_num(wsh->bp_points, "bp_points");
 
-//	luaopen_array(wsh->L);
-
 	/**
 	* Create a wrapper functions for other internal functions
 	*/
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "hexdump", "lhexdump");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, string.len(a), c, d, e, f, g, h); return j, k; end\n", "hex", "lhexdump");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "execlib", "lexeclib");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "disasm", "ldisasm");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "deref", "lderef");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "strace", "lstrace");
-	fprintf(wsh->scriptfile, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "script", "lscript");
+	char *luacmd = calloc(1, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "hexdump", "lhexdump");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, string.len(a), c, d, e, f, g, h); return j, k; end\n", "hex", "lhexdump");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "execlib", "lexeclib");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "disasm", "ldisasm");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "deref", "lderef");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "strace", "lstrace");
+	luabuff_append(luacmd);
+	memset(luacmd, 0x00, 1024);
+	snprintf(luacmd, 1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", "script", "lscript");	
+	luabuff_append(luacmd);
+	free(luacmd);
 }
 
-
-struct link_map *loadlibrary(char *libname)
-{
-	struct link_map *handle;
-
-	handle = dlopen(libname, RTLD_NOW);
-	if (!handle) {
-		fprintf(stderr, "ERROR: %s\n", dlerror());
-		_Exit(EXIT_FAILURE);
-	}
-
-	if (wsh->opt_verbose) {
-		printf(" -- Base address: %p of %s\n", (void *) handle->l_addr, libname);
-	}
-
-	dlerror();		/* Clear any existing error */
-
-	wsh->mainhandle = handle;
-	return handle;
-}
 
 int set_alloc_opt(void){
 	setenv("LIBC_FATAL_STDERR_", "yes", 1);
@@ -4349,7 +4401,12 @@ int gencore(lua_State * L){
 * Disable core files generation
 */
 int disable_core(lua_State * L){
-	prctl(PR_SET_DUMPABLE, (long)0);
+	int err = 0;
+	errno = 0;
+	err = prctl(PR_SET_DUMPABLE, (long)0);
+	if(err){
+		printf("ERROR: prctl() %s\n", strerror(errno));
+	}
 	return 0;
 }
 
@@ -4357,7 +4414,12 @@ int disable_core(lua_State * L){
 * Enable core files generation
 */
 int enable_core(lua_State * L){
-	prctl(PR_SET_DUMPABLE, (long)1);
+	int err = 0;
+	errno = 0;
+	err = prctl(PR_SET_DUMPABLE, (long)1);
+	if(err){
+		printf("ERROR: prctl() %s\n", strerror(errno));
+	}
 	return 0;
 }
 
@@ -4373,12 +4435,11 @@ int wsh_init(void)
 
 	// create lua state
 	wsh->L = luaL_newstate();	/* Create Lua state variable */
-	luaL_openlibs(wsh->L);	/* Load Lua libraries */
 
-	// Prepare script
-	wsh->scriptname = calloc(1, 255);
-	snprintf(wsh->scriptname, 254, "/tmp/self.%u.lua", getpid());
-	wsh->scriptfile = fopen(wsh->scriptname, "w");
+	// make sure version of lua matches
+	luaL_checkversion(wsh->L);
+
+	luaL_openlibs(wsh->L);	/* Load Lua libraries */
 
 	// Declare internal functions
 	declare_internals();
@@ -4388,6 +4449,9 @@ int wsh_init(void)
 
 	// Set malloc options
 	set_alloc_opt();
+
+	// Set process name
+	prctl(PR_SET_NAME,"wsh",NULL,NULL,NULL);
 
 	return 0;
 }
@@ -4419,6 +4483,13 @@ int run_script(char *name)
 {
 	char myerror[200];
 	int err;
+
+	if(!name){ return -1;}
+
+	if(wsh->opt_verbose){
+		printf("  * Running lua script %s\n", name);
+	}
+
 	memset(myerror, 0x00, 200);
 	err = 0;
 	if ((err = luaL_loadfile(wsh->L, name) != 0)) {	/* Load but don't run the Lua script */
@@ -4427,15 +4498,13 @@ int run_script(char *name)
 		return -1;
 	}
 	if (wsh->opt_verbose) {
-		printf(" -- Running lua script %s\n", name);
+		printf("  * Running lua script %s\n", name);
 	}
 
 	memset(myerror, 0x00, 200);
-	err = 0;
 
-	if ((err = lua_pcall(wsh->L, 0, 0, 0) != 0)) {	/* Run the loaded Lua script */
-		snprintf(myerror, 199, "error %d : %s", err, lua_strerror(err));
-		fprintf(stderr, "lua_pcall() failed with %s, for: %s (%s)\n",lua_tostring(wsh->L, -1), name, errno ? strerror(errno) : myerror);	/* Error out if Lua file has an error */
+	if (lua_pcall(wsh->L, 0, 0, 0)) {	/* Run the loaded Lua script */
+		fprintf(stderr, "lua_pcall() failed with %s, for: %s\n",lua_tostring(wsh->L, -1), name);	/* Error out if Lua file has an error */
 		lua_pop(wsh->L, 1);	// pop error message from the stack 
 	}
 	lua_settop(wsh->L, 0);	// remove eventual returns 
@@ -4469,6 +4538,85 @@ unsigned int read_elf_sig(char *fname, struct stat *sb)
 	return strncmp(sig, validelf, 4) ? 0 : 1;
 }
 
+
+/**
+* Execute default internal scripts
+*/
+int exec_default_scripts(void){
+	int err = 0;
+
+	if ((err =luaL_loadfile(wsh->L, DEFAULT_SCRIPT_INDEX)) != 0) {
+		printf("ERROR: %s in script %s (%s)\n", lua_strerror(err), DEFAULT_SCRIPT_INDEX, lua_tostring(wsh->L, -1));
+		fatal_error(wsh->L, "luaL_loadfile() failed");
+	}
+	if(lua_pcall(wsh->L, 0, 0, 0)){
+		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+	}
+
+	return 0;
+}
+
+
+int load_home_user_file(char *fname){
+	char pathname[255];
+	struct stat sb;
+	int err = 0;
+
+	memset(pathname, 0x00, 255);
+
+	if(!getenv("HOME")){
+		printf("WARNING: HOME environment variable not set : skipping %s file", fname);
+		return -1;
+	}
+
+	snprintf(pathname, 254, "%s/%s", getenv("HOME"), fname);
+
+	if (stat(pathname, &sb) == -1) {
+		if(wsh->opt_verbose){
+			printf("WARNING: %s file not found\n", pathname);
+		}
+		errno = 0;
+		return -1;
+	}
+
+	if(wsh->opt_verbose){
+		printf("  * Running user startup script %s\n", pathname);
+	}
+
+	// load file from home user directory if present
+	err = 0;
+	if ((err = luaL_loadfile(wsh->L, pathname)) != 0) {
+		printf("WARNING: %s while running startup script %s (%s)\n", lua_strerror(err), pathname, lua_tostring(wsh->L, -1));
+	}
+
+	if(lua_pcall(wsh->L, 0, 0, 0)){
+		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+	}
+
+	return 0;
+}
+
+
+/**
+* Load .wsh_profile script if it exists
+* We search for it in the directory
+* corresponding to environment variable HOME
+*/
+int load_profile(void){
+	load_home_user_file(DEFAULT_WSH_PROFILE);
+	return 0;
+}
+
+/**
+* Load .wshrc script if it exists
+* We search for it in the directory
+* corresponding to environment variable HOME
+*/
+int load_wshrc(void){
+	load_home_user_file(DEFAULT_WSHRC);
+	return 0;
+}
+
 /**
 * Run a lua shell/script
 */
@@ -4476,31 +4624,39 @@ int wsh_run(void)
 {
 	struct script_t *s;
 	unsigned int scriptcount = 0;
+
 	DL_COUNT(wsh->scripts, s, scriptcount);
 
-	if (wsh->opt_verbose) {
-		printf(" -- running %u scripts\n", scriptcount);
-	}
-
 	read_maps(getpid());
-	parse_link_map_dyn(wsh->mainhandle);
+	parse_link_map_dyn((struct link_map *)wsh->mainhandle);
+	parse_link_vdso();
 
-	// run internal script
-	fclose(wsh->scriptfile);
-	if (luaL_loadfile(wsh->L, wsh->scriptname)) {
-//              fatal_error(wsh->L, "luaL_loadfile() failed");
-	}
-	lua_pcall(wsh->L, 0, 0, 0);
+	/**
+	* run internal lua buffers
+	*/
+	exec_luabuff();
 
-	// load default internal script
-	if (luaL_loadfile(wsh->L, DEFAULT_SCRIPT_INDEX)) {
-		fatal_error(wsh->L, "luaL_loadfile() failed");
+	if (wsh->opt_verbose) {
+		printf(" -- Running startup lua scripts\n");
 	}
-	lua_pcall(wsh->L, 0, 0, 0);
+
+	/**
+	* Execute default internal scripts
+	*/
+	exec_default_scripts();
+
+	/**
+	* load .wshrc if present
+	*/
+	load_wshrc();
 
 	/**
 	* Run all the scripts specified in the command line
 	*/
+	if (wsh->opt_verbose) {
+		printf(" -- %u user scripts in queue\n", scriptcount);
+	}
+
 	script_t *ss, *stmp;
 	DL_FOREACH_SAFE(wsh->scripts, ss, stmp) {
 		run_script(ss->name);
@@ -4578,13 +4734,18 @@ int add_binary_preload(char *name)
 /**
 * Do load a shared binary into the address space
 */
-int do_loadlib(char *libname)
+struct link_map *do_loadlib(char *libname)
 {
 	struct link_map *handle;
 	unsigned long int ret = 0;
 
+	if((!libname)||(!strlen(libname))){
+		printf("ERROR: missing name of binary to load\n");
+		return 0;
+	}
+
 	if (wsh->opt_verbose) {
-		printf("  * Preloading : %s\n", libname);
+		printf("  * Loading %s\n", libname);
 	}
 
 	handle = dlopen(libname, RTLD_NOW);
@@ -4594,7 +4755,8 @@ int do_loadlib(char *libname)
 	}
 
 	if (wsh->opt_verbose) {
-		printf(" -- Base address: %p of %s\n", (void *) handle->l_addr, libname);
+//		printf("  * Base address: %p for %s\n", (void *) handle->l_addr, libname);
+		printf("  * Base address: %p\n", (void *) handle->l_addr);
 	}
 
 	dlerror();		// Clear any existing load error
@@ -4628,7 +4790,7 @@ int wsh_loadlibs(void)
 */
 int wsh_getopt(wsh_t * wsh1, int argc, char **argv)
 {
-	const char *short_opt = "hxvV";
+	const char *short_opt = "hqvVx";
 	int count = 0;
 	struct stat sb;
 	int c, i;
@@ -4636,18 +4798,15 @@ int wsh_getopt(wsh_t * wsh1, int argc, char **argv)
 	struct option long_opt[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"args", no_argument, NULL, 'x'},
+		{"quiet", no_argument, NULL, 'q'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"version", no_argument, NULL, 'V'},
 		{NULL, 0, NULL, 0}
 	};
 
-
-	if(argc < 2){
-		printf("ERROR: not enough arguments !\nTry --help for help.\n");
-		_Exit(EXIT_FAILURE);
-	}
-
 	wsh->opt_hollywood = 1;	// Set sane default
+
+	wsh->selflib = realpath("/proc/self/exe", 0);
 
 	while ((c = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
 		count++;
@@ -4659,6 +4818,10 @@ int wsh_getopt(wsh_t * wsh1, int argc, char **argv)
 		case 'h':
 			wsh_usage(argv[0]);
 			_Exit(EXIT_SUCCESS);
+			break;
+
+		case 'q':
+			wsh->opt_quiet = 1;
 			break;
 
 		case 'v':
@@ -4687,6 +4850,10 @@ nomoreargs:
 		return 0;	// no file argument
 	}
 
+	if (wsh->opt_verbose) {
+		printf(" -- Parsing command line\n");
+	}
+
 	for (i = count + 1; i < argc; i++) {
 
 		if (!strncmp(argv[i], "-x", strlen(argv[i]))) {	// Is this an argument stopper ?
@@ -4696,12 +4863,12 @@ nomoreargs:
 		} else if (!stat(argv[i], &sb)) {	// file exists. Determine if this is a binary or a script
 			if (read_elf_sig(argv[i], &sb)) {
 				if (wsh->opt_verbose) {
-					printf(" * adding binary %s to queue\n", argv[i]);
+					printf("  * User binary %s\n", argv[i]);
 				}
 				add_binary_preload(argv[i]);
 			} else {
 				if (wsh->opt_verbose) {
-					printf(" * adding script %s to queue\n", argv[i]);
+					printf("  * User script %s\n", argv[i]);
 				}
 				add_script_exec(argv[i]);
 			}
@@ -4710,6 +4877,9 @@ nomoreargs:
 			break;
 		}
 	}
+
+	// Load user profile
+	load_profile();
 
 	return 0;
 }
@@ -4728,12 +4898,13 @@ int wsh_print_version(void)
 */
 int wsh_usage(char *name)
 {
-	printf("Usage: %s [script] [options] [binary1] [binary2] ... [-x] [script_arg1] [script_arg2] ...\n", name);
+	printf("Usage: %s [script] [-h|-q|-v|-V] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]\n", name);
 	printf("\n");
 	printf("Options:\n\n");
-	printf("    -x, --args                Optional script argument separator.\n");
-	printf("    -v, --verbose\n");
-	printf("    -V, --version\n");
+	printf("    -x, --args                Optional script argument separator\n");
+	printf("    -q, --quiet               Display less output\n");
+	printf("    -v, --verbose             Display more output\n");
+	printf("    -V, --version             Display version and build, then exit\n");
 	printf("\n");
 	printf("Script:\n\n");
 	printf("    If the first argument is an existing file which is not a known binary file format,\n");
@@ -4746,6 +4917,25 @@ int wsh_usage(char *name)
 	return 0;
 }
 
+
+int teletype(lua_State * L)
+{
+	char *str = 0;
+	unsigned int i = 0;
+
+	read_arg1(str);
+	printf("%s", GREEN);
+	fflush(stdout);
+	for(i = 0; i < strlen(str); i++){
+		printf("%c", str[i] & 0xff);
+		usleep(10000);
+		fflush(stdout);
+	}
+	printf("%s", NORMAL);
+	printf("\n");
+	fflush(stdout);
+	return 0;
+}
 
 
 /***** Mapping of buffers *****/
@@ -4849,4 +5039,10 @@ int rawmemstrlen(lua_State *L) {
 	lua_pushinteger(L, strlen(addr));
 	return 1;
 }
+
+__attribute__((constructor))
+static void initialize_wsh() {
+	//
+}
+
 

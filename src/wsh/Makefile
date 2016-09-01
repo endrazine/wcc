@@ -9,7 +9,7 @@
 
 CC := gcc
 
-CFLAGS := -masm=intel -rdynamic -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #--sanitize=address
+CFLAGS := -masm=intel -rdynamic -W -Wno-unused-function -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #--sanitize=address
 OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
 
 
