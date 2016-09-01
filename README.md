@@ -112,7 +112,7 @@ The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Wi
 
 #### Example usage of wsh
 The following command loads the /usr/sbin/apache2 executable within wsh, calls the ap_get_server_banner() function within
-apache to retreive its banner and displays it within the wsh intterpreter.
+apache to retreive its banner and displays it within the wsh interpreter.
 
 	jonathan@blackbox:~$ wsh /usr/sbin/apache2
 	> a = ap_get_server_banner()
