@@ -821,7 +821,7 @@ segments_t *segment_from_addr(unsigned long int addr){
 /**
 * Return a symbol from an address
 */
-sections_t *symbol_from_addr(unsigned long int addr){
+symbols_t *symbol_from_addr(unsigned long int addr){
 	symbols_t *s, *stmp, *res = 0;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
@@ -835,7 +835,7 @@ sections_t *symbol_from_addr(unsigned long int addr){
 /**
 * Return a symbol from its name
 */
-sections_t *symbol_from_name(char *fname){
+symbols_t *symbol_from_name(char *fname){
 	symbols_t *s, *stmp;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
@@ -1793,8 +1793,6 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 
 	s = symbol_from_addr(arg[0]);
 
-//	printf("LEARN: %s argument%u (%s at %p base:%p offset:%ld)\n", tag, argn, vreason, faultaddr, arg[argn], offset);
-
 	if(!wsh->learnfile){
 		wsh->learnfile = fopen( wsh->learnlog ? wsh->learnlog : DEFAULT_LEARN_FILE ,"a+");
 	}
@@ -1834,7 +1832,6 @@ int prototypes(lua_State * L)
 	* Read all the lines to learnt data structure
 	*/
 	while (fgets(line, sizeof(line), wsh->learnfile)) {
-//		printf("line: %s", line); 
 		l = (learn_t*) calloc(1,sizeof(learn_t));
 
 		sscanf(line, "%10s %200s %200s %20s %200s %20s", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
@@ -1844,7 +1841,6 @@ int prototypes(lua_State * L)
 			free(l);
 		}else{
 			HASH_ADD(hh, protorecords, key, sizeof(learn_key_t), l);
-//			printf("%s %s %s %s %s\n", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue);
 		}
 	}
 
@@ -1854,12 +1850,10 @@ int prototypes(lua_State * L)
 	HASH_SRT(hh, protorecords, sort_learnt);
 
 	printf("\n [*] Prototypes: (from %u tag informations)\n", HASH_COUNT(protorecords));
-//	if(pattern) { printf("pattern: %s\n", pattern); }
 	HASH_ITER(hh, protorecords, l, p) {
 		if((!patternlib) || (strstr(l->key.tlib, patternlib))){
 			if((!pattern) || (!strncmp(pattern, l->key.tfunction, strlen(pattern)))){
 				if((!patterntag) || (strstr(l->key.tvalue, patterntag))){
-//					printf("%s\t% 20s\t%s\t%s\t%s\t%s\n", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
 					printf("%s\t%s\t%s\t%s\t%s\n", l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
 				}
 			}
@@ -4445,7 +4439,7 @@ int wsh_init(void)
 	declare_internals();
 
 	// Default is to disable core files
-	disable_core(wsh->L);
+//	disable_core(wsh->L);
 
 	// Set malloc options
 	set_alloc_opt();
@@ -4788,7 +4782,7 @@ int wsh_loadlibs(void)
 /**
 * Parse command line
 */
-int wsh_getopt(wsh_t * wsh1, int argc, char **argv)
+int wsh_getopt(int argc, char **argv)
 {
 	const char *short_opt = "hqvVx";
 	int count = 0;

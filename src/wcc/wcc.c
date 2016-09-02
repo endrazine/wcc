@@ -80,8 +80,6 @@
 #define ifis(x) if(!strncmp(name, x, strlen(x)))
 #define elis(x) else if(!strncmp(name, x, strlen(x)))
 
-#define MAXPADLEN 20
-
 #define EXTRA_CREATED_SECTIONS 4
 
 
@@ -230,7 +228,7 @@ typedef struct msec_t {
   char *name;
   unsigned long int len;
   unsigned char *data;
-  char *outoffset;
+  unsigned long int outoffset;
   unsigned int flags;		// See above
 
   asection *s_bfd;
@@ -455,13 +453,7 @@ void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
   symaddrs = sa;
 
   if (ctx->opt_verbose) {
-    int pad;
-    pad = MAXPADLEN - strlen(sa->name);
-    if (pad < 0) {
-      pad = 0;
-    }
-
-    printf("%s% *s\t\t%x\t\t%c\n", sa->name, pad, "", sa->addr, symclass);
+    printf("%-20s\t\t%x\t\t%c\n", sa->name, sa->addr, symclass);
   }
 
   /**
@@ -1566,21 +1558,21 @@ static int parse_reloc(ctx_t * ctx, msec_t * s)
   has_addend = (shdr->sh_type == SHT_RELA) ? 1 : 0;	// SHT_RELA has addends, SHT_REL doesn't
 
   if ((shdr->sh_type == SHT_RELA)
-      && (shdr->sh_entsize != entszfromname(".rela.dyn"))) {
+      && ((int)shdr->sh_entsize != entszfromname(".rela.dyn"))) {
     printf("warning: strange relocation size: %lu != %u in %s\n",
 	   shdr->sh_entsize, entszfromname(".rela.dyn"), s->name);
     return -1;
   }
 
   if ((shdr->sh_type == SHT_REL)
-      && (shdr->sh_entsize != entszfromname(".rel.dyn"))) {
+      && ((int)shdr->sh_entsize != entszfromname(".rel.dyn"))) {
     printf("warning: strange relocation size: %lu != %u in %s\n",
 	   shdr->sh_entsize, entszfromname(".rel.dyn"), s->name);
     return -1;
   }
 
   if ((shdr->sh_type == SHT_RELA)
-      && (shdr->sh_size % entszfromname(".rela.dyn"))) {
+      && ((int)shdr->sh_size % entszfromname(".rela.dyn"))) {
     printf
 	("warning: strange relocation section size: %lu not a multiple of %u in %s\n",
 	 shdr->sh_size, entszfromname(".rela.dyn"), s->name);
@@ -2151,7 +2143,7 @@ static int write_section(ctx_t * ctx, msec_t * m)
   unsigned int nwrite = 0;
 
   // Go to correct offset in output binary
-  lseek(ctx->fdout, (unsigned long int) m->outoffset, SEEK_SET);
+  lseek(ctx->fdout, m->outoffset, SEEK_SET);
 
   // write to fdout
   nwrite = write(ctx->fdout, m->data, m->len);
@@ -2179,22 +2171,16 @@ static int rd_extended_text(ctx_t * ctx)
     unsigned perms = parse_bfd_perm(s->flags);
     if (perms == 5) {
       if (ctx->opt_debug) {
-	int pad;
-	pad = MAXPADLEN - strlen(s->name);
-	if (pad < 0) {
-	  pad = 0;
-	}
-
-	printf(" [%2u] \t%s% *s\t%012llx-%012llx %llu\t%s\t%llu\n", i + 1,
-	       s->name, pad, "", s->vma, s->vma + s->size, s->size, "RX",
+	printf(" [%2u] \t%-20s\t%012lx-%012lx %lu\t%s\t%lu\n", i + 1,
+	       s->name, s->vma, s->vma + s->size, s->size, "RX",
 	       s->filepos);
       }
 
-      if (s->filepos < mintext) {
+      if ((unsigned long)s->filepos < mintext) {
 	mintext = s->filepos;
 	textvma = s->vma;
       }
-      if (s->filepos + s->size > maxtext) {
+      if ((unsigned long)s->filepos + s->size > maxtext) {
 	maxtext = s->filepos + s->size;
       }
     }
@@ -2210,7 +2196,7 @@ static int rd_extended_text(ctx_t * ctx)
 
 static int rd_extended_data(ctx_t * ctx)
 {
-  unsigned int i;
+  unsigned int i, perms;
   asection *s;
 
   if (ctx->opt_debug) {
@@ -2221,21 +2207,15 @@ static int rd_extended_data(ctx_t * ctx)
   }
   s = ctx->abfd->sections;
   for (i = 0; i < ctx->shnum; i++) {
-    unsigned perms = parse_bfd_perm(s->flags);
+    perms = parse_bfd_perm(s->flags);
     if (perms == 4) {
       if (ctx->opt_debug) {
-	int pad;
-	pad = MAXPADLEN - strlen(s->name);
-	if (pad < 0) {
-	  pad = 0;
-	}
-
-	printf(" [%2u] \t%s % *s\t%012llx-%012llx %llu\t%s\t%lu\n", i + 1,
-	       s->name, pad, "", s->vma, s->vma + s->size, s->size, "RW",
+	printf(" [%2u] \t%-20s\t%012lx-%012lx %lu\t%s\t%lu\n", i + 1,
+	       s->name, s->vma, s->vma + s->size, s->size, "RW",
 	       s->filepos);
       }
 
-      if (s->filepos < mindata) {
+      if ((unsigned long)s->filepos < mindata) {
 	mindata = s->filepos;
 	datavma = s->vma;
       }
@@ -2289,7 +2269,6 @@ int print_bfd_sections(ctx_t * ctx)
 {
   unsigned int i;
   asection *s;
-  int pad;
   unsigned perms;
   char *hperms;
 
@@ -2322,14 +2301,9 @@ int print_bfd_sections(ctx_t * ctx)
       break;
     }
 
-    pad = MAXPADLEN - strlen(s->name);
-    if (pad < 0) {
-      pad = 0;
-    }
-
     if (ctx->opt_verbose) {
-      printf(" [%2u] %s% *s\t%012llx-%012llx %llu\t%s\t%lu\n", i + 1, s->name,
-	     pad, "", s->vma, s->vma + s->size, s->size, hperms, s->filepos);
+      printf(" [%2u] %-20s\t%012lx-%012lx %lu\t%s\t%lu\n", i + 1, s->name,
+	     s->vma, s->vma + s->size, s->size, hperms, s->filepos);
     }
     s = s->next;
   }
@@ -2611,7 +2585,7 @@ static int read_section(ctx_t * ctx, asection * s)
   ms->len = n;
   ms->name = strdup(s->name);
   ms->data = (unsigned char *) buf;
-  ms->outoffset = (char *) s->filepos;
+  ms->outoffset = s->filepos;
 
   // fill ELF section
   craft_section(ctx, ms);
@@ -3407,7 +3381,7 @@ int analyze_text(ctx_t * ctx, char *data, unsigned int datalen,
   // request disassembly details
   cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
 
-  count = cs_disasm(handle, data, datalen - 1, addr, 0, &insn);
+  count = cs_disasm(handle, (const uint8_t *)data, datalen - 1, addr, 0, &insn);
   if (!count) {
     printf("error: Cannot disassemble code\n");
     return -1;

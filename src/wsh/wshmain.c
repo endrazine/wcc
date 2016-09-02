@@ -41,10 +41,8 @@ wsh_t *wsh;
 */
 int main(int argc, char **argv, char **envp)
 {
-	wsh_t *wsh1;
-
-	wsh1 = wsh_init();
-	wsh_getopt(wsh1, argc, argv);
+	wsh_init();
+	wsh_getopt(argc, argv);
 	wsh_loadlibs();
 	reload_elfs();
 	wsh_run();

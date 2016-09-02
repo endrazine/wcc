@@ -9,7 +9,7 @@
 
 CC := gcc
 
-CFLAGS := -masm=intel -rdynamic -W -Wno-unused-function -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #--sanitize=address
+CFLAGS := -masm=intel -rdynamic -W -Wall -Wextra -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-parameter -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #-fsanitize=address
 OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
 
 
@@ -17,15 +17,15 @@ OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
 #OBJLIB := ./luajit-2.0/src/libluajit.a ./openlibm/libopenlibm.a 
 
 all::
-	cd openlibm && make CFLAGS="-pie -fpie -fPIC"
-	cd lua && make linux CFLAGS="-pie -fpie -fPIC"
-	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -ldl -lreadline -pie -fpie -fPIC
-	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -ldl -lreadline -pie -fpie -fPIC
-	$(CC) $(CFLAGS) helper.c -o helper.o -c -pie -fpie -fPIC
-	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -pie -fpie -fPIC
+	cd openlibm && make CFLAGS="-fpie -fPIC"
+	cd lua && make linux CFLAGS="-fpie -fPIC"
+	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline
+	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -fpie -fPIC -ldl -lreadline
+	$(CC) $(CFLAGS) helper.c -o helper.o -c -fpie -fPIC
+	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -fpie -fPIC
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
-	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o wshmain.o -o wsh -T script.lds -liberty $(OBJLIB) -ldl -lgsl -lgslcblas
+	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o wshmain.o -o wsh -Wl,-T -Wl,script.lds -liberty $(OBJLIB) -ldl
 
 	cp wsh ../../bin/
 

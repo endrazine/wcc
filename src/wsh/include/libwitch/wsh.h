@@ -670,7 +670,7 @@ typedef struct learn_t{
 } learn_t;
 
 int wsh_init(void);
-int wsh_getopt(wsh_t * wsh1, int argc, char **argv);
+int wsh_getopt(int argc, char **argv);
 int wsh_loadlibs(void);
 int reload_elfs(void);
 int wsh_run(void);
