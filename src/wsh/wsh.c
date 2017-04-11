@@ -34,6 +34,7 @@
 #include <libwitch/wsh_help.h>
 #include <libwitch/sigs.h>
 #include <uthash.h>
+#include <libgen.h>	// For basename()
 
 #ifndef __amd64__
 #define REG_RIP    16
@@ -4726,6 +4727,143 @@ int add_binary_preload(char *name)
 }
 
 /**
+* Patch ELF ehdr->e_type to ET_DYN
+*/
+int mk_lib(char *name)
+{
+  int fd;
+  struct stat sb;
+  char *map = 0;
+  Elf32_Ehdr *ehdr32;
+  Elf64_Ehdr *ehdr64;
+
+  fd = open(name, O_RDWR);
+  if (fd <= 0) {
+    printf(" !! couldn't open %s : %s\n", name, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  if (fstat(fd, &sb) == -1) {
+    printf(" !! couldn't stat %s : %s\n", name, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  if ((unsigned int) sb.st_size < sizeof(Elf32_Ehdr)) {
+    printf(" !! file %s is too small (%u bytes) to be a valid ELF.\n", name, (unsigned int) sb.st_size);
+    exit(EXIT_FAILURE);
+  }
+
+  map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (map == MAP_FAILED) {
+    printf(" !! couldn't mmap %s : %s\n", name, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  switch (map[EI_CLASS]) {
+  case ELFCLASS32:
+    ehdr32 = (Elf32_Ehdr *) map;
+    ehdr32->e_type = ET_DYN;
+    break;
+  case ELFCLASS64:
+    ehdr64 = (Elf64_Ehdr *) map;
+    ehdr64->e_type = ET_DYN;
+    break;
+  default:
+    printf(" !! unknown ELF class\n");
+    exit(EXIT_FAILURE);
+  }
+
+  munmap(map, sb.st_size);
+  close(fd);
+  return 0;
+}
+
+/**
+* Attempt to patch a ET_EXEC binary as ET_DYN,
+* making it suitable for use with dlopen()
+*/
+int attempt_to_patch(char *libname){
+
+	struct stat sb;
+	int err = 0;
+	int fdin = 0, fdout = 0;
+	unsigned int copied = 0;
+	char *tmp_dirname = 0;
+	char *outlib = 0, shortname = 0;
+
+	/**
+	* Verify file exists
+	*/
+	if (stat(libname, &sb) == -1) {
+		if(wsh->opt_verbose){
+			printf("WARNING: %s file not found\n", libname);
+		}
+		return 0; // Fail
+	}
+
+//	printf("%s : %u bytes\n", libname, sb.st_size);
+
+	fdin = open(libname, O_RDONLY, 0700);
+	if (fdin < 0) {
+		fprintf(stderr, "!! ERROR : open(%s, O_RDONLY) %s\n", libname, strerror(errno));
+		return 0; // Fail
+	}
+
+	/**
+	* Create temporary directory under /tmp/
+	*
+	* NOTE: The directory name written to is predictable. Bug ?
+	*/
+	tmp_dirname = calloc(20, 1);
+	snprintf(tmp_dirname, 19, "/tmp/.wsh-%u", getpid());
+	if(mkdir(tmp_dirname, 0700)){
+		fprintf(stderr, "!! ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
+//		return 0; // Fail
+	}
+
+	/**
+	* Open destination file
+	*/
+
+	outlib = calloc(1, 300);
+	snprintf(outlib, 299, "/%s/%s", tmp_dirname, basename(libname));
+
+	printf(" ** libifying %s to %s (%u bytes)\n", libname, outlib, sb.st_size);
+
+	fdout = open(outlib, O_RDWR|O_CREAT|O_TRUNC, 0700);
+	if (fdout < 0) {
+		fprintf(stderr, "!! ERROR : open(%s, O_RDWR) %s\n", outlib, strerror(errno));
+		return 0; // Fail
+	}
+
+//	printf(" ** Zero copy\n");
+
+	/**
+	* Copy binary under newly created directory, with Zero copy data (sendfile())
+	*/
+	copied = sendfile(fdout, fdin, 0, sb.st_size);
+	if(copied != sb.st_size){
+		fprintf(stderr, "!! ERROR: sendfile(); Copy failed: %s\n", strerror(errno));
+		return 0; // Fail
+	}
+
+	close(fdin);
+	close(fdout);
+
+	/**
+	* Patch ET_EXEC into ET_DYN
+	*/
+	mk_lib(outlib);
+
+	if(wsh->libified++ != 0){
+		printf("\n\n Libifying more than once per process is likely to crash...\n\n");
+	}
+
+	return dlopen(outlib, RTLD_NOW);
+}
+
+
+/**
 * Do load a shared binary into the address space
 */
 struct link_map *do_loadlib(char *libname)
@@ -4744,8 +4882,16 @@ struct link_map *do_loadlib(char *libname)
 
 	handle = dlopen(libname, RTLD_NOW);
 	if (!handle) {
-		fprintf(stderr, "ERROR: %s\n", dlerror());
-		return 0;
+		fprintf(stderr, "ERROR: dlopen() %s \n", dlerror());
+
+		// attempt to patch binary as ET_DYN if was ET_EXEC
+		handle = attempt_to_patch(libname);
+		if(!handle){
+			fprintf(stderr, "ERROR: dlopen() of patched file! %s \n", dlerror());
+			return 0;
+		}else{
+			printf(" ** loading of libified binary succeeded\n");
+		}
 	}
 
 	if (wsh->opt_verbose) {
