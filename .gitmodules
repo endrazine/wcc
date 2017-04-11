@@ -1,6 +1,3 @@
-[submodule "src/wsh/lua"]
-	path = src/wsh/lua
-	url = https://github.com/lua/lua.git
 [submodule "src/wsh/linenoise"]
 	path = src/wsh/linenoise
 	url = https://github.com/antirez/linenoise.git
