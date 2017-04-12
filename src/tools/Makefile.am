@@ -24,5 +24,8 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 
-bin_SCRIPTS = wcch wldd
+bin_SCRIPTS = wcch
+if HAVE_LDD
+bin_SCRIPTS += wldd
+endif
 CLEANFILES = $(bin_SCRIPTS)

@@ -103,6 +103,12 @@
 /* Define to 1 if you have the <libelf/libelf.h> header file. */
 #undef HAVE_LIBELF_LIBELF_H
 
+/* Define to 1 if you have the `iberty' library (-liberty). */
+#undef HAVE_LIBIBERTY
+
+/* Define to 1 if you have the <libiberty.h> header file. */
+#undef HAVE_LIBIBERTY_H
+
 /* Define to 1 if you have the `openlibm' library (-lopenlibm). */
 #undef HAVE_LIBOPENLIBM
 

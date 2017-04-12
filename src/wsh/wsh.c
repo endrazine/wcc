@@ -29,6 +29,7 @@
 *
 */
 
+#include <config.h>
 #include <libwitch/wsh.h>
 #include <libwitch/wsh_functions.h>
 #include <libwitch/wsh_help.h>

@@ -30,6 +30,7 @@
 */
 
 
+#include <config.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,9 +48,8 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include "elf.h"
-
-#include <config.h>
+#include <libelf/libelf.h>
+#include <libelf/gelf.h>
 
 #define DEFAULT_NAME "wld"
 

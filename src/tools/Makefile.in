@@ -106,6 +106,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
+@HAVE_LDD_TRUE@am__append_1 = wldd
 subdir = src/tools
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -321,7 +322,7 @@ ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CFLAGS = 
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS = 
-bin_SCRIPTS = wcch wldd
+bin_SCRIPTS = wcch $(am__append_1)
 CLEANFILES = $(bin_SCRIPTS)
 all: all-am
 

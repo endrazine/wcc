@@ -822,6 +822,9 @@ with_capstone_libdir
 with_libbfd
 with_libbfd_incdir
 with_libbfd_libdir
+with_libiberty
+with_libiberty_incdir
+with_libiberty_libdir
 with_openlibm
 with_openlibm_incdir
 with_openlibm_libdir
@@ -1505,6 +1508,10 @@ Optional Packages:
   --with-libbfd           LIBBFD directory (must contain ./lib and ./include)
   --with-libbfd-incdir    LIBBFD include directory
   --with-libbfd-libdir    LIBBFD library directory
+  --with-libiberty        LIBIBERTY directory (must contain ./lib and
+                          ./include)
+  --with-libiberty-incdir LIBIBERTY include directory
+  --with-libiberty-libdir LIBIBERTY library directory
   --with-openlibm         OPENLIBM directory (must contain ./lib and
                           ./include)
   --with-openlibm-incdir  OPENLIBM include directory
@@ -18490,7 +18497,7 @@ done
 
 
 if test "x$LIBBFD_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LIBBFD_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LIBBFD_LIB_DIR} ${LDFLAGS}"
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for bfd_init in -lbfd" >&5
@@ -18539,6 +18546,100 @@ _ACEOF
 else
 
   as_fn_error $? "Unable to find the bfd_init() function!" "$LINENO" 5
+
+fi
+
+
+
+# Check whether --with-libiberty was given.
+if test "${with_libiberty+set}" = set; then :
+  withval=$with_libiberty; LIBIBERTY_INC_DIR="${withval}/include";
+            LIBIBERTY_LIB_DIR="${withval}/lib";
+fi
+
+
+# Check whether --with-libiberty-incdir was given.
+if test "${with_libiberty_incdir+set}" = set; then :
+  withval=$with_libiberty_incdir; LIBIBERTY_INC_DIR="${withval}";
+fi
+
+
+# Check whether --with-libiberty-libdir was given.
+if test "${with_libiberty_libdir+set}" = set; then :
+  withval=$with_libiberty_libdir; LIBIBERTY_LIB_DIR="${withval}";
+fi
+
+
+if test "x$LIBIBERTY_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${LIBIBERTY_INC_DIR} ${CPPFLAGS}"
+fi
+for ac_header in libiberty.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "libiberty.h" "ac_cv_header_libiberty_h" "$ac_includes_default"
+if test "x$ac_cv_header_libiberty_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBIBERTY_H 1
+_ACEOF
+
+else
+
+  as_fn_error $? "Unable to find the libiberty.h header!" "$LINENO" 5
+
+fi
+
+done
+
+
+if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
+   LDFLAGS="-L${LIBIBERTY_LIB_DIR} ${LDFLAGS}"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for get_run_time in -liberty" >&5
+$as_echo_n "checking for get_run_time in -liberty... " >&6; }
+if ${ac_cv_lib_iberty_get_run_time+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-liberty  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char get_run_time ();
+int
+main ()
+{
+return get_run_time ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_iberty_get_run_time=yes
+else
+  ac_cv_lib_iberty_get_run_time=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_iberty_get_run_time" >&5
+$as_echo "$ac_cv_lib_iberty_get_run_time" >&6; }
+if test "x$ac_cv_lib_iberty_get_run_time" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBIBERTY 1
+_ACEOF
+
+  LIBS="-liberty $LIBS"
+
+else
+
+  as_fn_error $? "Unable to find the get_run_time() function!" "$LINENO" 5
 
 fi
 
@@ -18678,7 +18779,7 @@ done
 
 
 if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LIBREADLINE_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
@@ -18773,7 +18874,7 @@ done
 
 
 if test "x$LUA53_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LUA53_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
 fi
 
 #AC_CHECK_LIB([lua5.3], [lua_settable], [], [

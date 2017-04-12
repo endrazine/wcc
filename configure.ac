@@ -150,13 +150,41 @@ AC_CHECK_HEADERS([bfd.h], [], [
 ])
 
 if test "x$LIBBFD_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LIBBFD_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LIBBFD_LIB_DIR} ${LDFLAGS}"
 fi
 
 dnl The dlopen() function is in the C library for *BSD and in
 dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([bfd], [bfd_init], [], [
   AC_MSG_ERROR([Unable to find the bfd_init() function!])
+])
+
+AC_ARG_WITH(libiberty,
+            [AS_HELP_STRING([--with-libiberty],[LIBIBERTY directory (must contain ./lib and ./include)])],
+            [LIBIBERTY_INC_DIR="${withval}/include";
+            LIBIBERTY_LIB_DIR="${withval}/lib";],)
+AC_ARG_WITH(libiberty-incdir,
+  	   [AS_HELP_STRING([--with-libiberty-incdir],[LIBIBERTY include directory])],
+	   [LIBIBERTY_INC_DIR="${withval}";],)
+AC_ARG_WITH(libiberty-libdir,
+           [AS_HELP_STRING([--with-libiberty-libdir],[LIBIBERTY library directory])],
+           [LIBIBERTY_LIB_DIR="${withval}";],)
+
+if test "x$LIBIBERTY_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${LIBIBERTY_INC_DIR} ${CPPFLAGS}"
+fi
+AC_CHECK_HEADERS([libiberty.h], [], [
+  AC_MSG_ERROR([Unable to find the libiberty.h header!])
+])
+
+if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
+   LDFLAGS="-L${LIBIBERTY_LIB_DIR} ${LDFLAGS}"
+fi
+
+dnl The dlopen() function is in the C library for *BSD and in
+dnl libdl on GLIBC-based systems
+AC_CHECK_LIB([iberty], [get_run_time], [], [
+  AC_MSG_ERROR([Unable to find the get_run_time() function!])
 ])
 
 AC_ARG_WITH(openlibm,
@@ -206,7 +234,7 @@ AC_CHECK_HEADERS([readline/readline.h], [], [
 ])
 
 if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LIBREADLINE_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
 fi
 
 dnl The dlopen() function is in the C library for *BSD and in
@@ -234,7 +262,7 @@ AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h], [], [
 ])
 
 if test "x$LUA53_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LUA53_LIB_DIR} ${LDFLAGS}"
+   LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
 fi
 
 dnl The dlopen() function is in the C library for *BSD and in

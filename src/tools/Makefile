@@ -106,6 +106,7 @@ POST_UNINSTALL = :
 build_triplet = x86_64-apple-darwin13.4.0
 host_triplet = x86_64-apple-darwin13.4.0
 target_triplet = x86_64-apple-darwin13.4.0
+#am__append_1 = wldd
 subdir = src/tools
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -184,7 +185,7 @@ CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
 CPP = gcc -E
-CPPFLAGS = -I/Users/nietzsche/Downloads/openlibm/include/ -I/opt/local/include 
+CPPFLAGS = -I/Users/nietzsche/Downloads/openlibm/include/ -I/opt/local//include/libiberty -I/opt/local/include 
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
@@ -210,14 +211,14 @@ INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
-LDFLAGS = -L/Users/nietzsche/Downloads/openlibm -L/opt/local/lib 
+LDFLAGS = -L/Users/nietzsche/Downloads/openlibm -L/opt/local//lib/x86_64/ -L/opt/local/lib 
 LIBADD_DL =  
 LIBADD_DLD_LINK = 
 LIBADD_DLOPEN = 
 LIBADD_SHL_LOAD = 
 LIBLTDL = $(top_build_prefix)libltdl/libltdlc.la
 LIBOBJS = 
-LIBS = -lreadline -lopenlibm -lbfd -lcapstone -lelf 
+LIBS = -lreadline -lopenlibm -liberty -lbfd -lcapstone -lelf 
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = lipo
 LN_S = ln -s
@@ -321,7 +322,7 @@ ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CFLAGS = 
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS = 
-bin_SCRIPTS = wcch wldd
+bin_SCRIPTS = wcch $(am__append_1)
 CLEANFILES = $(bin_SCRIPTS)
 all: all-am
 
