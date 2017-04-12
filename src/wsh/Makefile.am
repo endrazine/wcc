@@ -20,9 +20,9 @@
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
-AM_CFLAGS = -masm=intel -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now  #--sanitize=address
+AM_CFLAGS = -masm=intel -mpreferred-stack-boundary=12 -mstackrealign -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now  #--sanitize=address
 AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude
-AM_LDFLAGS =
+AM_LDFLAGS = -T ./script.lds
 
 bin_PROGRAMS = wsh$(EXEEXT)
 EXTRA_PROGRAMS = 

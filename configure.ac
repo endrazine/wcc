@@ -73,7 +73,7 @@ AC_C_STRINGIZE
 AC_C_BIGENDIAN
 AC_FUNC_SELECT_ARGTYPES
 
-AC_CHECK_HEADERS([sys/procfs.h])
+AC_CHECK_HEADERS([sys/procfs.h sys/prctl.h link.h stropts.h malloc.h])
 
 AC_ARG_WITH(libelf,
             [AS_HELP_STRING([--with-libelf],[LIBELF directory (must contain ./lib and ./include)])],
@@ -257,9 +257,9 @@ AC_ARG_WITH(lua53-libdir,
 if test "x$LUA53_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h], [], [
-  AC_MSG_ERROR([Unable to find the LUA headers!])
-])
+#AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h], [], [
+#  AC_MSG_ERROR([Unable to find the LUA headers!])
+#])
 
 if test "x$LUA53_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
@@ -275,6 +275,8 @@ AC_CHECK_TOOL([LOCAL_LDD], [ldd])
 AM_CONDITIONAL(HAVE_LDD, [test -n "$LOCAL_LDD"])
 AC_CHECK_TOOL([DOXYGEN], [doxygen])
 AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
+
+AS_AC_EXPAND(BINDIR, $bindir)
 
 dnl generate output
 AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/tools/Makefile])

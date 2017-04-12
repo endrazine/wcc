@@ -30,9 +30,14 @@
 */
 
 #define _GNU_SOURCE
+#define _XOPEN_SOURCE
+#ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
+#endif
 #include <setjmp.h>
+#ifdef HAVE_LINK_H
 #include <link.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -56,7 +61,6 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <link.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <string.h>
@@ -66,10 +70,14 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <poll.h>
+#ifdef HAVE_STROPTS_H
 #include <stropts.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/mman.h>
@@ -85,7 +93,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
-#include <malloc.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,7 +112,7 @@
 #include <lualib.h>
 #else
 #include "mylaux.h"
-#include "luajit.h"
+#include <luajit.h>
 #endif
 
 #include <stdio.h>
@@ -127,6 +134,7 @@
 #include <config.h>
 #include <utlist.h>
 #include <uthash.h>
+#include <libelf/libelf.h>
 
 #define DEFAULT_SCRIPT		"/usr/share/wcc/scripts/debug"
 #define DEFAULT_SCRIPT_INDEX	"/usr/share/wcc/scripts/INDEX"

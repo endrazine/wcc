@@ -109,7 +109,8 @@ target_triplet = x86_64-apple-darwin13.4.0
 #am__append_1 = wldd
 subdir = src/tools
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/m4/ac_c_compile_flags.m4 \
+	$(top_srcdir)/m4/as-ac-expand.m4 $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltargz.m4 $(top_srcdir)/m4/ltdl.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
@@ -181,6 +182,7 @@ AUTOCONF = ${SHELL} /Users/nietzsche/Downloads/wcc/missing autoconf
 AUTOHEADER = ${SHELL} /Users/nietzsche/Downloads/wcc/missing autoheader
 AUTOMAKE = ${SHELL} /Users/nietzsche/Downloads/wcc/missing automake-1.15
 AWK = gawk
+BINDIR = /usr/local/bin
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
