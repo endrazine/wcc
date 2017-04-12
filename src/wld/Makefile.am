@@ -29,7 +29,7 @@ EXTRA_PROGRAMS =
 
 wld_SOURCES = wld.c
 wld_LDADD = 
-man_MANS = wld.8
+man_MANS = $(top_builddir)/doc/manpages/wld.8
 noinst_HEADERS = 
 EXTRA_DIST = $(man_MANS)
 
