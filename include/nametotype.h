@@ -38,6 +38,7 @@
 
 #define SHT_VERSYM 0x6fffffff
 #define SHT_VERNEED 0x6ffffffe
+#define SHT_GNU_HASH	  0x6ffffff6	/* GNU-style hash table.  */
 
 typedef struct assoc_nametotype_t{
 	char *name;

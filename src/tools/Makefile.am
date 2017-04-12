@@ -20,7 +20,7 @@
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
-AM_CFLAGS = -Xlinker --defsym -Xlinker WDATE=$$(date +'%Y%m%d') -Xlinker --defsym -Xlinker WTIME=$$(date +'%H%M')
+AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 

@@ -1,1 +1,0 @@
-/opt/buildroot-gcc463/usr/share/aclocal/lt~obsolete.m4

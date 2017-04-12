@@ -30,9 +30,9 @@
 */
 #define __USE_GNU
 #define _GNU_SOURCE
+#include <config.h>
 #include <bfd.h>
 #include <dlfcn.h>
-#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -41,7 +41,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#ifdef HAVE_SYS_PROCFS_H
 #include <sys/procfs.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ucontext.h>
@@ -56,8 +58,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include <libelf.h>
-#include <gelf.h>
+#include <libelf/libelf.h>
+#include <libelf/gelf.h>
 
 #include <nametotype.h>
 #include <nametoalign.h>
@@ -66,12 +68,6 @@
 #include <nametoinfo.h>
 #include <arch.h>
 #include <inttypes.h>
-
-#include <config.h>
-
-
-extern char WDATE;
-extern char WTIME;
 
 #define DEFAULT_STRNDX_SIZE 4096
 
@@ -86,9 +82,101 @@ extern char WTIME;
 
 #define EXTRA_CREATED_SECTIONS 4
 
+#define PT_LOOS    0x60000000      /* OS-specific */
+#define PT_GNU_EH_FRAME		0x6474e550
+#define PT_GNU_STACK	(PT_LOOS + 0x474e551)
 
 #define RELOC_X86_64 1
 #define RELOC_X86_32 2
+
+// X86_64 relocations.
+enum {
+  R_X86_64_NONE       = 0,
+  R_X86_64_64         = 1,
+  R_X86_64_PC32       = 2,
+  R_X86_64_GOT32      = 3,
+  R_X86_64_PLT32      = 4,
+  R_X86_64_COPY       = 5,
+  R_X86_64_GLOB_DAT   = 6,
+  R_X86_64_JUMP_SLOT  = 7,
+  R_X86_64_RELATIVE   = 8,
+  R_X86_64_GOTPCREL   = 9,
+  R_X86_64_32         = 10,
+  R_X86_64_32S        = 11,
+  R_X86_64_16         = 12,
+  R_X86_64_PC16       = 13,
+  R_X86_64_8          = 14,
+  R_X86_64_PC8        = 15,
+  R_X86_64_DTPMOD64   = 16,
+  R_X86_64_DTPOFF64   = 17,
+  R_X86_64_TPOFF64    = 18,
+  R_X86_64_TLSGD      = 19,
+  R_X86_64_TLSLD      = 20,
+  R_X86_64_DTPOFF32   = 21,
+  R_X86_64_GOTTPOFF   = 22,
+  R_X86_64_TPOFF32    = 23,
+  R_X86_64_PC64       = 24,
+  R_X86_64_GOTOFF64   = 25,
+  R_X86_64_GOTPC32    = 26,
+  R_X86_64_GOT64      = 27,
+  R_X86_64_GOTPCREL64 = 28,
+  R_X86_64_GOTPC64    = 29,
+  R_X86_64_GOTPLT64   = 30,
+  R_X86_64_PLTOFF64   = 31,
+  R_X86_64_SIZE32     = 32,
+  R_X86_64_SIZE64     = 33,
+  R_X86_64_GOTPC32_TLSDESC = 34,
+  R_X86_64_TLSDESC_CALL    = 35,
+  R_X86_64_TLSDESC    = 36,
+  R_X86_64_IRELATIVE  = 37,
+  R_X86_64_NUM = 43
+};
+// i386 relocations.
+// TODO: this is just a subset
+enum {
+  R_386_NONE          = 0,
+  R_386_32            = 1,
+  R_386_PC32          = 2,
+  R_386_GOT32         = 3,
+  R_386_PLT32         = 4,
+  R_386_COPY          = 5,
+  R_386_GLOB_DAT      = 6,
+  R_386_JMP_SLOT      = 7,
+  R_386_RELATIVE      = 8,
+  R_386_GOTOFF        = 9,
+  R_386_GOTPC         = 10,
+  R_386_32PLT         = 11,
+  R_386_TLS_TPOFF     = 14,
+  R_386_TLS_IE        = 15,
+  R_386_TLS_GOTIE     = 16,
+  R_386_TLS_LE        = 17,
+  R_386_TLS_GD        = 18,
+  R_386_TLS_LDM       = 19,
+  R_386_16            = 20,
+  R_386_PC16          = 21,
+  R_386_8             = 22,
+  R_386_PC8           = 23,
+  R_386_TLS_GD_32     = 24,
+  R_386_TLS_GD_PUSH   = 25,
+  R_386_TLS_GD_CALL   = 26,
+  R_386_TLS_GD_POP    = 27,
+  R_386_TLS_LDM_32    = 28,
+  R_386_TLS_LDM_PUSH  = 29,
+  R_386_TLS_LDM_CALL  = 30,
+  R_386_TLS_LDM_POP   = 31,
+  R_386_TLS_LDO_32    = 32,
+  R_386_TLS_IE_32     = 33,
+  R_386_TLS_LE_32     = 34,
+  R_386_TLS_DTPMOD32  = 35,
+  R_386_TLS_DTPOFF32  = 36,
+  R_386_TLS_TPOFF32   = 37,
+  R_386_TLS_GOTDESC   = 39,
+  R_386_TLS_DESC_CALL = 40,
+  R_386_TLS_DESC      = 41,
+  R_386_IRELATIVE     = 42,
+  R_386_NUM           = 43
+};
+
 
 //#ifdef __x86_64__
 #ifdef __LP64__			// Generic 64b
@@ -3798,7 +3886,7 @@ int usage(char *name)
 
 int print_version(void)
 {
-  printf("%s (%lu %lu)\n", PACKAGE_STRING, (unsigned long)&WDATE, (unsigned long)&WTIME);
+  printf("%s (%s %s)\n", PACKAGE_STRING, __DATE__, __TIME__);
   return 0;
 }
 

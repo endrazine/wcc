@@ -47,14 +47,11 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include <elf.h>
+#include "elf.h"
 
 #include <config.h>
 
 #define DEFAULT_NAME "wld"
-
-extern char WDATE;
-extern char WTIME;
 
 /**
 * Patch ELF ehdr->e_type to ET_DYN
@@ -110,7 +107,7 @@ int mk_lib(char *name)
 
 int print_version(void)
 {
-  printf("%s (%lu %lu)\n", PACKAGE_STRING, (unsigned long)&WDATE, (unsigned long)&WTIME);
+	printf("%s (%s %s)\n", PACKAGE_STRING, __DATE__, __TIME__);
   return 0;
 }
 

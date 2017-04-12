@@ -19,11 +19,10 @@ dnl Process this file with autoconf to produce a configure script.
 
 dnl init autoconf
 AC_REQ(2.63)
-AC_INIT([Witchcraft Compiler Collection (WCC)],[0.0.1],[Jonathan Brossard <endrazine@gmail.com>],[wcc])
+AC_INIT([Witchcraft Compiler Collection (WCC)],[0.0.1],[Jonathan Brossard <endrazine@gmail.com>],[wcc],[https://github.com/endrazine/wcc])
 AC_CONFIG_HEADERS([config.h:config.h.in])
 AC_CONFIG_SRCDIR([src/wld/wld.c])
 AC_CONFIG_AUX_DIR([.])
-AC_CONFIG_AUX_DIR([libltdl/config])
 AC_REQUIRE_AUX_FILE([install-sh])
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -34,7 +33,7 @@ dnl macros for automake
 AM_INIT_AUTOMAKE([foreign 1.11 check-news dist-bzip2 std-options])
 AM_MAINTAINER_MODE
 AC_PROG_MAKE_SET
-AC_CONFIG_MACRO_DIR([m4 libltdl/m4])
+AC_CONFIG_MACRO_DIR([m4])
 
 dnl Set it in C99-mode
 AC_SYS_INTERPRETER
@@ -74,6 +73,7 @@ AC_C_STRINGIZE
 AC_C_BIGENDIAN
 AC_FUNC_SELECT_ARGTYPES
 
+AC_CHECK_HEADERS([sys/procfs.h])
 
 AC_ARG_WITH(libelf,
             [AS_HELP_STRING([--with-libelf],[LIBELF directory (must contain ./lib and ./include)])],
@@ -89,7 +89,9 @@ AC_ARG_WITH(libelf-libdir,
 if test "x$LIBELF_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBELF_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([libelf.h gelf.h])
+AC_CHECK_HEADERS([libelf/libelf.h libelf/gelf.h], [], [
+  AC_MSG_ERROR([Unable to find the libelf headers!])
+])
 
 if test "x$LIBELF_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBELF_LIB_DIR} ${LDFLAGS}"
@@ -115,7 +117,9 @@ AC_ARG_WITH(capstone-libdir,
 if test "x$CAPSTONE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${CAPSTONE_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([capstone.h])
+AC_CHECK_HEADERS([capstone/capstone.h], [], [
+  AC_MSG_ERROR([Unable to find the capstone.h header!])
+])
 
 if test "x$CAPSTONE_LIB_DIR" != "x" ; then
    LDFLAGS="-L${CAPSTONE_LIB_DIR} ${LDFLAGS}"
@@ -141,7 +145,9 @@ AC_ARG_WITH(libbfd-libdir,
 if test "x$LIBBFD_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBBFD_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([bfd.h])
+AC_CHECK_HEADERS([bfd.h], [], [
+  AC_MSG_ERROR([Unable to find the bfd.h header!])
+])
 
 if test "x$LIBBFD_LIB_DIR" != "x" ; then
    LDFLAGS="-L$LIBBFD_LIB_DIR} ${LDFLAGS}"
@@ -153,25 +159,26 @@ AC_CHECK_LIB([bfd], [bfd_init], [], [
   AC_MSG_ERROR([Unable to find the bfd_init() function!])
 ])
 
+AC_ARG_WITH(openlibm,
+            [AS_HELP_STRING([--with-openlibm],[OPENLIBM directory (must contain ./lib and ./include)])],
+            [OPENLIBM_INC_DIR="${withval}/include";
+            OPENLIBM_LIB_DIR="${withval}/lib";],)
+AC_ARG_WITH(openlibm-incdir,
+  	   [AS_HELP_STRING([--with-openlibm-incdir],[OPENLIBM include directory])],
+	   [OPENLIBM_INC_DIR="${withval}";],)
+AC_ARG_WITH(openlibm-libdir,
+           [AS_HELP_STRING([--with-openlibm-libdir],[OPENLIBM library directory])],
+           [OPENLIBM_LIB_DIR="${withval}";],)
 
-AC_ARG_WITH(libopenlibm,
-            [AS_HELP_STRING([--with-libopenlibm],[LIBOPENLIBM directory (must contain ./lib and ./include)])],
-            [LIBOPENLIBM_INC_DIR="${withval}/include";
-            LIBOPENLIBM_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(libopenlibm-incdir,
-  	   [AS_HELP_STRING([--with-libopenlibm-incdir],[LIBOPENLIBM include directory])],
-	   [LIBOPENLIBM_INC_DIR="${withval}";],)
-AC_ARG_WITH(libopenlibm-libdir,
-           [AS_HELP_STRING([--with-libopenlibm-libdir],[LIBOPENLIBM library directory])],
-           [LIBOPENLIBM_LIB_DIR="${withval}";],)
-
-if test "x$LIBOPENLIBM_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LIBOPENLIBM_INC_DIR} ${CPPFLAGS}"
+if test "x$OPENLIBM_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([openlibm.h])
+AC_CHECK_HEADERS([openlibm.h], [], [
+  AC_MSG_ERROR([Unable to find the openlibm.h header!])
+])
 
-if test "x$LIBOPENLIBM_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LIBOPENLIBM_LIB_DIR} ${LDFLAGS}"
+if test "x$OPENLIBM_LIB_DIR" != "x" ; then
+   LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
 fi
 
 dnl The dlopen() function is in the C library for *BSD and in
@@ -194,7 +201,9 @@ AC_ARG_WITH(libopenlibm-libdir,
 if test "x$LIBREADLINE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([readline.h])
+AC_CHECK_HEADERS([readline/readline.h], [], [
+  AC_MSG_ERROR([Unable to find the readline.h header!])
+])
 
 if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
    LDFLAGS="-L$LIBREADLINE_LIB_DIR} ${LDFLAGS}"
@@ -206,33 +215,38 @@ AC_CHECK_LIB([readline], [readline], [], [
   AC_MSG_ERROR([Unable to find the readline() function!])
 ])
 
-AC_ARG_WITH(lua51,
-            [AS_HELP_STRING([--with-lua51],[LUA 5.1 directory (must contain ./lib and ./include)])],
-            [LUA51_INC_DIR="${withval}/include";
-            LUA51_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(lua51-incdir,
-  	   [AS_HELP_STRING([--with-lua51-incdir],[LUA 5.1 include directory])],
+AC_ARG_WITH(lua53,
+            [AS_HELP_STRING([--with-lua53],[LUA 5.3 directory (must contain ./lib and ./include)])],
+            [LUA53_INC_DIR="${withval}/include";
+            LUA53_LIB_DIR="${withval}/lib";],)
+AC_ARG_WITH(lua53-incdir,
+  	   [AS_HELP_STRING([--with-lua53-incdir],[LUA 5.3 include directory])],
 	   [LUA51_INC_DIR="${withval}";],)
-AC_ARG_WITH(lua51-libdir,
-           [AS_HELP_STRING([--with-lua51-libdir],[LUA 5.1 library directory])],
-           [LUA51_LIB_DIR="${withval}";],)
+AC_ARG_WITH(lua53-libdir,
+           [AS_HELP_STRING([--with-lua53-libdir],[LUA 5.3 library directory])],
+           [LUA53_LIB_DIR="${withval}";],)
 
-if test "x$LUA51_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LUA51_INC_DIR} ${CPPFLAGS}"
+if test "x$LUA53_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h])
+AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h], [], [
+  AC_MSG_ERROR([Unable to find the LUA headers!])
+])
 
-if test "x$LUA51_LIB_DIR" != "x" ; then
-   LDFLAGS="-L$LUA51_LIB_DIR} ${LDFLAGS}"
+if test "x$LUA53_LIB_DIR" != "x" ; then
+   LDFLAGS="-L$LUA53_LIB_DIR} ${LDFLAGS}"
 fi
 
 dnl The dlopen() function is in the C library for *BSD and in
 dnl libdl on GLIBC-based systems
-AC_CHECK_LIB([lua5.1], [lua_settable], [], [
-  AC_MSG_ERROR([Unable to find the lua_settable() function!])
-])
+#AC_CHECK_LIB([lua5.3], [lua_settable], [], [
+#  AC_MSG_ERROR([Unable to find the lua_settable() function!])
+#])
 
 AC_CHECK_TOOL([LOCAL_LDD], [ldd])
+AM_CONDITIONAL(HAVE_LDD, [test -n "$LOCAL_LDD"])
+AC_CHECK_TOOL([DOXYGEN], [doxygen])
+AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
 
 dnl generate output
 AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/tools/Makefile])

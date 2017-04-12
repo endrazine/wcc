@@ -1,4 +1,4 @@
-#!/usr/bin/wsh
+#!@bindir@/wsh
 
 headers()
 exit(0)

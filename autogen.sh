@@ -2,7 +2,9 @@
 
 set -e
 
-libtoolize --install -c --force || glibtoolize --install -c --force
+case `uname` in Darwin*) glibtoolize --install --force --copy ;;
+  *) libtoolize --install --force --copy ;; esac
+  
 aclocal -Im4
 autoheader
 automake --gnu --add-missing --copy
