@@ -604,6 +604,8 @@ typedef struct wsh_t {
 
 	unsigned long int btcaller;
 
+	unsigned int libified;
+
 	breakpoint_t *bp_array;
 	unsigned int bp_num;
 

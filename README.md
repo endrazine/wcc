@@ -11,6 +11,61 @@ WCC is a collection of compilation tools to perform binary black magic on the GN
 
 The WCC user manual is available online at : https://github.com/endrazine/wcc/wiki
 
+## Installation
+
+### Installation Requirements
+The Witchcraft Compiler Collection requires the following software to be installed:
+
+    capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make
+
+### Installation Requirements on Ubuntu/Debian
+Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 14.04):
+
+    # Add repo for clang
+    sudo add-apt-repository ppa:kxstudio-team/builds
+    sudo apt-get update
+
+    # Install dependencies
+    sudo apt-get install binutils-dev clang libelf-dev libgsl0-dev libiberty-dev libreadline6 libreadline6-dev make uthash-dev
+
+    # Install latest capstone and capstone-dev from "Ubuntu 14.04 - DEB packages" http://www.capstone-engine.org/download.html
+    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
+    sudo dpkg -i libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
+    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
+    sudo dpkg -i libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
+
+## Building and Installing:
+
+### Fetching the code over git
+This will download the code of wcc from the internet to a directory named wcc in the current working directory:
+
+    git clone https://github.com/endrazine/wcc.git
+
+You can then enter this directory with:
+
+    cd wcc
+
+### Initializing git submodules
+From your root wcc directory, type:
+
+    git submodule init
+    git submodule update
+
+#### Building WCC
+From your root wcc directory, type:
+
+    make
+#### Installing WCC
+Then to install wcc, type:
+
+    sudo make install
+
+#### Building the WCC documentation (Optional)
+WCC makes use of doxygen to generate its documentation. From the root wcc directory, type
+
+    make documentation
+
+
 ## Core commands
 The following commands constitute the core of the Witchcraft Compiler Collection.
 
@@ -280,44 +335,6 @@ The official codebase of the Witchcraft Compiler Collection is hosted on github 
     git submodule update
 
 This will create a directory named wcc and fetch all required source code in it.
-
-## Prerequisites
-
-### Installation Requirements
-The Witchcraft Compiler Collection requires the following software to be installed:
-
-    capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make
-
-### Installation Requirements on Ubuntu/Debian
-Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 14.04):
-
-    # Add repo for clang
-    sudo add-apt-repository ppa:kxstudio-team/builds
-    sudo apt-get update
-
-    # Install dependencies
-    sudo apt-get install binutils-dev clang libelf-dev libgsl0-dev libiberty-dev libreadline6 libreadline6-dev make uthash-dev
-
-    # Install latest capstone and capstone-dev from "Ubuntu 14.04 - DEB packages" http://www.capstone-engine.org/download.html
-    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
-    sudo dpkg -i libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
-    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
-    sudo dpkg -i libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
-
-## Building and Installing:
-#### Building WCC
-From your root wcc directory, type:
-
-    make
-#### Installing WCC
-Then to install wcc, type:
-
-    sudo make install
-
-#### Building the WCC documentation (Optional)
-WCC makes use of doxygen to generate its documentation. From the root wcc directory, type
-
-    make documentation
 
 ## Greetings
 The Witchcraft Compiler Collection uses the following amazing Open Source third party software:
