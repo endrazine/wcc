@@ -69,6 +69,10 @@
 
 #include <config.h>
 
+
+extern char WDATE;
+extern char WTIME;
+
 #define DEFAULT_STRNDX_SIZE 4096
 
 // Valid flags for msec_t->flags
@@ -3794,7 +3798,7 @@ int usage(char *name)
 
 int print_version(void)
 {
-  printf("%s version:%s    (%s %s)\n", WNAME, WVERSION, WTIME, WDATE);
+  printf("%s version: %s    (%u %u)\n", PACKAGE_NAME, PACKAGE_VERSION, (unsigned long)&WDATE, (unsigned long)&WTIME);
   return 0;
 }
 
