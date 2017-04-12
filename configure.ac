@@ -19,7 +19,7 @@ dnl Process this file with autoconf to produce a configure script.
 
 dnl init autoconf
 AC_REQ(2.63)
-AC_INIT([wcc],[0.0.1],[Jonathan Brossard <jonathan@blackbox>])
+AC_INIT([Witchcraft Compiler Collection (WCC)],[0.0.1],[Jonathan Brossard <endrazine@gmail.com>],[wcc])
 AC_CONFIG_HEADERS([config.h:config.h.in])
 AC_CONFIG_SRCDIR([src/wld/wld.c])
 AC_CONFIG_AUX_DIR([.])
@@ -40,9 +40,6 @@ AC_SYS_INTERPRETER
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CC_C99
-dnl GNUlib
-gl_EARLY
-gl_INIT
 
 dnl AC_PROG_CPP
 AC_REQUIRE_CPP
