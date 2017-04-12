@@ -2,7 +2,7 @@
 
 set -e
 
-libtoolize --install --force || glibtoolize --install --force
+libtoolize --install -c --force || glibtoolize --install -c --force
 aclocal -Im4
 autoheader
 automake --gnu --add-missing --copy

@@ -1,12 +1,12 @@
-#!/bin/bash
+#!/bin/sh
 #
-# wlld : This file is part of the Witchcraft Compiler Collection
+# wlld : This file is part of the Witchcraft Compiler Collection (WCC)
 #
-# Copyright : Jonathan Brossard - endrazine@gmail.com
+# Copyright : Jonathan Brossard <endrazine@gmail.com>
 #
 # This file is licensed under the MIT license
 #
-# version 0.01 Sun Jul 17 19:25:18 PDT 2016
+# version 0.0.1 Sun Jul 17 19:25:18 PDT 2016
 #
 #
 

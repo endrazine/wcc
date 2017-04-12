@@ -110,7 +110,7 @@ int mk_lib(char *name)
 
 int print_version(void)
 {
-  printf("%s version: %s    (%u %u)\n", PACKAGE_NAME, PACKAGE_VERSION, (unsigned long)&WDATE, (unsigned long)&WTIME);
+  printf("%s version: %s    (%lu %lu)\n", PACKAGE_NAME, PACKAGE_VERSION, (unsigned long)&WDATE, (unsigned long)&WTIME);
   return 0;
 }
 

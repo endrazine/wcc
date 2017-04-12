@@ -1,0 +1,32 @@
+#!@SHELL@
+#
+# wlld : This file is part of the @PACKAGE_NAME@
+#
+# Copyright : @PACKAGE_BUGREPORT@
+#
+# This file is licensed under the MIT license
+#
+# version @VERSION@ Sun Jul 17 19:25:18 PDT 2016
+#
+#
+
+usage () {
+	echo "Usage: $0 </path/to/bin>"
+	echo ""
+	echo "  Returns libraries to be passed to gcc to relink this application."
+	echo ""
+	exit
+}
+
+getlibs (){
+	@LOCAL_LDD@ $1|grep "=> /"|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
+	echo ""
+}
+
+if [ "$1" == "" ]
+then
+	usage
+fi
+
+getlibs $1
+

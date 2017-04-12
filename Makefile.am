@@ -19,5 +19,5 @@
 
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
-ACLOCAL_AMFLAGS = -I m4
-SUBDIRS = src/wcc src/wld src/wld
+ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
+SUBDIRS = src/wcc src/wld src/wsh src/tools
