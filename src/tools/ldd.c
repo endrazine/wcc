@@ -30,6 +30,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <libelf.h>
+#include <gelf.h>
 
 #if defined(_WIN32) || defined(_WINNT)
 # include "mmap-windows.c"
@@ -40,7 +42,6 @@
 #ifdef HAVE_LINK_H
 #include <link.h>
 #endif
-/* makefile will include elf.h for us */
 
 #include "bswap.h"
 
@@ -57,50 +58,28 @@
 #define PATH_MAX _POSIX_PATH_MAX
 #endif
 
-#undef UCLIBC_ENDIAN_HOST
-#define UCLIBC_ENDIAN_LITTLE 1234
-#define UCLIBC_ENDIAN_BIG    4321
-#if defined(BYTE_ORDER)
-# if BYTE_ORDER == LITTLE_ENDIAN
-#  define UCLIBC_ENDIAN_HOST UCLIBC_ENDIAN_LITTLE
-# elif BYTE_ORDER == BIG_ENDIAN
-#  define UCLIBC_ENDIAN_HOST UCLIBC_ENDIAN_BIG
-# endif
-#elif defined(__BYTE_ORDER)
-# if __BYTE_ORDER == __LITTLE_ENDIAN
-#  define UCLIBC_ENDIAN_HOST UCLIBC_ENDIAN_LITTLE
-# elif __BYTE_ORDER == __BIG_ENDIAN
-#  define UCLIBC_ENDIAN_HOST UCLIBC_ENDIAN_BIG
-# endif
-#endif
-#if !defined(UCLIBC_ENDIAN_HOST)
-# error "Unknown host byte order!"
-#endif
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-# define ELFMAG_U32 ((uint32_t)(ELFMAG0 + 0x100 * (ELFMAG1 + (0x100 * (ELFMAG2 + 0x100 * ELFMAG3)))))
-#elif __BYTE_ORDER == __BIG_ENDIAN
-# define ELFMAG_U32 ((uint32_t)((((ELFMAG0 * 0x100) + ELFMAG1) * 0x100 + ELFMAG2) * 0x100 + ELFMAG3))
-#endif
-
 #if defined(__alpha__)
 #define MATCH_MACHINE(x) (x == EM_ALPHA)
 #define ELFCLASSM	ELFCLASS64
+#define ELF_ARCH	EM_ALPHA
 #endif
 
 #if defined(__arm__) || defined(__thumb__)
 #define MATCH_MACHINE(x) (x == EM_ARM)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_ARM
 #endif
 
 #if defined(__avr32__)
 #define MATCH_MACHINE(x) (x == EM_AVR32)
 #define ELFCLASSM      ELFCLASS32
+#define ELF_ARCH	EM_AVR32
 #endif
 
 #if defined(__s390__)
 #define MATCH_MACHINE(x) (x == EM_S390)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_S390
 #endif
 
 #if defined(__hppa__)
@@ -110,13 +89,16 @@
 #else
 #define ELFCLASSM		ELFCLASS32
 #endif
+#define ELF_ARCH	EM_PARISC
 #endif
 
 #if defined(__i386__)
 #ifndef EM_486
 #define MATCH_MACHINE(x) (x == EM_386)
+#define ELF_ARCH	EM_386
 #else
 #define MATCH_MACHINE(x) (x == EM_386 || x == EM_486)
+#define ELF_ARCH	EM_486
 #endif
 #define ELFCLASSM	ELFCLASS32
 #endif
@@ -124,75 +106,78 @@
 #if defined(__ia64__)
 #define MATCH_MACHINE(x) (x == EM_IA_64)
 #define ELFCLASSM	ELFCLASS64
+#define ELF_ARCH	EM_IA_64
 #endif
 
 #if defined(__mc68000__)
 #define MATCH_MACHINE(x) (x == EM_68K)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_68K
 #endif
 
 #if defined(__mips__)
 #define MATCH_MACHINE(x) (x == EM_MIPS || x == EM_MIPS_RS3_LE)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_MIPS
 #endif
 
 #if defined(__powerpc64__)
 #define MATCH_MACHINE(x) (x == EM_PPC64)
 #define ELFCLASSM	ELFCLASS64
+#define ELF_ARCH	EM_PPC64
 #elif defined(__powerpc__)
 #define MATCH_MACHINE(x) (x == EM_PPC)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_PPC
 #endif
 
 #if defined(__sh__)
 #define MATCH_MACHINE(x) (x == EM_SH)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_SH
 #endif
 
 #if defined(__v850e__)
 #define MATCH_MACHINE(x) ((x) == EM_V850 || (x) == EM_CYGNUS_V850)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_V850
 #endif
 
 #if defined(__sparc__)
 #define MATCH_MACHINE(x) ((x) == EM_SPARC || (x) == EM_SPARC32PLUS)
 #define ELFCLASSM    ELFCLASS32
+#define ELF_ARCH	EM_SPARC
 #endif
 
 #if defined(__cris__)
 #define MATCH_MACHINE(x) (x == EM_CRIS)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_CRIS
 #endif
 
 #if defined(__x86_64__)
 #define MATCH_MACHINE(x) (x == EM_X86_64)
 #define ELFCLASSM	ELFCLASS64
+#define ELF_ARCH	EM_X86_64
 #endif
 
 #if defined(__microblaze__)
 #define MATCH_MACHINE(x) (x == EM_MICROBLAZE_OLD)
 #define ELFCLASSM	ELFCLASS32
+#define ELF_ARCH	EM_MICROBLAZE_OLD
 #endif
 
-#ifndef MATCH_MACHINE
-# ifdef __linux__
-#  include <asm/elf.h>
-# endif
-# ifdef ELF_ARCH
-#  define MATCH_MACHINE(x) (x == ELF_ARCH)
-# endif
-# ifdef ELF_CLASS
+#define MATCH_MACHINE(x) (x == ELF_ARCH)
+#ifdef ELF_CLASS
 #  define ELFCLASSM ELF_CLASS
-# endif
-#endif
-#ifndef MATCH_MACHINE
-# warning "You really should add a MATCH_MACHINE() macro for your architecture"
 #endif
 
-#if UCLIBC_ENDIAN_HOST == UCLIBC_ENDIAN_LITTLE
-#define ELFDATAM	ELFDATA2LSB
-#elif UCLIBC_ENDIAN_HOST == UCLIBC_ENDIAN_BIG
-#define ELFDATAM	ELFDATA2MSB
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+# define ELFMAG_U32 ((uint32_t)(ELFMAG0 + 0x100 * (ELFMAG1 + (0x100 * (ELFMAG2 + 0x100 * ELFMAG3)))))
+# define ELFDATAM	ELFDATA2LSB
+#elif __BYTE_ORDER == __BIG_ENDIAN
+# define ELFMAG_U32 ((uint32_t)((((ELFMAG0 * 0x100) + ELFMAG1) * 0x100 + ELFMAG2) * 0x100 + ELFMAG3))
+# define ELFDATAM	ELFDATA2MSB
 #endif
 
 #define ARRAY_SIZE(v)	(sizeof(v) / sizeof(*v))
@@ -301,10 +286,10 @@ static int check_elf_header(ElfW(Ehdr) *const ehdr)
 
 	/* Check if the target endianness matches the host's endianness */
 	byteswap = 0;
-	if (UCLIBC_ENDIAN_HOST == UCLIBC_ENDIAN_LITTLE) {
+	if ( __BYTE_ORDER == __LITTLE_ENDIAN) {
 		if (ehdr->e_ident[5] == ELFDATA2MSB)
 			byteswap = 1;
-	} else if (UCLIBC_ENDIAN_HOST == UCLIBC_ENDIAN_BIG) {
+	} else if ( __BYTE_ORDER == __BIG_ENDIAN) {
 		if (ehdr->e_ident[5] == ELFDATA2LSB)
 			byteswap = 1;
 	}
@@ -649,7 +634,7 @@ foo:
 	    && ehdr->e_ident[EI_CLASS] == ELFCLASSM
 	    && ehdr->e_ident[EI_DATA] == ELFDATAM
 	    && ehdr->e_ident[EI_VERSION] == EV_CURRENT
-	    && MATCH_MACHINE(ehdr->e_machine))
+	    && ehdr->e_machine == ELF_ARCH)
 	{
 		struct stat st;
 		if (stat(interp->path, &st) == 0 && S_ISREG(st.st_mode)) {
