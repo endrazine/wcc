@@ -19,7 +19,7 @@ usage () {
 }
 
 getlibs (){
-	@BINDIR@/wcc-ldd $1|grep "=> "|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
+	@BINDIR@/wcc-ldd $1|grep "=> /"|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
 	echo ""
 }
 
