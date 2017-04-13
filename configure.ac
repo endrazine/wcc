@@ -263,6 +263,30 @@ if test "x$LUA53_LIB_DIR" != "x" ; then
 fi
 
 AC_CHECK_LIB([lua5.3], [lua_settable])
+
+AC_ARG_WITH(luajit53,
+            [AS_HELP_STRING([--with-luajit53],[LUA JIT 5.3 directory (must contain ./lib and ./include)])],
+            [LUAJIT_INC_DIR="${withval}/include";
+            LUAJIT_LIB_DIR="${withval}/lib";],)
+AC_ARG_WITH(luajit53-incdir,
+  	   [AS_HELP_STRING([--with-luajit53-incdir],[LUAJIT 5.3 include directory])],
+	   [LUAJIT_INC_DIR="${withval}";],)
+AC_ARG_WITH(luajit53-libdir,
+           [AS_HELP_STRING([--with-luajit53-libdir],[LUA JIT 5.3 library directory])],
+           [LUAJIT_LIB_DIR="${withval}";],)
+
+if test "x$LUAJIT_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
+fi
+AC_CHECK_HEADERS([luajit.h])
+
+if test "x$LUAJIT_LIB_DIR" != "x" ; then
+   LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
+fi
+
+AC_CHECK_LIB([luajit-5.3], [lua_settable])
+
+
 AC_SEARCH_LIBS([dladdr1], [dl dld])
 
 AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])

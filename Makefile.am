@@ -32,4 +32,6 @@ SUBDIRS = src/wcc src/wld src/wsh src/tools src/wsh/tests
 
 #all-local: doxyfile.stamp
 
+EXTRA_DIST = autogen.sh
+
 #endif

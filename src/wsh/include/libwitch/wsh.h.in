@@ -1,4 +1,4 @@
-	/**
+/**
 *
 * Witchcraft Compiler Collection
 *
@@ -103,9 +103,7 @@
 #include <sys/ptrace.h>
 #include <signal.h>
 
-#define USE_LUA 1
-// Use either lua or luajit
-#ifdef USE_LUA
+#ifndef HAVE_LUAJIT_H
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>

@@ -824,6 +824,9 @@ with_readline_libdir
 with_lua53
 with_lua53_incdir
 with_lua53_libdir
+with_luajit20
+with_luajit20_incdir
+with_luajit20_libdir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1520,6 +1523,10 @@ Optional Packages:
   --with-lua53            LUA 5.3 directory (must contain ./lib and ./include)
   --with-lua53-incdir     LUA 5.3 include directory
   --with-lua53-libdir     LUA 5.3 library directory
+  --with-luajit20         LUA JIT 2.0 directory (must contain ./lib and
+                          ./include)
+  --with-luajit20-incdir  LUAJIT 2.0 include directory
+  --with-luajit20-libdir  LUA JIT 2.0 library directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -17896,6 +17903,94 @@ _ACEOF
   LIBS="-llua5.3 $LIBS"
 
 fi
+
+
+
+# Check whether --with-luajit20 was given.
+if test "${with_luajit20+set}" = set; then :
+  withval=$with_luajit20; LUAJIT_INC_DIR="${withval}/include";
+            LUAJIT_LIB_DIR="${withval}/lib";
+fi
+
+
+# Check whether --with-luajit20-incdir was given.
+if test "${with_luajit20_incdir+set}" = set; then :
+  withval=$with_luajit20_incdir; LUAJIT_INC_DIR="${withval}";
+fi
+
+
+# Check whether --with-luajit20-libdir was given.
+if test "${with_luajit20_libdir+set}" = set; then :
+  withval=$with_luajit20_libdir; LUAJIT_LIB_DIR="${withval}";
+fi
+
+
+if test "x$LUAJIT_INC_DIR" != "x" ; then
+   CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
+fi
+for ac_header in luajit.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "luajit.h" "ac_cv_header_luajit_h" "$ac_includes_default"
+if test "x$ac_cv_header_luajit_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LUAJIT_H 1
+_ACEOF
+
+fi
+
+done
+
+
+if test "x$LUAJIT_LIB_DIR" != "x" ; then
+   LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -lluajit" >&5
+$as_echo_n "checking for lua_settable in -lluajit... " >&6; }
+if ${ac_cv_lib_luajit_lua_settable+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lluajit  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char lua_settable ();
+int
+main ()
+{
+return lua_settable ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_luajit_lua_settable=yes
+else
+  ac_cv_lib_luajit_lua_settable=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_luajit_lua_settable" >&5
+$as_echo "$ac_cv_lib_luajit_lua_settable" >&6; }
+if test "x$ac_cv_lib_luajit_lua_settable" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBLUAJIT 1
+_ACEOF
+
+  LIBS="-lluajit $LIBS"
+
+fi
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dladdr1" >&5
 $as_echo_n "checking for library containing dladdr1... " >&6; }

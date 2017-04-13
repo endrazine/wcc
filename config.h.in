@@ -54,6 +54,9 @@
 /* Define to 1 if you have the `lua5.3' library (-llua5.3). */
 #undef HAVE_LIBLUA5_3
 
+/* Define to 1 if you have the `luajit' library (-lluajit). */
+#undef HAVE_LIBLUAJIT
+
 /* Define to 1 if you have the `openlibm' library (-lopenlibm). */
 #undef HAVE_LIBOPENLIBM
 
@@ -65,6 +68,9 @@
 
 /* Define to 1 if you have the <luaconf.h> header file. */
 #undef HAVE_LUACONF_H
+
+/* Define to 1 if you have the <luajit.h> header file. */
+#undef HAVE_LUAJIT_H
 
 /* Define to 1 if you have the <lualib.h> header file. */
 #undef HAVE_LUALIB_H

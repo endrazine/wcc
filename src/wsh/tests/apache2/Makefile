@@ -206,7 +206,7 @@ CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
 CPP = gcc -E
-CPPFLAGS = -I/usr/include/lua5.3 -I/usr/include/readline -I/usr/include/openlibm -I/usr/include/libiberty -I/usr/include/capstone 
+CPPFLAGS = -I/usr/include/lua5.3/ -I/usr/include/readline -I/usr/include/openlibm -I/usr/include/libiberty -I/usr/include/capstone 
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
