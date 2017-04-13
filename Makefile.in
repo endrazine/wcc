@@ -71,7 +71,10 @@ target_triplet = @target@
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/configure $(top_srcdir)/src/wsh/scripts/INDEX.in \
+	$(top_srcdir)/configure \
+	$(top_srcdir)/src/wsh/include/libwitch/wsh.h.in \
+	$(top_srcdir)/src/wsh/scripts/INDEX.in \
+	$(top_srcdir)/src/wsh/scripts/libmain.in \
 	$(top_srcdir)/src/wsh/scripts/md5.wsh.in \
 	$(top_srcdir)/src/wsh/scripts/print_G.in \
 	$(top_srcdir)/src/wsh/scripts/read.wsh.in AUTHORS config.guess \
@@ -90,7 +93,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES = src/wsh/scripts/INDEX src/wsh/scripts/print_G \
+CONFIG_CLEAN_FILES = src/wsh/scripts/INDEX src/wsh/scripts/libmain \
+	src/wsh/include/libwitch/wsh.h src/wsh/scripts/print_G \
 	src/wsh/scripts/md5.wsh src/wsh/scripts/read.wsh
 CONFIG_CLEAN_VPATH_FILES =
 SOURCES =
@@ -208,6 +212,7 @@ LN_S = @LN_S@
 LOCAL_APACHE2 = @LOCAL_APACHE2@
 LOCAL_LDD = @LOCAL_LDD@
 LOCAL_LUA = @LOCAL_LUA@
+LOCAL_POSTGRES = @LOCAL_POSTGRES@
 LOCAL_SSHD = @LOCAL_SSHD@
 LOCAL_SSHD2 = @LOCAL_SSHD2@
 LTDLDEPS = @LTDLDEPS@
@@ -357,6 +362,10 @@ $(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 distclean-hdr:
 	-rm -f config.h stamp-h1
 src/wsh/scripts/INDEX: $(top_builddir)/config.status $(top_srcdir)/src/wsh/scripts/INDEX.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+src/wsh/scripts/libmain: $(top_builddir)/config.status $(top_srcdir)/src/wsh/scripts/libmain.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+src/wsh/include/libwitch/wsh.h: $(top_builddir)/config.status $(top_srcdir)/src/wsh/include/libwitch/wsh.h.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 src/wsh/scripts/print_G: $(top_builddir)/config.status $(top_srcdir)/src/wsh/scripts/print_G.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@

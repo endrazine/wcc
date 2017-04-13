@@ -17,7 +17,7 @@ function callmain (arg)
 end
 
 
--- callmain({"/usr/sbin/sshd","-V"})
+-- callmain({"@LOCAL_SSHD@","-V"})
 
--- a,b=callmain({"","-h"})
--- a,b=callmain({"","--help"})
+-- a,b=callmain({"@LOCAL_APACHE2@","-h"})
+-- a,b=callmain({"@LOCAL_POSTGRES@","--help"})

@@ -137,8 +137,8 @@
 #include <libelf.h>
 #include <gelf.h>
 
-#define DEFAULT_SCRIPT		"/usr/local/share/wsh/debug"
-#define DEFAULT_SCRIPT_INDEX	"/usr/local/share/wsh/INDEX"
+#define DEFAULT_SCRIPT		"@DATADIR@/debug"
+#define DEFAULT_SCRIPT_INDEX	"@DATADIR@/INDEX"
 #define DEFAULT_WSHRC		".wshrc"
 #define DEFAULT_WSH_PROFILE	".wsh_profile"
 #define PROC_ASLR_PATH		"/proc/sys/kernel/randomize_va_space"

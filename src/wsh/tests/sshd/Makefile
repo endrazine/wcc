@@ -167,6 +167,7 @@ LN_S = ln -s
 LOCAL_APACHE2 = 
 LOCAL_LDD = /opt/buildroot-gcc463/usr/bin/ldd
 LOCAL_LUA = /usr/bin/lua
+LOCAL_POSTGRES = 
 LOCAL_SSHD = /usr/sbin/sshd
 LOCAL_SSHD2 = 
 LTDLDEPS = 
