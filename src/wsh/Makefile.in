@@ -343,10 +343,12 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
-AM_CFLAGS = -masm=intel -mpreferred-stack-boundary=12 -mstackrealign -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now  #--sanitize=address
 AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude
-AM_LDFLAGS = -T ./script.lds
-bin_PROGRAMS = wsh$(EXEEXT)
+@TARGET_IS_X64_FALSE@AM_LDFLAGS = 
+@TARGET_IS_X64_TRUE@AM_LDFLAGS = -T ./script.lds
+@TARGET_IS_I386_TRUE@@TARGET_IS_X64_FALSE@AM_CFLAGS = -masm=intel -mpreferred-stack-boundary=12 -mstackrealign -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now  #--sanitize=address
+@TARGET_IS_X64_TRUE@AM_CFLAGS = -masm=intel -mpreferred-stack-boundary=12 -mstackrealign -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now  #--sanitize=address
+@TARGET_IS_LINUX_TRUE@bin_PROGRAMS = wsh$(EXEEXT)
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
 wsh_LDADD = 
 man_MANS = 

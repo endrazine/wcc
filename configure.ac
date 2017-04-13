@@ -73,6 +73,21 @@ AC_C_STRINGIZE
 AC_C_BIGENDIAN
 AC_FUNC_SELECT_ARGTYPES
 
+AC_CANONICAL_TARGET
+AS_CASE([target],
+       [x86-64-*-*], [IS_X64="true"],
+       [i?86-*-*],   [IS_I386="true"],
+       [IS_X64="false",IS_I386="false"]
+)
+AS_CASE([target],
+       [*-linux-*], [IS_LINUX=true],
+       [IS_LINUX=false]
+)
+AM_CONDITIONAL(TARGET_IS_X64, [test "$IS_X64" = "true"])
+AM_CONDITIONAL(TARGET_IS_I386, test "$IS_I386" = "true"]])
+AM_CONDITIONAL(TARGET_IS_LINUX, test "$IS_LINUX" = "true"]])
+
+
 AC_CHECK_HEADERS([sys/procfs.h sys/prctl.h link.h stropts.h malloc.h])
 
 AC_ARG_WITH(libelf,

@@ -650,6 +650,12 @@ DOXYGEN
 HAVE_LDD_FALSE
 HAVE_LDD_TRUE
 LOCAL_LDD
+TARGET_IS_LINUX_FALSE
+TARGET_IS_LINUX_TRUE
+TARGET_IS_I386_FALSE
+TARGET_IS_I386_TRUE
+TARGET_IS_X64_FALSE
+TARGET_IS_X64_TRUE
 LTDLOPEN
 LT_CONFIG_H
 subdirs
@@ -18255,6 +18261,49 @@ _ACEOF
 rm -f conftest*
 
 
+
+case target in #(
+  x86-64-*-*) :
+    IS_X64="true" ;; #(
+  i?86-*-*) :
+    IS_I386="true" ;; #(
+  *) :
+    IS_X64="false",IS_I386="false"
+ ;;
+esac
+case target in #(
+  *-linux-*) :
+    IS_LINUX=true ;; #(
+  *) :
+    IS_LINUX=false
+ ;;
+esac
+ if test "$IS_X64" = "true"; then
+  TARGET_IS_X64_TRUE=
+  TARGET_IS_X64_FALSE='#'
+else
+  TARGET_IS_X64_TRUE='#'
+  TARGET_IS_X64_FALSE=
+fi
+
+ if test "$IS_I386" = "true"]]; then
+  TARGET_IS_I386_TRUE=
+  TARGET_IS_I386_FALSE='#'
+else
+  TARGET_IS_I386_TRUE='#'
+  TARGET_IS_I386_FALSE=
+fi
+
+ if test "$IS_LINUX" = "true"]]; then
+  TARGET_IS_LINUX_TRUE=
+  TARGET_IS_LINUX_FALSE='#'
+else
+  TARGET_IS_LINUX_TRUE='#'
+  TARGET_IS_LINUX_FALSE=
+fi
+
+
+
 for ac_header in sys/procfs.h sys/prctl.h link.h stropts.h malloc.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
@@ -19273,6 +19322,18 @@ LT_CONFIG_H=config.h
 
 
 
+if test -z "${TARGET_IS_X64_TRUE}" && test -z "${TARGET_IS_X64_FALSE}"; then
+  as_fn_error $? "conditional \"TARGET_IS_X64\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${TARGET_IS_I386_TRUE}" && test -z "${TARGET_IS_I386_FALSE}"; then
+  as_fn_error $? "conditional \"TARGET_IS_I386\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${TARGET_IS_LINUX_TRUE}" && test -z "${TARGET_IS_LINUX_FALSE}"; then
+  as_fn_error $? "conditional \"TARGET_IS_LINUX\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${HAVE_LDD_TRUE}" && test -z "${HAVE_LDD_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_LDD\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
