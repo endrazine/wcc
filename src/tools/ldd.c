@@ -29,10 +29,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#ifdef __LDSO_LDD_SUPPORT__
-# include <sys/wait.h>
-#endif
+#include <sys/wait.h>
 
 #if defined(_WIN32) || defined(_WINNT)
 # include "mmap-windows.c"
@@ -58,10 +55,6 @@
 /* For SunOS */
 #ifndef PATH_MAX
 #define PATH_MAX _POSIX_PATH_MAX
-#endif
-
-#ifndef UCLIBC_RUNTIME_PREFIX
-# define UCLIBC_RUNTIME_PREFIX "/"
 #endif
 
 #undef UCLIBC_ENDIAN_HOST
@@ -203,7 +196,7 @@
 #endif
 
 #define ARRAY_SIZE(v)	(sizeof(v) / sizeof(*v))
-#define TRUSTED_LDSO	UCLIBC_RUNTIME_PREFIX "lib/" UCLIBC_LDSO
+#define TRUSTED_LDSO	"/lib/" UCLIBC_LDSO
 
 struct library {
 	char *name;
@@ -328,87 +321,12 @@ static int check_elf_header(ElfW(Ehdr) *const ehdr)
 	return 0;
 }
 
-#ifdef __LDSO_CACHE_SUPPORT__
-static caddr_t cache_addr = NULL;
-static size_t cache_size = 0;
-
-static int map_cache(void)
-{
-	int fd;
-	struct stat st;
-	header_t *header;
-	libentry_t *libent;
-	int i, strtabsize;
-
-	if (cache_addr == (caddr_t) - 1)
-		return -1;
-	else if (cache_addr != NULL)
-		return 0;
-
-	if (stat(LDSO_CACHE, &st) || (fd = open(LDSO_CACHE, O_RDONLY)) < 0) {
-		fprintf(stderr, "ldd: can't open cache '%s'\n", LDSO_CACHE);
-		cache_addr = (caddr_t) - 1;	/* so we won't try again */
-		return -1;
-	}
-
-	cache_size = st.st_size;
-	cache_addr = mmap(0, cache_size, PROT_READ, MAP_SHARED, fd, 0);
-	close(fd);
-	if (cache_addr == MAP_FAILED) {
-		fprintf(stderr, "ldd: can't map cache '%s'\n", LDSO_CACHE);
-		return -1;
-	}
-
-	header = (header_t *) cache_addr;
-
-	if (cache_size < sizeof(header_t)
-	    || memcmp(header->magic, LDSO_CACHE_MAGIC, LDSO_CACHE_MAGIC_LEN)
-	    || memcmp(header->version, LDSO_CACHE_VER, LDSO_CACHE_VER_LEN)
-	    || cache_size < (sizeof(header_t) + header->nlibs * sizeof(libentry_t))
-	    || cache_addr[cache_size - 1] != '\0')
-	{
-		fprintf(stderr, "ldd: cache '%s' is corrupt\n", LDSO_CACHE);
-		goto fail;
-	}
-
-	strtabsize = cache_size - sizeof(header_t) - header->nlibs * sizeof(libentry_t);
-	libent = (libentry_t *) & header[1];
-
-	for (i = 0; i < header->nlibs; i++) {
-		if (libent[i].sooffset >= strtabsize || libent[i].liboffset >= strtabsize) {
-			fprintf(stderr, "ldd: cache '%s' is corrupt\n", LDSO_CACHE);
-			goto fail;
-		}
-	}
-
-	return 0;
-
-fail:
-	munmap(cache_addr, cache_size);
-	cache_addr = (caddr_t) - 1;
-	return -1;
-}
-
-static int unmap_cache(void)
-{
-	if (cache_addr == NULL || cache_addr == (caddr_t) - 1)
-		return -1;
-
-#if 1
-	munmap(cache_addr, cache_size);
-	cache_addr = NULL;
-#endif
-
-	return 0;
-}
-#else
 static __inline__ void map_cache(void)
 {
 }
 static __inline__ void unmap_cache(void)
 {
 }
-#endif
 
 /* This function's behavior must exactly match that
  * in uClibc/ldso/ldso/dl-elf.c */
@@ -502,25 +420,6 @@ static void locate_library_file(ElfW(Ehdr) *ehdr, ElfW(Dyn) *dynamic,
 			return;
 		}
 	}
-#ifdef __LDSO_CACHE_SUPPORT__
-	if (cache_addr != NULL && cache_addr != (caddr_t) - 1) {
-		int i;
-		header_t *header = (header_t *) cache_addr;
-		libentry_t *libent = (libentry_t *) & header[1];
-		char *strs = (char *)&libent[header->nlibs];
-
-		for (i = 0; i < header->nlibs; i++) {
-			if ((libent[i].flags == LIB_ELF ||
-			     libent[i].flags == LIB_ELF_LIBC0 ||
-			     libent[i].flags == LIB_ELF_LIBC5) &&
-			    strcmp(lib->name, strs + libent[i].sooffset) == 0)
-			{
-				lib->path = strdup(strs + libent[i].liboffset);
-				return;
-			}
-		}
-	}
-#endif
 
 	/* Next look for libraries wherever the shared library
 	 * loader was installed -- this is usually where we
@@ -535,10 +434,7 @@ static void locate_library_file(ElfW(Ehdr) *ehdr, ElfW(Dyn) *dynamic,
 
 	/* Lastly, search the standard list of paths for the library.
 	   This list must exactly match the list in uClibc/ldso/ldso/dl-elf.c */
-	path = UCLIBC_RUNTIME_PREFIX "lib:" UCLIBC_RUNTIME_PREFIX "usr/lib"
-#ifndef __LDSO_CACHE_SUPPORT__
-	    ":" UCLIBC_RUNTIME_PREFIX "usr/X11R6/lib"
-#endif
+	path = "/lib:/usr/lib:/usr/X11R6/lib"
 	    ;
 	search_for_named_library(lib->name, buf, path);
 	if (*buf != '\0') {
@@ -621,7 +517,6 @@ static void find_needed_libraries(ElfW(Ehdr) *ehdr, ElfW(Dyn) *dynamic, int is_s
 	}
 }
 
-#ifdef __LDSO_LDD_SUPPORT__
 static struct library *find_elf_interpreter(ElfW(Ehdr) *ehdr)
 {
 	ElfW(Phdr) *phdr;
@@ -672,22 +567,11 @@ static struct library *find_elf_interpreter(ElfW(Ehdr) *ehdr)
 		newlib->path = strdup(newlib->name);
 		newlib->resolved = 1;
 		newlib->next = NULL;
-
-#if 0
-		/*printf("find_elf_interpreter is adding '%s' to '%s'\n", newlib->name, newlib->path); */
-		if (!lib_list) {
-			lib_list = newlib;
-		} else {
-			for (cur = lib_list; cur->next; cur = cur->next) ;	/* nothing */
-			cur->next = newlib;
-		}
-#endif
 		interpreter_already_found = 1;
 		return newlib;
 	}
 	return NULL;
 }
-#endif /* __LDSO_LDD_SUPPORT__ */
 
 /* map the .so, and locate interesting pieces */
 /*
@@ -701,9 +585,7 @@ static int find_dependencies(char *filename)
 	ElfW(Ehdr) *ehdr = NULL;
 	ElfW(Shdr) *dynsec = NULL;
 	ElfW(Dyn) *dynamic = NULL;
-#ifdef __LDSO_LDD_SUPPORT__
 	struct library *interp;
-#endif
 
 	if (filename == not_found)
 		return 0;
@@ -760,7 +642,6 @@ foo:
 	}
 
 	interpreter_already_found = 0;
-#ifdef __LDSO_LDD_SUPPORT__
 	interp = find_elf_interpreter(ehdr);
 
 	if (interp
@@ -780,57 +661,16 @@ foo:
 				"LD_TRACE_LOADED_OBJECTS=1",
 				NULL
 			};
-# ifdef __LDSO_STANDALONE_SUPPORT__
-			char * lib_path = getenv("LD_LIBRARY_PATH");
-			/* The 'extended' environment inclusing the LD_LIBRARY_PATH */
-			static char *ext_environment[ARRAY_SIZE(environment) + 1];
-			char **envp = (char **) environment;
 
-			if (lib_path) {
-				/*
-				 * If the LD_LIBRARY_PATH is set, it needs to include it
-				 * into the environment for the new process to be spawned
-				 */
-				char ** eenvp = (char **) ext_environment;
-
-				/* Copy the N-1 environment's entries */
-				while (*envp)
-					*eenvp++=*envp++;
-
-				/* Make room for LD_LIBRARY_PATH */
-				*eenvp = (char *) malloc(sizeof("LD_LIBRARY_PATH=")
-									  + strlen(lib_path));
-				strcpy(*eenvp, "LD_LIBRARY_PATH=");
-				strcat(*eenvp, lib_path);
-				lib_path = *eenvp;
-				/* ext_environment[size] is already NULL */
-
-				/* Use the extended environment */
-				envp = ext_environment;
-			}
-			if ((pid = vfork()) == 0) {
-				/*
-				 * Force to use the standard dynamic linker in stand-alone mode.
-				 * It will fails at runtime if support is not actually available
-				 */
-				execle(TRUSTED_LDSO, TRUSTED_LDSO, filename, NULL, envp);
-				_exit(0xdead);
-			}
-# else
 			if ((pid = vfork()) == 0) {
 				/* Cool, it looks like we should be able to actually
 				 * run this puppy.  Do so now... */
 				execle(filename, filename, NULL, environment);
 				_exit(0xdead);
 			}
-# endif
+
 			/* Wait till it returns */
 			waitpid(pid, &status, 0);
-
-# ifdef __LDSO_STANDALONE_SUPPORT__
-			/* Do not leak */
-			free(lib_path);
-# endif
 
 			if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
 				return 1;
@@ -841,7 +681,6 @@ foo:
 			 * in the ELF headers... */
 		}
 	}
-#endif
 
 	dynsec = elf_find_section_type(SHT_DYNAMIC, ehdr);
 	if (dynsec) {
