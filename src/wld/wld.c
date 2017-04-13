@@ -114,10 +114,10 @@ int print_version(void)
 int main(int argc, char **argv)
 {
 
-  if ((argc < 2)||(strncmp(argv[1],"-libify",7))) {
+  if ((argc < 2)||(strncmp(argv[1],"--libify",8))) {
     print_version();
     printf("\nUsage: %s [options] file\n", argc > 0 ? argv[0] : DEFAULT_NAME);
-    printf("\noptions:\n\n    -libify          Set Class to ET_DYN in input ELF file.\n\n");
+    printf("\noptions:\n\n    --libify          Set Class to ET_DYN in input ELF file.\n\n");
     exit(EXIT_FAILURE);
   }
 
