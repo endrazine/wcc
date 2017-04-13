@@ -34,6 +34,7 @@
 
 
 
+
 am__make_dryrun = \
   { \
     am__dry=no; \
@@ -72,8 +73,8 @@ host_triplet = x86_64-unknown-linux-gnu
 target_triplet = x86_64-unknown-linux-gnu
 EXTRA_PROGRAMS =
 subdir = src/tools
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(srcdir)/wcch.in $(srcdir)/wldd.in
+DIST_COMMON = $(noinst_HEADERS) $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in $(srcdir)/wcch.in $(srcdir)/wldd.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/argz.m4 \
 	$(top_srcdir)/m4/as-ac-expand.m4 \
@@ -141,6 +142,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -195,7 +197,6 @@ LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
 LOCAL_APACHE2 = 
-LOCAL_LDD = /opt/buildroot-gcc463/usr/bin/ldd
 LOCAL_LUA = /usr/bin/lua
 LOCAL_POSTGRES = 
 LOCAL_SSHD = /usr/sbin/sshd
@@ -298,6 +299,7 @@ AM_LDFLAGS =
 bin_SCRIPTS = wcch wldd
 bin_PROGRAMS = wcc-ldd$(EXEEXT)
 wcc_ldd_SOURCES = ldd.c
+noinst_HEADERS = bswap.h
 CLEANFILES = $(bin_SCRIPTS)
 all: all-am
 
@@ -572,7 +574,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS) $(SCRIPTS)
+all-am: Makefile $(PROGRAMS) $(SCRIPTS) $(HEADERS)
 installdirs:
 	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \

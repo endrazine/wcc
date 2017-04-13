@@ -280,8 +280,6 @@ dnl The dlopen() function is in the C library for *BSD and in
 dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([lua5.3], [lua_settable])
 
-AC_PATH_TARGET_TOOL([LOCAL_LDD], [ldd])
-AM_CONDITIONAL(HAVE_LDD, [test -n "$LOCAL_LDD"])
 AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])
 AM_CONDITIONAL(HAVE_LUA, [test -n "$LOCAL_LUA"])
 AC_PATH_TARGET_TOOL([LOCAL_APACHE2], [apache2])
