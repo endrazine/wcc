@@ -39,15 +39,15 @@ Under Ubuntu/Debian those dependencies can be installed with the following comma
 ### Fetching the code over git
 This will download the code of wcc from the internet to a directory named wcc in the current working directory:
 
-	git clone https://github.com/endrazine/wcc.git
+    git clone https://github.com/endrazine/wcc.git
 
 You can then enter this directory with:
-	cd wcc
+    cd wcc
 
 ### Initializing git submodules
 From your root wcc directory, type:
-	git submodule init
-	git submodule update
+    git submodule init
+    git submodule update
 
 #### Building WCC
 From your root wcc directory, type:
