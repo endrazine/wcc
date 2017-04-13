@@ -24,8 +24,11 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 
-bin_SCRIPTS = wcch
-if HAVE_LDD
-bin_SCRIPTS += wldd
-endif
+bin_SCRIPTS = wcch wldd
+bin_PROGRAMS = wcc-ldd$(EXEEXT)
+EXTRA_PROGRAMS = 
+
+wcc_ldd_SOURCES = ldd.c
+noinst_HEADERS = bswap.h
+
 CLEANFILES = $(bin_SCRIPTS)
