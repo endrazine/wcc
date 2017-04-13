@@ -33,6 +33,8 @@
 #*/
 
 
+
+
 VPATH = @srcdir@
 am__make_dryrun = \
   { \
@@ -70,6 +72,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
+@HAVE_LUA_TRUE@@TARGET_IS_LINUX_TRUE@am__append_1 = scripts/print_G
 EXTRA_PROGRAMS =
 subdir = src/wsh
 DIST_COMMON = $(noinst_HEADERS) $(srcdir)/Makefile.am \
@@ -88,12 +91,41 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(bindir)"
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" \
+	"$(DESTDIR)$(wshdir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_wsh_OBJECTS = wsh.$(OBJEXT) wshmain.$(OBJEXT) helper.$(OBJEXT) \
 	linenoise.$(OBJEXT)
 wsh_OBJECTS = $(am_wsh_OBJECTS)
 wsh_DEPENDENCIES =
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+SCRIPTS = $(bin_SCRIPTS)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -114,6 +146,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+DATA = $(wsh_DATA)
 HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -137,6 +170,7 @@ CXXCPP = @CXXCPP@
 CXXDEPMODE = @CXXDEPMODE@
 CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
+DATADIR = @DATADIR@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DOXYGEN = @DOXYGEN@
@@ -169,6 +203,7 @@ LIPO = @LIPO@
 LN_S = @LN_S@
 LOCAL_APACHE2 = @LOCAL_APACHE2@
 LOCAL_LDD = @LOCAL_LDD@
+LOCAL_LUA = @LOCAL_LUA@
 LOCAL_SSHD = @LOCAL_SSHD@
 LOCAL_SSHD2 = @LOCAL_SSHD2@
 LTDLDEPS = @LTDLDEPS@
@@ -268,10 +303,14 @@ AM_CFLAGS = -mpreferred-stack-boundary=12 -mstackrealign -W -Wall -Wextra -O0 -g
 @TARGET_IS_X64_FALSE@AM_LDFLAGS = 
 @TARGET_IS_X64_TRUE@AM_LDFLAGS = -T ./script.lds
 @TARGET_IS_LINUX_TRUE@bin_PROGRAMS = wsh$(EXEEXT)
+@TARGET_IS_LINUX_TRUE@bin_SCRIPTS = scripts/read.wsh scripts/md5.wsh \
+@TARGET_IS_LINUX_TRUE@	$(am__append_1)
+@TARGET_IS_LINUX_TRUE@wshdir = @DATADIR@
+@TARGET_IS_LINUX_TRUE@wsh_DATA = scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
 wsh_LDADD = 
 man_MANS = 
-noinst_HEADERS = 
+noinst_HEADERS = include/linenoise.h include/colors.h 
 EXTRA_DIST = $(man_MANS)
 all: all-am
 
@@ -372,6 +411,56 @@ installcheck-binPROGRAMS: $(bin_PROGRAMS)
 wsh$(EXEEXT): $(wsh_OBJECTS) $(wsh_DEPENDENCIES) $(EXTRA_wsh_DEPENDENCIES) 
 	@rm -f wsh$(EXEEXT)
 	$(LINK) $(wsh_OBJECTS) $(wsh_LDADD) $(LIBS)
+install-binSCRIPTS: $(bin_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
+	done | \
+	sed -e 'p;s,.*/,,;n' \
+	    -e 'h;s|.*|.|' \
+	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
+	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
+	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
+	      if (++n[d] == $(am__install_max)) { \
+		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
+	    else { print "f", d "/" $$4, $$1 } } \
+	  END { for (d in files) print "f", d, files[d] }' | \
+	while read type dir files; do \
+	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	     test -z "$$files" || { \
+	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	     } \
+	; done
+
+uninstall-binSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	files=`for p in $$list; do echo "$$p"; done | \
+	       sed -e 's,.*/,,;$(transform)'`; \
+	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
+
+installcheck-binSCRIPTS: $(bin_SCRIPTS)
+	bad=0; pid=$$$$; list="$(bin_SCRIPTS)"; for p in $$list; do \
+	  case ' $(AM_INSTALLCHECK_STD_OPTIONS_EXEMPT) ' in \
+	   *" $$p "* | *" $(srcdir)/$$p "*) continue;; \
+	  esac; \
+	  f=`echo "$$p" | sed 's,^.*/,,;$(transform)'`; \
+	  for opt in --help --version; do \
+	    if "$(DESTDIR)$(bindir)/$$f" $$opt >c$${pid}_.out \
+	         2>c$${pid}_.err </dev/null \
+		 && test -n "`cat c$${pid}_.out`" \
+		 && test -z "`cat c$${pid}_.err`"; then :; \
+	    else echo "$$f does not support $$opt" 1>&2; bad=1; fi; \
+	  done; \
+	done; rm -f c$${pid}_.???; exit $$bad
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -410,6 +499,27 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-wshDATA: $(wsh_DATA)
+	@$(NORMAL_INSTALL)
+	@list='$(wsh_DATA)'; test -n "$(wshdir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(wshdir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(wshdir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(wshdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(wshdir)" || exit $$?; \
+	done
+
+uninstall-wshDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(wsh_DATA)'; test -n "$(wshdir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(wshdir)'; $(am__uninstall_files_from_dir)
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
@@ -495,9 +605,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS) $(HEADERS)
+all-am: Makefile $(PROGRAMS) $(SCRIPTS) $(DATA) $(HEADERS)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(wshdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -552,13 +662,13 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-wshDATA
 
 install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binPROGRAMS
+install-exec-am: install-binPROGRAMS install-binSCRIPTS
 
 install-html: install-html-am
 
@@ -578,7 +688,7 @@ install-ps: install-ps-am
 
 install-ps-am:
 
-installcheck-am: installcheck-binPROGRAMS
+installcheck-am: installcheck-binPROGRAMS installcheck-binSCRIPTS
 
 maintainer-clean: maintainer-clean-am
 	-rm -rf ./$(DEPDIR)
@@ -598,7 +708,8 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
+uninstall-am: uninstall-binPROGRAMS uninstall-binSCRIPTS \
+	uninstall-wshDATA
 
 .MAKE: install-am install-strip
 
@@ -606,15 +717,17 @@ uninstall-am: uninstall-binPROGRAMS
 	clean-generic clean-libtool ctags distclean distclean-compile \
 	distclean-generic distclean-libtool distclean-tags distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am \
-	installcheck-binPROGRAMS installdirs maintainer-clean \
+	install-binPROGRAMS install-binSCRIPTS install-data \
+	install-data-am install-dvi install-dvi-am install-exec \
+	install-exec-am install-html install-html-am install-info \
+	install-info-am install-man install-pdf install-pdf-am \
+	install-ps install-ps-am install-strip install-wshDATA \
+	installcheck installcheck-am installcheck-binPROGRAMS \
+	installcheck-binSCRIPTS installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags uninstall uninstall-am uninstall-binPROGRAMS
+	tags uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-binSCRIPTS uninstall-wshDATA
 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

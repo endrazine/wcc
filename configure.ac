@@ -282,21 +282,27 @@ AC_CHECK_LIB([lua5.3], [lua_settable])
 
 AC_PATH_TARGET_TOOL([LOCAL_LDD], [ldd])
 AM_CONDITIONAL(HAVE_LDD, [test -n "$LOCAL_LDD"])
-AC_PATH_TOOL([LOCAL_APACHE2], [apache2])
+AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])
+AM_CONDITIONAL(HAVE_LUA, [test -n "$LOCAL_LUA"])
+AC_PATH_TARGET_TOOL([LOCAL_APACHE2], [apache2])
 AM_CONDITIONAL(HAVE_APACHE2, [test -n "$LOCAL_APACHE2"])
-AC_PATH_TOOL([LOCAL_SSHD], [sshd])
+AC_PATH_TARGET_TOOL([LOCAL_SSHD], [sshd])
 AM_CONDITIONAL(HAVE_SSHD, [test -n "$LOCAL_SSHD"])
-AC_PATH_TOOL([LOCAL_SSHD2], [sshd2])
+AC_PATH_TARGET_TOOL([LOCAL_SSHD2], [sshd2])
 AM_CONDITIONAL(HAVE_SSHD2, [test -n "$LOCAL_SSHD2"])
 AC_PATH_TOOL([DOXYGEN], [doxygen])
 AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
 AX_CHECK_COMPILE_FLAG([-masm=intel], [CFLAGS="$CFLAGS -masm=intel"])
 
 AS_AC_EXPAND(BINDIR, $bindir)
+AS_AC_EXPAND(DATADIR, ${datadir}/wsh)
 
 dnl generate output
-AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile])
+AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX])
 AC_CONFIG_FILES([src/tools/wldd], [chmod +x src/tools/wldd])
 AC_CONFIG_FILES([src/tools/wcch], [chmod +x src/tools/wcch])
+AC_CONFIG_FILES([src/wsh/scripts/print_G], [chmod +x src/wsh/scripts/print_G])
+AC_CONFIG_FILES([src/wsh/scripts/md5.wsh], [chmod +x src/wsh/scripts/md5.wsh])
+AC_CONFIG_FILES([src/wsh/scripts/read.wsh], [chmod +x src/wsh/scripts/read.wsh])
 
 AC_OUTPUT

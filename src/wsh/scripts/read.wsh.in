@@ -1,4 +1,4 @@
-#!/usr/local/bin/wsh
+#!@BINDIR@/wsh
 
  fname="/etc/passwd"
  printf("\n ** Reading file %s\n", fname)

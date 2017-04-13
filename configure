@@ -623,6 +623,7 @@ am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+DATADIR
 BINDIR
 HAVE_DOXYGEN_FALSE
 HAVE_DOXYGEN_TRUE
@@ -636,6 +637,9 @@ LOCAL_SSHD
 HAVE_APACHE2_FALSE
 HAVE_APACHE2_TRUE
 LOCAL_APACHE2
+HAVE_LUA_FALSE
+HAVE_LUA_TRUE
+LOCAL_LUA
 HAVE_LDD_FALSE
 HAVE_LDD_TRUE
 LOCAL_LDD
@@ -17358,9 +17362,106 @@ else
   HAVE_LDD_FALSE=
 fi
 
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}apache2", so it can be a program name with args.
-set dummy ${ac_tool_prefix}apache2; ac_word=$2
+# Extract the first word of "$target_alias-lua", so it can be a program name with args.
+set dummy $target_alias-lua; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_LOCAL_LUA+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $LOCAL_LUA in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_LOCAL_LUA="$LOCAL_LUA" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_LOCAL_LUA="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+LOCAL_LUA=$ac_cv_path_LOCAL_LUA
+if test -n "$LOCAL_LUA"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LOCAL_LUA" >&5
+$as_echo "$LOCAL_LUA" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test -z "$ac_cv_path_LOCAL_LUA"; then
+  if test "$build" = "$target"; then
+    ac_pt_LOCAL_LUA=$LOCAL_LUA
+    # Extract the first word of "lua", so it can be a program name with args.
+set dummy lua; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_ac_pt_LOCAL_LUA+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $ac_pt_LOCAL_LUA in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_ac_pt_LOCAL_LUA="$ac_pt_LOCAL_LUA" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_ac_pt_LOCAL_LUA="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+ac_pt_LOCAL_LUA=$ac_cv_path_ac_pt_LOCAL_LUA
+if test -n "$ac_pt_LOCAL_LUA"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_pt_LOCAL_LUA" >&5
+$as_echo "$ac_pt_LOCAL_LUA" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+    LOCAL_LUA=$ac_pt_LOCAL_LUA
+  else
+    LOCAL_LUA=""
+  fi
+else
+  LOCAL_LUA="$ac_cv_path_LOCAL_LUA"
+fi
+
+ if test -n "$LOCAL_LUA"; then
+  HAVE_LUA_TRUE=
+  HAVE_LUA_FALSE='#'
+else
+  HAVE_LUA_TRUE='#'
+  HAVE_LUA_FALSE=
+fi
+
+# Extract the first word of "$target_alias-apache2", so it can be a program name with args.
+set dummy $target_alias-apache2; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
 if ${ac_cv_path_LOCAL_APACHE2+:} false; then :
@@ -17399,10 +17500,10 @@ $as_echo "no" >&6; }
 fi
 
 
-fi
 if test -z "$ac_cv_path_LOCAL_APACHE2"; then
-  ac_pt_LOCAL_APACHE2=$LOCAL_APACHE2
-  # Extract the first word of "apache2", so it can be a program name with args.
+  if test "$build" = "$target"; then
+    ac_pt_LOCAL_APACHE2=$LOCAL_APACHE2
+    # Extract the first word of "apache2", so it can be a program name with args.
 set dummy apache2; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -17441,16 +17542,9 @@ else
 $as_echo "no" >&6; }
 fi
 
-  if test "x$ac_pt_LOCAL_APACHE2" = x; then
-    LOCAL_APACHE2=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
-$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
-ac_tool_warned=yes ;;
-esac
     LOCAL_APACHE2=$ac_pt_LOCAL_APACHE2
+  else
+    LOCAL_APACHE2=""
   fi
 else
   LOCAL_APACHE2="$ac_cv_path_LOCAL_APACHE2"
@@ -17464,9 +17558,8 @@ else
   HAVE_APACHE2_FALSE=
 fi
 
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}sshd", so it can be a program name with args.
-set dummy ${ac_tool_prefix}sshd; ac_word=$2
+# Extract the first word of "$target_alias-sshd", so it can be a program name with args.
+set dummy $target_alias-sshd; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
 if ${ac_cv_path_LOCAL_SSHD+:} false; then :
@@ -17505,10 +17598,10 @@ $as_echo "no" >&6; }
 fi
 
 
-fi
 if test -z "$ac_cv_path_LOCAL_SSHD"; then
-  ac_pt_LOCAL_SSHD=$LOCAL_SSHD
-  # Extract the first word of "sshd", so it can be a program name with args.
+  if test "$build" = "$target"; then
+    ac_pt_LOCAL_SSHD=$LOCAL_SSHD
+    # Extract the first word of "sshd", so it can be a program name with args.
 set dummy sshd; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -17547,16 +17640,9 @@ else
 $as_echo "no" >&6; }
 fi
 
-  if test "x$ac_pt_LOCAL_SSHD" = x; then
-    LOCAL_SSHD=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
-$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
-ac_tool_warned=yes ;;
-esac
     LOCAL_SSHD=$ac_pt_LOCAL_SSHD
+  else
+    LOCAL_SSHD=""
   fi
 else
   LOCAL_SSHD="$ac_cv_path_LOCAL_SSHD"
@@ -17570,9 +17656,8 @@ else
   HAVE_SSHD_FALSE=
 fi
 
-if test -n "$ac_tool_prefix"; then
-  # Extract the first word of "${ac_tool_prefix}sshd2", so it can be a program name with args.
-set dummy ${ac_tool_prefix}sshd2; ac_word=$2
+# Extract the first word of "$target_alias-sshd2", so it can be a program name with args.
+set dummy $target_alias-sshd2; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
 if ${ac_cv_path_LOCAL_SSHD2+:} false; then :
@@ -17611,10 +17696,10 @@ $as_echo "no" >&6; }
 fi
 
 
-fi
 if test -z "$ac_cv_path_LOCAL_SSHD2"; then
-  ac_pt_LOCAL_SSHD2=$LOCAL_SSHD2
-  # Extract the first word of "sshd2", so it can be a program name with args.
+  if test "$build" = "$target"; then
+    ac_pt_LOCAL_SSHD2=$LOCAL_SSHD2
+    # Extract the first word of "sshd2", so it can be a program name with args.
 set dummy sshd2; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -17653,16 +17738,9 @@ else
 $as_echo "no" >&6; }
 fi
 
-  if test "x$ac_pt_LOCAL_SSHD2" = x; then
-    LOCAL_SSHD2=""
-  else
-    case $cross_compiling:$ac_tool_warned in
-yes:)
-{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
-$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
-ac_tool_warned=yes ;;
-esac
     LOCAL_SSHD2=$ac_pt_LOCAL_SSHD2
+  else
+    LOCAL_SSHD2=""
   fi
 else
   LOCAL_SSHD2="$ac_cv_path_LOCAL_SSHD2"
@@ -17849,11 +17927,45 @@ fi
   exec_prefix=$exec_prefix_save
 
 
-ac_config_files="$ac_config_files Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile"
+  EXP_VAR=DATADIR
+  FROM_VAR=${datadir}/wsh
+
+    prefix_save=$prefix
+  exec_prefix_save=$exec_prefix
+
+    if test "x$prefix" = "xNONE"; then
+    prefix="$ac_default_prefix"
+  fi
+    if test "x$exec_prefix" = "xNONE"; then
+    exec_prefix=$prefix
+  fi
+
+  full_var="$FROM_VAR"
+    while true; do
+    new_full_var="`eval echo $full_var`"
+    if test "x$new_full_var" = "x$full_var"; then break; fi
+    full_var=$new_full_var
+  done
+
+    full_var=$new_full_var
+  DATADIR="$full_var"
+
+
+    prefix=$prefix_save
+  exec_prefix=$exec_prefix_save
+
+
+ac_config_files="$ac_config_files Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX"
 
 ac_config_files="$ac_config_files src/tools/wldd"
 
 ac_config_files="$ac_config_files src/tools/wcch"
+
+ac_config_files="$ac_config_files src/wsh/scripts/print_G"
+
+ac_config_files="$ac_config_files src/wsh/scripts/md5.wsh"
+
+ac_config_files="$ac_config_files src/wsh/scripts/read.wsh"
 
 
 cat >confcache <<\_ACEOF
@@ -18025,6 +18137,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_LDD_TRUE}" && test -z "${HAVE_LDD_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_LDD\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${HAVE_LUA_TRUE}" && test -z "${HAVE_LUA_FALSE}"; then
+  as_fn_error $? "conditional \"HAVE_LUA\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_APACHE2_TRUE}" && test -z "${HAVE_APACHE2_FALSE}"; then
@@ -19019,8 +19135,12 @@ do
     "src/wsh/tests/sshd/Makefile") CONFIG_FILES="$CONFIG_FILES src/wsh/tests/sshd/Makefile" ;;
     "src/wsh/tests/sshd2/Makefile") CONFIG_FILES="$CONFIG_FILES src/wsh/tests/sshd2/Makefile" ;;
     "src/tools/Makefile") CONFIG_FILES="$CONFIG_FILES src/tools/Makefile" ;;
+    "src/wsh/scripts/INDEX") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/INDEX" ;;
     "src/tools/wldd") CONFIG_FILES="$CONFIG_FILES src/tools/wldd" ;;
     "src/tools/wcch") CONFIG_FILES="$CONFIG_FILES src/tools/wcch" ;;
+    "src/wsh/scripts/print_G") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/print_G" ;;
+    "src/wsh/scripts/md5.wsh") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/md5.wsh" ;;
+    "src/wsh/scripts/read.wsh") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/read.wsh" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
   esac
@@ -20524,6 +20644,9 @@ _LT_EOF
  ;;
     "src/tools/wldd":F) chmod +x src/tools/wldd ;;
     "src/tools/wcch":F) chmod +x src/tools/wcch ;;
+    "src/wsh/scripts/print_G":F) chmod +x src/wsh/scripts/print_G ;;
+    "src/wsh/scripts/md5.wsh":F) chmod +x src/wsh/scripts/md5.wsh ;;
+    "src/wsh/scripts/read.wsh":F) chmod +x src/wsh/scripts/read.wsh ;;
 
   esac
 done # for ac_tag

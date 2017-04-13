@@ -1,4 +1,4 @@
-#!/usr/local/bin/wsh
+#!@BINDIR@/wsh
 
 -- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
 

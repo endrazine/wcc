@@ -143,6 +143,7 @@ CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
 CXXFLAGS = -g -O2
 CYGPATH_W = echo
+DATADIR = /usr/local/share/wsh
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
 DOXYGEN = /usr/bin/doxygen
@@ -175,6 +176,7 @@ LIPO =
 LN_S = ln -s
 LOCAL_APACHE2 = 
 LOCAL_LDD = /opt/buildroot-gcc463/usr/bin/ldd
+LOCAL_LUA = /usr/bin/lua
 LOCAL_SSHD = /usr/sbin/sshd
 LOCAL_SSHD2 = 
 LTDLDEPS = 
