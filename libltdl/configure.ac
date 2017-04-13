@@ -1,7 +1,6 @@
 # Process this file with autoconf to create configure. -*- autoconf -*-
 #
-#    Copyright (C) 2004-2005, 2007-2008, 2011-2015 Free Software
-#    Foundation, Inc.
+#    Copyright (C) 2004, 2005, 2007, 2008 Free Software Foundation, Inc.
 #    Written by Gary V. Vaughan, 2004
 #
 #    NOTE: The canonical source of this file is maintained with the
@@ -41,10 +40,11 @@ AC_PREREQ(2.59)dnl We use AS_HELP_STRING
 ## ------------------------ ##
 ## Autoconf initialisation. ##
 ## ------------------------ ##
-AC_INIT([libltdl], [2.4.3a], [bug-libtool@gnu.org])
+AC_INIT([libltdl], [2.2.10], [bug-libtool@gnu.org])
 AC_CONFIG_HEADERS([config.h:config-h.in])
 AC_CONFIG_SRCDIR([ltdl.c])
-AC_CONFIG_AUX_DIR([..])
+AC_CONFIG_AUX_DIR([config])
+AC_CONFIG_MACRO_DIR([m4])
 LT_CONFIG_LTDL_DIR([.]) # I am me!
 
 
@@ -52,14 +52,13 @@ LT_CONFIG_LTDL_DIR([.]) # I am me!
 ## Automake Initialisation. ##
 ## ------------------------ ##
 
-AM_INIT_AUTOMAKE([gnu subdir-objects])
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+AM_INIT_AUTOMAKE([gnu])
 
 
 ## ------------------------------- ##
 ## Libtool specific configuration. ##
 ## ------------------------------- ##
-pkgdatadir='$datadir'"/$PACKAGE"
+pkgdatadir='${datadir}'"/${PACKAGE}"
 
 
 ## ----------------------- ##

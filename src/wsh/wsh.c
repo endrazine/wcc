@@ -4431,10 +4431,10 @@ int wsh_init(void)
 
 	// create lua state
 	wsh->L = luaL_newstate();	/* Create Lua state variable */
-#if LUA_VERSION_NUM > 501
+
 	// make sure version of lua matches
 	luaL_checkversion(wsh->L);
-#endif
+
 	luaL_openlibs(wsh->L);	/* Load Lua libraries */
 
 	// Declare internal functions

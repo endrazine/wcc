@@ -39,8 +39,8 @@
 /* Define to 1 if you have the <bfd.h> header file. */
 #undef HAVE_BFD_H
 
-/* Define to 1 if you have the <capstone/capstone.h> header file. */
-#undef HAVE_CAPSTONE_CAPSTONE_H
+/* Define to 1 if you have the <capstone.h> header file. */
+#undef HAVE_CAPSTONE_H
 
 /* Define to 1 if you have the `closedir' function. */
 #undef HAVE_CLOSEDIR
@@ -76,8 +76,14 @@
 /* Define to 1 if the system has the type `error_t'. */
 #undef HAVE_ERROR_T
 
+/* Define to 1 if you have the <gelf.h> header file. */
+#undef HAVE_GELF_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <lauxlib.h> header file. */
+#undef HAVE_LAUXLIB_H
 
 /* Define to 1 if you have the `bfd' library (-lbfd). */
 #undef HAVE_LIBBFD
@@ -94,17 +100,17 @@
 /* Define to 1 if you have the `elf' library (-lelf). */
 #undef HAVE_LIBELF
 
-/* Define to 1 if you have the <libelf/gelf.h> header file. */
-#undef HAVE_LIBELF_GELF_H
-
-/* Define to 1 if you have the <libelf/libelf.h> header file. */
-#undef HAVE_LIBELF_LIBELF_H
+/* Define to 1 if you have the <libelf.h> header file. */
+#undef HAVE_LIBELF_H
 
 /* Define to 1 if you have the `iberty' library (-liberty). */
 #undef HAVE_LIBIBERTY
 
 /* Define to 1 if you have the <libiberty.h> header file. */
 #undef HAVE_LIBIBERTY_H
+
+/* Define to 1 if you have the `lua5.3' library (-llua5.3). */
+#undef HAVE_LIBLUA5_3
 
 /* Define to 1 if you have the `openlibm' library (-lopenlibm). */
 #undef HAVE_LIBOPENLIBM
@@ -117,6 +123,15 @@
 
 /* Define this if a modern libltdl is already installed */
 #undef HAVE_LTDL
+
+/* Define to 1 if you have the <luaconf.h> header file. */
+#undef HAVE_LUACONF_H
+
+/* Define to 1 if you have the <lualib.h> header file. */
+#undef HAVE_LUALIB_H
+
+/* Define to 1 if you have the <lua.h> header file. */
+#undef HAVE_LUA_H
 
 /* Define to 1 if you have the <mach-o/dyld.h> header file. */
 #undef HAVE_MACH_O_DYLD_H
@@ -139,8 +154,8 @@
 /* Define to 1 if you have the `readdir' function. */
 #undef HAVE_READDIR
 
-/* Define to 1 if you have the <readline/readline.h> header file. */
-#undef HAVE_READLINE_READLINE_H
+/* Define to 1 if you have the <readline.h> header file. */
+#undef HAVE_READLINE_H
 
 /* Define if you have the shl_load function. */
 #undef HAVE_SHL_LOAD
@@ -208,9 +223,6 @@
 /* The archive extension */
 #undef LT_LIBEXT
 
-/* The archive prefix */
-#undef LT_LIBPREFIX
-
 /* Define to the extension used for runtime loadable modules, say, ".so". */
 #undef LT_MODULE_EXT
 
@@ -218,14 +230,9 @@
    module search path. */
 #undef LT_MODULE_PATH_VAR
 
-/* Define to the sub-directory where libtool stores uninstalled libraries. */
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
 #undef LT_OBJDIR
-
-/* Define to the shared library suffix, say, ".dylib". */
-#undef LT_SHARED_EXT
-
-/* Define to the shared archive member specification, say "(shr.o)". */
-#undef LT_SHARED_LIB_MEMBER
 
 /* Define if dlsym() requires a leading underscore in symbol names. */
 #undef NEED_USCORE
@@ -324,7 +331,7 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
 
-/* Define to a type to use for 'error_t' if it is not otherwise available. */
+/* Define to a type to use for `error_t' if it is not otherwise available. */
 #undef error_t
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler

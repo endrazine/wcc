@@ -134,7 +134,8 @@
 #include <config.h>
 #include <utlist.h>
 #include <uthash.h>
-#include <libelf/libelf.h>
+#include <libelf.h>
+#include <gelf.h>
 
 #define DEFAULT_SCRIPT		"/usr/share/wcc/scripts/debug"
 #define DEFAULT_SCRIPT_INDEX	"/usr/share/wcc/scripts/INDEX"

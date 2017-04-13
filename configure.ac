@@ -19,7 +19,7 @@ dnl Process this file with autoconf to produce a configure script.
 
 dnl init autoconf
 AC_REQ(2.63)
-AC_INIT([Witchcraft Compiler Collection (WCC)],[0.0.1],[Jonathan Brossard <endrazine@gmail.com>],[wcc],[https://github.com/endrazine/wcc])
+AC_INIT([Witchcraft Compiler Collection (WCC)],[0.0.1],[Jonathan Brossard endrazine@gmail.com],[wcc],[https://github.com/endrazine/wcc])
 AC_CONFIG_HEADERS([config.h:config.h.in])
 AC_CONFIG_SRCDIR([src/wld/wld.c])
 AC_CONFIG_AUX_DIR([.])
@@ -74,18 +74,16 @@ AC_C_BIGENDIAN
 AC_FUNC_SELECT_ARGTYPES
 
 AC_CANONICAL_TARGET
-AS_CASE([target],
-       [x86-64-*-*], [IS_X64="true"],
-       [i?86-*-*],   [IS_I386="true"],
-       [IS_X64="false",IS_I386="false"]
+AS_CASE([$target_cpu],
+       [x86_64], [IS_X64="true"],
+       [IS_X64="false"]
 )
-AS_CASE([target],
-       [*-linux-*], [IS_LINUX=true],
-       [IS_LINUX=false]
+AS_CASE([$target_os],
+       [linux*], [IS_LINUX="true"],
+       [IS_LINUX="false"]
 )
 AM_CONDITIONAL(TARGET_IS_X64, [test "$IS_X64" = "true"])
-AM_CONDITIONAL(TARGET_IS_I386, test "$IS_I386" = "true"]])
-AM_CONDITIONAL(TARGET_IS_LINUX, test "$IS_LINUX" = "true"]])
+AM_CONDITIONAL(TARGET_IS_LINUX, [test "$IS_LINUX" = "true"])
 
 
 AC_CHECK_HEADERS([sys/procfs.h sys/prctl.h link.h stropts.h malloc.h])
@@ -104,7 +102,7 @@ AC_ARG_WITH(libelf-libdir,
 if test "x$LIBELF_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBELF_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([libelf/libelf.h libelf/gelf.h], [], [
+AC_CHECK_HEADERS([libelf.h gelf.h], [], [
   AC_MSG_ERROR([Unable to find the libelf headers!])
 ])
 
@@ -132,7 +130,7 @@ AC_ARG_WITH(capstone-libdir,
 if test "x$CAPSTONE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${CAPSTONE_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([capstone/capstone.h], [], [
+AC_CHECK_HEADERS([capstone.h], [], [
   AC_MSG_ERROR([Unable to find the capstone.h header!])
 ])
 
@@ -230,21 +228,21 @@ AC_CHECK_LIB([openlibm], [isopenlibm], [], [
   AC_MSG_ERROR([Unable to find the isopenlibm() function!])
 ])
 
-AC_ARG_WITH(libreadline,
-            [AS_HELP_STRING([--with-libreadline],[LIBREADLINE directory (must contain ./lib and ./include)])],
+AC_ARG_WITH(readline,
+            [AS_HELP_STRING([--with-readline],[LIBREADLINE directory (must contain ./lib and ./include)])],
             [LIBREADLINE_INC_DIR="${withval}/include";
             LIBREADLINE_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(libreadline-incdir,
-  	   [AS_HELP_STRING([--with-libreadline-incdir],[LIBREADLINE include directory])],
+AC_ARG_WITH(readline-incdir,
+  	   [AS_HELP_STRING([--with-readline-incdir],[LIBREADLINE include directory])],
 	   [LIBREADLINE_INC_DIR="${withval}";],)
-AC_ARG_WITH(libopenlibm-libdir,
-           [AS_HELP_STRING([--with-libreadline-libdir],[LIBREADLINE library directory])],
+AC_ARG_WITH(readline-libdir,
+           [AS_HELP_STRING([--with-readline-libdir],[LIBREADLINE library directory])],
            [LIBREADLINE_LIB_DIR="${withval}";],)
 
 if test "x$LIBREADLINE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([readline/readline.h], [], [
+AC_CHECK_HEADERS([readline.h], [], [
   AC_MSG_ERROR([Unable to find the readline.h header!])
 ])
 
@@ -264,7 +262,7 @@ AC_ARG_WITH(lua53,
             LUA53_LIB_DIR="${withval}/lib";],)
 AC_ARG_WITH(lua53-incdir,
   	   [AS_HELP_STRING([--with-lua53-incdir],[LUA 5.3 include directory])],
-	   [LUA51_INC_DIR="${withval}";],)
+	   [LUA53_INC_DIR="${withval}";],)
 AC_ARG_WITH(lua53-libdir,
            [AS_HELP_STRING([--with-lua53-libdir],[LUA 5.3 library directory])],
            [LUA53_LIB_DIR="${withval}";],)
@@ -272,9 +270,7 @@ AC_ARG_WITH(lua53-libdir,
 if test "x$LUA53_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
 fi
-#AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h], [], [
-#  AC_MSG_ERROR([Unable to find the LUA headers!])
-#])
+AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h])
 
 if test "x$LUA53_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
@@ -282,19 +278,24 @@ fi
 
 dnl The dlopen() function is in the C library for *BSD and in
 dnl libdl on GLIBC-based systems
-#AC_CHECK_LIB([lua5.3], [lua_settable], [], [
-#  AC_MSG_ERROR([Unable to find the lua_settable() function!])
-#])
+AC_CHECK_LIB([lua5.3], [lua_settable])
 
-AC_CHECK_TOOL([LOCAL_LDD], [ldd])
+AC_PATH_TARGET_TOOL([LOCAL_LDD], [ldd])
 AM_CONDITIONAL(HAVE_LDD, [test -n "$LOCAL_LDD"])
-AC_CHECK_TOOL([DOXYGEN], [doxygen])
+AC_PATH_TOOL([LOCAL_APACHE2], [apache2])
+AM_CONDITIONAL(HAVE_APACHE2, [test -n "$LOCAL_APACHE2"])
+AC_PATH_TOOL([LOCAL_SSHD], [sshd])
+AM_CONDITIONAL(HAVE_SSHD, [test -n "$LOCAL_SSHD"])
+AC_PATH_TOOL([LOCAL_SSHD2], [sshd2])
+AM_CONDITIONAL(HAVE_SSHD2, [test -n "$LOCAL_SSHD2"])
+AC_PATH_TOOL([DOXYGEN], [doxygen])
 AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
+AX_CHECK_COMPILE_FLAG([-masm=intel], [CFLAGS="$CFLAGS -masm=intel"])
 
 AS_AC_EXPAND(BINDIR, $bindir)
 
 dnl generate output
-AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/tools/Makefile])
+AC_CONFIG_FILES([Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile])
 AC_CONFIG_FILES([src/tools/wldd], [chmod +x src/tools/wldd])
 AC_CONFIG_FILES([src/tools/wcch], [chmod +x src/tools/wcch])
 

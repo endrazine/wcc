@@ -19,17 +19,16 @@
 
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
-ACLOCAL_AMFLAGS = -Im4
-SUBDIRS = src/wcc src/wld src/wsh src/tools src/wsh/tests
+ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
+AM_CFLAGS = -W -Wall -Wextra
+AM_CPPFLAGS = -I$(top_builddir)/include
+AM_LDFLAGS = @LOCAL_APACHE2@
 
-#if HAVE_DOXYGEN
-#doxyfile.stamp:
-  
-#   $(DOXYGEN) src/tex/project.cfg
-#   echo Timestamp > doxyfile.stamp
+if TARGET_IS_LINUX
+if HAVE_APACHE2
+bin_PROGRAMS = ap2v$(EXEEXT)
+ap2v_SOURCES = ap2v.c
+endif
+endif
 
-#CLEANFILES = doxyfile.stamp
-
-#all-local: doxyfile.stamp
-
-#endif
+CLEANFILES = $(bin_PROGRAMS)

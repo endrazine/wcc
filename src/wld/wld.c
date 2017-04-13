@@ -48,8 +48,8 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include <libelf/libelf.h>
-#include <libelf/gelf.h>
+#include <libelf.h>
+#include <gelf.h>
 
 #define DEFAULT_NAME "wld"
 
