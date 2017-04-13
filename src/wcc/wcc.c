@@ -129,6 +129,8 @@ enum {
   R_X86_64_TLSDESC_CALL    = 35,
   R_X86_64_TLSDESC    = 36,
   R_X86_64_IRELATIVE  = 37,
+  R_X86_64_GOTPCRELX = 39,
+  R_X86_64_REX_GOTPCRELX = 42,
   R_X86_64_NUM = 43
 };
 // i386 relocations.
@@ -174,7 +176,8 @@ enum {
   R_386_TLS_DESC_CALL = 40,
   R_386_TLS_DESC      = 41,
   R_386_IRELATIVE     = 42,
-  R_386_NUM           = 43
+  R_386_GOT32X        = 43,
+  R_386_NUM           = 44
 };
 
 
