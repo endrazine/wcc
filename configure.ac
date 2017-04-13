@@ -57,10 +57,8 @@ AC_PROG_INSTALL
 dnl /bin/mkdir -p
 AC_PROG_MKDIR_P
 
-
-LT_INIT
-LTDL_INIT
-LT_CONFIG_LTDL_DIR([libltdl])
+LT_INIT([dlopen])
+LT_PATH_LD
 
 dnl C checks
 AC_C_CONST
@@ -110,8 +108,6 @@ if test "x$LIBELF_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBELF_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([elf], [elf_begin], [], [
   AC_MSG_ERROR([Unable to find the elf_begin() function!])
 ])
@@ -138,8 +134,6 @@ if test "x$CAPSTONE_LIB_DIR" != "x" ; then
    LDFLAGS="-L${CAPSTONE_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([capstone], [cs_version], [], [
   AC_MSG_ERROR([Unable to find the cs_version() function!])
 ])
@@ -166,8 +160,6 @@ if test "x$LIBBFD_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBBFD_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([bfd], [bfd_init], [], [
   AC_MSG_ERROR([Unable to find the bfd_init() function!])
 ])
@@ -194,8 +186,6 @@ if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBIBERTY_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([iberty], [get_run_time], [], [
   AC_MSG_ERROR([Unable to find the get_run_time() function!])
 ])
@@ -222,8 +212,6 @@ if test "x$OPENLIBM_LIB_DIR" != "x" ; then
    LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([openlibm], [isopenlibm], [], [
   AC_MSG_ERROR([Unable to find the isopenlibm() function!])
 ])
@@ -250,8 +238,6 @@ if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([readline], [readline], [], [
   AC_MSG_ERROR([Unable to find the readline() function!])
 ])
@@ -276,9 +262,8 @@ if test "x$LUA53_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
 fi
 
-dnl The dlopen() function is in the C library for *BSD and in
-dnl libdl on GLIBC-based systems
 AC_CHECK_LIB([lua5.3], [lua_settable])
+AC_SEARCH_LIBS([dladdr1], [dl dld])
 
 AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])
 AM_CONDITIONAL(HAVE_LUA, [test -n "$LOCAL_LUA"])
@@ -292,7 +277,11 @@ AC_PATH_TARGET_TOOL([LOCAL_SSHD2], [sshd2])
 AM_CONDITIONAL(HAVE_SSHD2, [test -n "$LOCAL_SSHD2"])
 AC_PATH_TOOL([DOXYGEN], [doxygen])
 AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
-AX_CHECK_COMPILE_FLAG([-masm=intel], [CFLAGS="$CFLAGS -masm=intel"])
+AX_CHECK_COMPILE_FLAG([-masm=intel], [INTELCFLAGS="$INTELCFLAGS -masm=intel"])
+AX_CHECK_COMPILE_FLAG([-mpreferred-stack-boundary=12], [INTELCFLAGS="$INTELCFLAGS -mpreferred-stack-boundary=12"])
+AX_CHECK_COMPILE_FLAG([-mstackrealign], [INTELCFLAGS="$INTELCFLAGS -mstackrealign"])
+AX_CHECK_COMPILE_FLAG([--sanitize=address], [INTELCFLAGS="$INTELCFLAGS --sanitize=address"])
+AC_SUBST(INTELCFLAGS)
 
 AS_AC_EXPAND(BINDIR, $bindir)
 AS_AC_EXPAND(DATADIR, ${datadir}/wsh)

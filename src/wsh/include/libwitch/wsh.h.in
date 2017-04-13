@@ -30,7 +30,7 @@
 */
 
 #define _GNU_SOURCE
-#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE 500
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
 #endif
@@ -58,7 +58,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
