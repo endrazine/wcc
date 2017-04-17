@@ -122,13 +122,13 @@ DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
 	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = wldd wcch
+CONFIG_CLEAN_FILES = wcch
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_wcc_ldd_OBJECTS = ldd.$(OBJEXT)
-wcc_ldd_OBJECTS = $(am_wcc_ldd_OBJECTS)
-wcc_ldd_LDADD = $(LDADD)
+am_wldd_OBJECTS = wldd.$(OBJEXT)
+wldd_OBJECTS = $(am_wldd_OBJECTS)
+wldd_LDADD = $(LDADD)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -195,8 +195,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(wcc_ldd_SOURCES)
-DIST_SOURCES = $(wcc_ldd_SOURCES)
+SOURCES = $(wldd_SOURCES)
+DIST_SOURCES = $(wldd_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -223,7 +223,7 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/wcch.in \
-	$(srcdir)/wldd.in $(top_srcdir)/depcomp
+	$(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -365,11 +365,11 @@ ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CFLAGS = 
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS = 
-bin_SCRIPTS = wcch wldd
-bin_PROGRAMS = wcc-ldd$(EXEEXT)
-wcc_ldd_SOURCES = ldd.c
+bin_SCRIPTS = wcch
+bin_PROGRAMS = wldd$(EXEEXT)
+wldd_SOURCES = wldd.c
 noinst_HEADERS = bswap.h
-CLEANFILES = $(bin_SCRIPTS)
+CLEANFILES = $(bin_SCRIPTS) $(bin_PROGRAMS)
 all: all-am
 
 .SUFFIXES:
@@ -403,8 +403,6 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-wldd: $(top_builddir)/config.status $(srcdir)/wldd.in
-	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 wcch: $(top_builddir)/config.status $(srcdir)/wcch.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 install-binPROGRAMS: $(bin_PROGRAMS)
@@ -473,9 +471,9 @@ installcheck-binPROGRAMS: $(bin_PROGRAMS)
 	  done; \
 	done; rm -f c$${pid}_.???; exit $$bad
 
-wcc-ldd$(EXEEXT): $(wcc_ldd_OBJECTS) $(wcc_ldd_DEPENDENCIES) $(EXTRA_wcc_ldd_DEPENDENCIES) 
-	@rm -f wcc-ldd$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(wcc_ldd_OBJECTS) $(wcc_ldd_LDADD) $(LIBS)
+wldd$(EXEEXT): $(wldd_OBJECTS) $(wldd_DEPENDENCIES) $(EXTRA_wldd_DEPENDENCIES) 
+	@rm -f wldd$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(wldd_OBJECTS) $(wldd_LDADD) $(LIBS)
 install-binSCRIPTS: $(bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
@@ -533,7 +531,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ldd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wldd.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

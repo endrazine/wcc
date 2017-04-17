@@ -18975,8 +18975,6 @@ fi
 
 ac_config_files="$ac_config_files Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h"
 
-ac_config_files="$ac_config_files src/tools/wldd"
-
 ac_config_files="$ac_config_files src/tools/wcch"
 
 ac_config_files="$ac_config_files src/wsh/scripts/print_G"
@@ -20152,7 +20150,6 @@ do
     "src/wsh/scripts/INDEX") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/INDEX" ;;
     "src/wsh/scripts/libmain") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/libmain" ;;
     "src/wsh/include/libwitch/wsh.h") CONFIG_FILES="$CONFIG_FILES src/wsh/include/libwitch/wsh.h" ;;
-    "src/tools/wldd") CONFIG_FILES="$CONFIG_FILES src/tools/wldd" ;;
     "src/tools/wcch") CONFIG_FILES="$CONFIG_FILES src/tools/wcch" ;;
     "src/wsh/scripts/print_G") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/print_G" ;;
     "src/wsh/scripts/md5.wsh") CONFIG_FILES="$CONFIG_FILES src/wsh/scripts/md5.wsh" ;;
@@ -21555,7 +21552,6 @@ compiler_lib_search_path=$lt_compiler_lib_search_path_CXX
 _LT_EOF
 
  ;;
-    "src/tools/wldd":F) chmod +x src/tools/wldd ;;
     "src/tools/wcch":F) chmod +x src/tools/wcch ;;
     "src/wsh/scripts/print_G":F) chmod +x src/wsh/scripts/print_G ;;
     "src/wsh/scripts/md5.wsh":F) chmod +x src/wsh/scripts/md5.wsh ;;

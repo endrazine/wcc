@@ -24,11 +24,11 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 
-bin_SCRIPTS = wcch wldd
-bin_PROGRAMS = wcc-ldd$(EXEEXT)
+bin_SCRIPTS = wcch
+bin_PROGRAMS = wldd$(EXEEXT)
 EXTRA_PROGRAMS = 
 
-wcc_ldd_SOURCES = ldd.c
+wldd_SOURCES = wldd.c
 noinst_HEADERS = bswap.h
 
-CLEANFILES = $(bin_SCRIPTS)
+CLEANFILES = $(bin_SCRIPTS) $(bin_PROGRAMS)
