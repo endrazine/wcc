@@ -252,24 +252,22 @@ AC_ARG_WITH(readline-libdir,
            [AS_HELP_STRING([--with-readline-libdir],[LIBREADLINE library directory])],
            [LIBREADLINE_LIB_DIR="${withval}";],)
 
-if test "x$LIBREADLINE_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
-fi
-AC_CHECK_HEADERS([readline.h], [], [
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		AC_MSG_ERROR([Unable to find the readline.h header!])
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LIBREADLINE_INC_DIR" != "x" ; then
+		CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
 	fi
-])
+	AC_CHECK_HEADERS([readline.h], [], [
+			AC_MSG_ERROR([Unable to find the readline.h header!])
+	])
 
-if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
-fi
-
-AC_CHECK_LIB([readline], [readline], [], [
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		AC_MSG_ERROR([Unable to find the readline() function!])
+	if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
+   		LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
 	fi
-])
+
+	AC_CHECK_LIB([readline], [readline], [], [
+			AC_MSG_ERROR([Unable to find the readline() function!])
+	])
+fi
 
 AC_ARG_WITH(lua53,
             [AS_HELP_STRING([--with-lua53],[LUA 5.3 directory (must contain ./lib and ./include)])],
@@ -282,16 +280,18 @@ AC_ARG_WITH(lua53-libdir,
            [AS_HELP_STRING([--with-lua53-libdir],[LUA 5.3 library directory])],
            [LUA53_LIB_DIR="${withval}";],)
 
-if test "x$LUA53_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
-fi
-AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h])
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LUA53_INC_DIR" != "x" ; then
+   		CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
+	fi
+	AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h])
 
-if test "x$LUA53_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$LUA53_LIB_DIR" != "x" ; then
+		LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
+	fi
 
-AC_CHECK_LIB([lua5.3], [lua_settable])
+	AC_CHECK_LIB([lua5.3], [lua_settable])
+fi
 
 AC_ARG_WITH(luajit53,
             [AS_HELP_STRING([--with-luajit53],[LUA JIT 5.3 directory (must contain ./lib and ./include)])],
@@ -304,19 +304,20 @@ AC_ARG_WITH(luajit53-libdir,
            [AS_HELP_STRING([--with-luajit53-libdir],[LUA JIT 5.3 library directory])],
            [LUAJIT_LIB_DIR="${withval}";],)
 
-if test "x$LUAJIT_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LUAJIT_INC_DIR" != "x" ; then
+		CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
+	fi
+	AC_CHECK_HEADERS([luajit.h])
+
+	if test "x$LUAJIT_LIB_DIR" != "x" ; then
+		LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
+	fi
+
+	AC_CHECK_LIB([luajit-5.3], [lua_settable])
+
+	AC_SEARCH_LIBS([dladdr1], [dl dld])
 fi
-AC_CHECK_HEADERS([luajit.h])
-
-if test "x$LUAJIT_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
-fi
-
-AC_CHECK_LIB([luajit-5.3], [lua_settable])
-
-
-AC_SEARCH_LIBS([dladdr1], [dl dld])
 
 AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])
 AM_CONDITIONAL(HAVE_LUA, [test -n "$LOCAL_LUA"])

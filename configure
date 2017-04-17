@@ -17898,10 +17898,11 @@ if test "${with_readline_libdir+set}" = set; then :
 fi
 
 
-if test "x$LIBREADLINE_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
-fi
-for ac_header in readline.h
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LIBREADLINE_INC_DIR" != "x" ; then
+		CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
+	fi
+	for ac_header in readline.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "readline.h" "ac_cv_header_readline_h" "$ac_includes_default"
 if test "x$ac_cv_header_readline_h" = xyes; then :
@@ -17911,20 +17912,18 @@ _ACEOF
 
 else
 
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
-	fi
+			as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
 
 fi
 
 done
 
 
-if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
+   		LDFLAGS="-L${LIBREADLINE_LIB_DIR} ${LDFLAGS}"
+	fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
 $as_echo_n "checking for readline in -lreadline... " >&6; }
 if ${ac_cv_lib_readline_readline+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -17969,12 +17968,11 @@ _ACEOF
 
 else
 
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		as_fn_error $? "Unable to find the readline() function!" "$LINENO" 5
-	fi
+			as_fn_error $? "Unable to find the readline() function!" "$LINENO" 5
 
 fi
 
+fi
 
 
 # Check whether --with-lua53 was given.
@@ -17996,10 +17994,11 @@ if test "${with_lua53_libdir+set}" = set; then :
 fi
 
 
-if test "x$LUA53_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
-fi
-for ac_header in lua.h luaconf.h lauxlib.h lualib.h
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LUA53_INC_DIR" != "x" ; then
+   		CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
+	fi
+	for ac_header in lua.h luaconf.h lauxlib.h lualib.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -18013,11 +18012,11 @@ fi
 done
 
 
-if test "x$LUA53_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$LUA53_LIB_DIR" != "x" ; then
+		LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
+	fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -llua5.3" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -llua5.3" >&5
 $as_echo_n "checking for lua_settable in -llua5.3... " >&6; }
 if ${ac_cv_lib_lua5_3_lua_settable+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -18062,6 +18061,7 @@ _ACEOF
 
 fi
 
+fi
 
 
 # Check whether --with-luajit53 was given.
@@ -18083,10 +18083,11 @@ if test "${with_luajit53_libdir+set}" = set; then :
 fi
 
 
-if test "x$LUAJIT_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
-fi
-for ac_header in luajit.h
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$LUAJIT_INC_DIR" != "x" ; then
+		CPPFLAGS="-I${LUAJIT_INC_DIR} ${CPPFLAGS}"
+	fi
+	for ac_header in luajit.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "luajit.h" "ac_cv_header_luajit_h" "$ac_includes_default"
 if test "x$ac_cv_header_luajit_h" = xyes; then :
@@ -18099,11 +18100,11 @@ fi
 done
 
 
-if test "x$LUAJIT_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$LUAJIT_LIB_DIR" != "x" ; then
+		LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
+	fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -lluajit-5.3" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -lluajit-5.3" >&5
 $as_echo_n "checking for lua_settable in -lluajit-5.3... " >&6; }
 if ${ac_cv_lib_luajit_5_3_lua_settable+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -18149,8 +18150,7 @@ _ACEOF
 fi
 
 
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dladdr1" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing dladdr1" >&5
 $as_echo_n "checking for library containing dladdr1... " >&6; }
 if ${ac_cv_search_dladdr1+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -18206,6 +18206,7 @@ if test "$ac_res" != no; then :
 
 fi
 
+fi
 
 # Extract the first word of "$target_alias-lua", so it can be a program name with args.
 set dummy $target_alias-lua; ac_word=$2
