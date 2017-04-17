@@ -238,7 +238,7 @@ CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
 CPP = gcc -E
-CPPFLAGS = -I/opt/local//include/libiberty -I/opt/local/include 
+CPPFLAGS = -I/opt/local/include 
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3

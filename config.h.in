@@ -57,9 +57,6 @@
 /* Define to 1 if you have the `iberty' library (-liberty). */
 #undef HAVE_LIBIBERTY
 
-/* Define to 1 if you have the <libiberty.h> header file. */
-#undef HAVE_LIBIBERTY_H
-
 /* Define to 1 if you have the `lua5.3' library (-llua5.3). */
 #undef HAVE_LIBLUA5_3
 
@@ -98,6 +95,9 @@
 
 /* Define to 1 if you have the <readline.h> header file. */
 #undef HAVE_READLINE_H
+
+/* Define to 1 if you have the <readline/readline.h> header file. */
+#undef HAVE_READLINE_READLINE_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H

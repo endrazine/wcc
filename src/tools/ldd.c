@@ -74,6 +74,8 @@
 #elif BYTE_ORDER == BIG_ENDIAN
 # define ELFMAG_U32 ((uint32_t)((((ELFMAG0 * 0x100) + ELFMAG1) * 0x100 + ELFMAG2) * 0x100 + ELFMAG3))
 # define ELFDATAM	ELFDATA2MSB
+#else
+#error "PDP-endian not supported."
 #endif
 
 struct library {

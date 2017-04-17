@@ -88,8 +88,18 @@ AS_CASE([$target_os],
        [IS_LINUX="false"]
 )
 
+AC_ARG_ENABLE([wsh],
+      [AS_HELP_STRING([--disable-wsh],
+         [Build wsh tool (default is yes)])],
+      [enable_wsh=$enableval],
+      [enable_wsh=yes])
+
+if test x$enable_wsh != xyes; then
+	IS_LINUX="false"
+fi
+
 if test x$acl_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
-	AC_MSG_ERROR([Please use --with-gnu-ld to specify GNU ld for builing wsh.])
+	AC_MSG_ERROR([Please use --with-gnu-ld to specify GNU ld for building 'wsh' or disable 'wsh' with --disable-wsh.])
 fi
 
 AM_CONDITIONAL(TARGET_IS_SUPPORTED, [test "$IS_SUPPORTED" = "true"])
@@ -181,21 +191,10 @@ AC_CHECK_LIB([bfd], [bfd_init], [], [
   AC_MSG_ERROR([Unable to find the bfd_init() function!])
 ])
 
-AC_ARG_WITH(libiberty,
-            [AS_HELP_STRING([--with-libiberty],[LIBIBERTY directory (must contain ./lib and ./include)])],
-            [LIBIBERTY_INC_DIR="${withval}/include";
-            LIBIBERTY_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(libiberty-incdir,
-          [AS_HELP_STRING([--with-libiberty-incdir],[LIBIBERTY include directory])],
-          [LIBIBERTY_INC_DIR="${withval}";],)
 AC_ARG_WITH(libiberty-libdir,
            [AS_HELP_STRING([--with-libiberty-libdir],[LIBIBERTY library directory])],
            [LIBIBERTY_LIB_DIR="${withval}";],)
 
-if test "x$LIBIBERTY_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LIBIBERTY_INC_DIR} ${CPPFLAGS}"
-fi
-AC_CHECK_HEADERS([libiberty.h], [], [])
 
 if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBIBERTY_LIB_DIR} ${LDFLAGS}"
@@ -205,40 +204,26 @@ AC_CHECK_LIB([iberty], [get_run_time], [], [
 	AC_MSG_ERROR([Unable to find the get_run_time() function!])
 ])
 
-AC_ARG_WITH(openlibm,
-            [AS_HELP_STRING([--with-openlibm],[OPENLIBM directory (must contain ./lib and ./include)])],
-            [OPENLIBM_INC_DIR="${withval}/include";
-            OPENLIBM_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(openlibm-incdir,
-  	   [AS_HELP_STRING([--with-openlibm-incdir],[OPENLIBM include directory])],
-	   [OPENLIBM_INC_DIR="${withval}";],)
+
 AC_ARG_WITH(openlibm-libdir,
            [AS_HELP_STRING([--with-openlibm-libdir],[OPENLIBM library directory])],
            [OPENLIBM_LIB_DIR="${withval}";],)
 
-if test "$IS_X64" = "true" -a "$IS_LINUX" = "true"; then
+if test "$IS_X64" = "true" -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi
-	AC_CHECK_HEADERS([openlibm.h], [], [
-		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-			AC_MSG_ERROR([Unable to find the openlibm.h header!])
-		fi
-	])
+	AC_CHECK_HEADERS([openlibm.h], [], [])
 
 	if test "x$OPENLIBM_LIB_DIR" != "x" ; then
    		LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
 	fi
 
 	AC_CHECK_LIB([openlibm], [isopenlibm], [], [
-		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
   			AC_MSG_ERROR([Unable to find the isopenlibm() function!])
-		fi
 	])
-else
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		LT_LIB_M
-	fi
+elif test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	LT_LIB_M
 fi
 
 AC_ARG_WITH(readline,
@@ -257,7 +242,9 @@ if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 		CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
 	fi
 	AC_CHECK_HEADERS([readline.h], [], [
-			AC_MSG_ERROR([Unable to find the readline.h header!])
+		AC_CHECK_HEADERS([readline/readline.h], [], [
+				AC_MSG_ERROR([Unable to find the readline.h header!])
+		])
 	])
 
 	if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
@@ -318,6 +305,7 @@ if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 
 	AC_SEARCH_LIBS([dladdr1], [dl dld])
 fi
+
 
 AC_PATH_TARGET_TOOL([LOCAL_LUA], [lua])
 AM_CONDITIONAL(HAVE_LUA, [test -n "$LOCAL_LUA"])

@@ -130,7 +130,8 @@ PROGRAMS = $(bin_PROGRAMS)
 am_wsh_OBJECTS = wsh.$(OBJEXT) wshmain.$(OBJEXT) helper.$(OBJEXT) \
 	linenoise.$(OBJEXT)
 wsh_OBJECTS = $(am_wsh_OBJECTS)
-wsh_DEPENDENCIES =
+am__DEPENDENCIES_1 =
+wsh_DEPENDENCIES = $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -393,7 +394,7 @@ AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-va
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/md5.wsh \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	$(am__append_1)
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD = 
+wsh_LDADD = $(LIBM)
 man_MANS = 
 noinst_HEADERS = include/linenoise.h include/colors.h 
 EXTRA_DIST = $(man_MANS)

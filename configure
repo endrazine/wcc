@@ -805,6 +805,7 @@ with_aix_soname
 with_gnu_ld
 with_sysroot
 enable_libtool_lock
+enable_wsh
 with_libelf
 with_libelf_incdir
 with_libelf_libdir
@@ -814,11 +815,7 @@ with_capstone_libdir
 with_libbfd
 with_libbfd_incdir
 with_libbfd_libdir
-with_libiberty
-with_libiberty_incdir
 with_libiberty_libdir
-with_openlibm
-with_openlibm_incdir
 with_openlibm_libdir
 with_readline
 with_readline_incdir
@@ -1477,6 +1474,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
+  --disable-wsh           Build wsh tool (default is yes)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1499,13 +1497,7 @@ Optional Packages:
   --with-libbfd           LIBBFD directory (must contain ./lib and ./include)
   --with-libbfd-incdir    LIBBFD include directory
   --with-libbfd-libdir    LIBBFD library directory
-  --with-libiberty        LIBIBERTY directory (must contain ./lib and
-                          ./include)
-  --with-libiberty-incdir LIBIBERTY include directory
   --with-libiberty-libdir LIBIBERTY library directory
-  --with-openlibm         OPENLIBM directory (must contain ./lib and
-                          ./include)
-  --with-openlibm-incdir  OPENLIBM include directory
   --with-openlibm-libdir  OPENLIBM library directory
   --with-readline         LIBREADLINE directory (must contain ./lib and
                           ./include)
@@ -17195,8 +17187,20 @@ case $target_os in #(
  ;;
 esac
 
+# Check whether --enable-wsh was given.
+if test "${enable_wsh+set}" = set; then :
+  enableval=$enable_wsh; enable_wsh=$enableval
+else
+  enable_wsh=yes
+fi
+
+
+if test x$enable_wsh != xyes; then
+	IS_LINUX="false"
+fi
+
 if test x$acl_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
-	as_fn_error $? "Please use --with-gnu-ld to specify GNU ld for builing wsh." "$LINENO" 5
+	as_fn_error $? "Please use --with-gnu-ld to specify GNU ld for building 'wsh' or disable 'wsh' with --disable-wsh." "$LINENO" 5
 fi
 
  if test "$IS_SUPPORTED" = "true"; then
@@ -17554,39 +17558,11 @@ fi
 
 
 
-# Check whether --with-libiberty was given.
-if test "${with_libiberty+set}" = set; then :
-  withval=$with_libiberty; LIBIBERTY_INC_DIR="${withval}/include";
-            LIBIBERTY_LIB_DIR="${withval}/lib";
-fi
-
-
-# Check whether --with-libiberty-incdir was given.
-if test "${with_libiberty_incdir+set}" = set; then :
-  withval=$with_libiberty_incdir; LIBIBERTY_INC_DIR="${withval}";
-fi
-
-
 # Check whether --with-libiberty-libdir was given.
 if test "${with_libiberty_libdir+set}" = set; then :
   withval=$with_libiberty_libdir; LIBIBERTY_LIB_DIR="${withval}";
 fi
 
-
-if test "x$LIBIBERTY_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${LIBIBERTY_INC_DIR} ${CPPFLAGS}"
-fi
-for ac_header in libiberty.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "libiberty.h" "ac_cv_header_libiberty_h" "$ac_includes_default"
-if test "x$ac_cv_header_libiberty_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBIBERTY_H 1
-_ACEOF
-
-fi
-
-done
 
 
 if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
@@ -17644,18 +17620,6 @@ fi
 
 
 
-# Check whether --with-openlibm was given.
-if test "${with_openlibm+set}" = set; then :
-  withval=$with_openlibm; OPENLIBM_INC_DIR="${withval}/include";
-            OPENLIBM_LIB_DIR="${withval}/lib";
-fi
-
-
-# Check whether --with-openlibm-incdir was given.
-if test "${with_openlibm_incdir+set}" = set; then :
-  withval=$with_openlibm_incdir; OPENLIBM_INC_DIR="${withval}";
-fi
-
 
 # Check whether --with-openlibm-libdir was given.
 if test "${with_openlibm_libdir+set}" = set; then :
@@ -17663,7 +17627,7 @@ if test "${with_openlibm_libdir+set}" = set; then :
 fi
 
 
-if test "$IS_X64" = "true" -a "$IS_LINUX" = "true"; then
+if test "$IS_X64" = "true" -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi
@@ -17674,12 +17638,6 @@ if test "x$ac_cv_header_openlibm_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_OPENLIBM_H 1
 _ACEOF
-
-else
-
-		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-			as_fn_error $? "Unable to find the openlibm.h header!" "$LINENO" 5
-		fi
 
 fi
 
@@ -17735,15 +17693,12 @@ _ACEOF
 
 else
 
-		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
   			as_fn_error $? "Unable to find the isopenlibm() function!" "$LINENO" 5
-		fi
 
 fi
 
-else
-	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-		LIBM=
+elif test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+	LIBM=
 case $host in
 *-*-beos* | *-*-cegcc* | *-*-cygwin* | *-*-haiku* | *-*-pw32* | *-*-darwin*)
   # These system don't have libm, or don't need it
@@ -17875,7 +17830,6 @@ fi
 esac
 
 
-	fi
 fi
 
 
@@ -17912,7 +17866,22 @@ _ACEOF
 
 else
 
-			as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
+		for ac_header in readline/readline.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "readline/readline.h" "ac_cv_header_readline_readline_h" "$ac_includes_default"
+if test "x$ac_cv_header_readline_readline_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_READLINE_READLINE_H 1
+_ACEOF
+
+else
+
+				as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
+
+fi
+
+done
+
 
 fi
 
@@ -18207,6 +18176,7 @@ if test "$ac_res" != no; then :
 fi
 
 fi
+
 
 # Extract the first word of "$target_alias-lua", so it can be a program name with args.
 set dummy $target_alias-lua; ac_word=$2

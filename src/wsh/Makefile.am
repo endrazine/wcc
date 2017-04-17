@@ -42,7 +42,7 @@ endif
 EXTRA_PROGRAMS = 
 
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD =
+wsh_LDADD = $(LIBM)
  
 man_MANS =
 noinst_HEADERS = include/linenoise.h include/colors.h 
