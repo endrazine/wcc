@@ -24,7 +24,12 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 
+if TARGET_IS_LINUX
+if TARGET_IS_SUPPORTED
 bin_SCRIPTS = wcch
+endif
+endif
+
 bin_PROGRAMS = wldd$(EXEEXT)
 EXTRA_PROGRAMS = 
 
