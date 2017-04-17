@@ -318,7 +318,7 @@ static Elf64_Shdr *elf64_find_section_type(uint32_t key, Elf64_Ehdr *ehdr)
 	Elf64_Shdr *shdr;
 	shdr = (Elf64_Shdr *) (ehdr->e_shoff + (char *)ehdr);
 	for (j = ehdr->e_shnum; --j >= 0; ++shdr) {
-		if (key == byteswap64_to_host(shdr->sh_type)) {
+		if (key == byteswap32_to_host(shdr->sh_type)) {
 			return shdr;
 		}
 	}
@@ -330,7 +330,7 @@ static Elf64_Phdr *elf64_find_phdr_type(uint32_t type, Elf64_Ehdr *ehdr)
 	int j;
 	Elf64_Phdr *phdr = (Elf64_Phdr *) (ehdr->e_phoff + (char *)ehdr);
 	for (j = ehdr->e_phnum; --j >= 0; ++phdr) {
-		if (type == byteswap64_to_host(phdr->p_type)) {
+		if (type == byteswap32_to_host(phdr->p_type)) {
 			return phdr;
 		}
 	}
