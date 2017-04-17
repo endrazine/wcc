@@ -131,8 +131,18 @@
 #include <config.h>
 #include <utlist.h>
 #include <uthash.h>
+
+#ifdef HAVE_LIBELF_LIBELF_H
+#include <libelf/libelf.h>
+#else
 #include <libelf.h>
+#endif
+
+#ifdef HAVE_LIBELF_GELF_H
+#include <libelf/gelf.h>
+#else
 #include <gelf.h>
+#endif
 
 #define DEFAULT_SCRIPT		"@DATADIR@/debug"
 #define DEFAULT_SCRIPT_INDEX	"@DATADIR@/INDEX"

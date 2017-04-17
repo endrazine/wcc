@@ -657,10 +657,13 @@ LOCAL_APACHE2
 HAVE_LUA_FALSE
 HAVE_LUA_TRUE
 LOCAL_LUA
+LIBM
 TARGET_IS_LINUX_FALSE
 TARGET_IS_LINUX_TRUE
 TARGET_IS_X64_FALSE
 TARGET_IS_X64_TRUE
+TARGET_IS_SUPPORTED_FALSE
+TARGET_IS_SUPPORTED_TRUE
 CXXCPP
 LT_SYS_LIBRARY_PATH
 OTOOL64
@@ -17171,6 +17174,19 @@ case $target_cpu in #(
     IS_X64="false"
  ;;
 esac
+case $target_cpu in #(
+  x86_64) :
+    IS_SUPPORTED="true" ;; #(
+  aarch64) :
+    IS_SUPPORTED="true" ;; #(
+  i386) :
+    IS_SUPPORTED="true" ;; #(
+  arm*) :
+    IS_SUPPORTED="true" ;; #(
+  *) :
+    IS_SUPPORTED="false"
+ ;;
+esac
 case $target_os in #(
   linux*) :
     IS_LINUX="true" ;; #(
@@ -17178,6 +17194,19 @@ case $target_os in #(
     IS_LINUX="false"
  ;;
 esac
+
+if test x$acl_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
+	as_fn_error $? "Please use --with-gnu-ld to specify GNU ld for builing wsh." "$LINENO" 5
+fi
+
+ if test "$IS_SUPPORTED" = "true"; then
+  TARGET_IS_SUPPORTED_TRUE=
+  TARGET_IS_SUPPORTED_FALSE='#'
+else
+  TARGET_IS_SUPPORTED_TRUE='#'
+  TARGET_IS_SUPPORTED_FALSE=
+fi
+
  if test "$IS_X64" = "true"; then
   TARGET_IS_X64_TRUE=
   TARGET_IS_X64_FALSE='#'
@@ -17244,7 +17273,23 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the libelf headers!" "$LINENO" 5
+	for ac_header in libelf/libelf.h libelf/gelf.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+
+  		as_fn_error $? "Unable to find the libelf headers!" "$LINENO" 5
+
+fi
+
+done
+
 
 fi
 
@@ -17338,7 +17383,22 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the capstone.h header!" "$LINENO" 5
+	for ac_header in capstone/capstone.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "capstone/capstone.h" "ac_cv_header_capstone_capstone_h" "$ac_includes_default"
+if test "x$ac_cv_header_capstone_capstone_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_CAPSTONE_CAPSTONE_H 1
+_ACEOF
+
+else
+
+	  as_fn_error $? "Unable to find the capstone.h header!" "$LINENO" 5
+
+fi
+
+done
+
 
 fi
 
@@ -17524,10 +17584,6 @@ if test "x$ac_cv_header_libiberty_h" = xyes; then :
 #define HAVE_LIBIBERTY_H 1
 _ACEOF
 
-else
-
-  as_fn_error $? "Unable to find the libiberty.h header!" "$LINENO" 5
-
 fi
 
 done
@@ -17582,7 +17638,7 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the get_run_time() function!" "$LINENO" 5
+	as_fn_error $? "Unable to find the get_run_time() function!" "$LINENO" 5
 
 fi
 
@@ -17607,10 +17663,11 @@ if test "${with_openlibm_libdir+set}" = set; then :
 fi
 
 
-if test "x$OPENLIBM_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
-fi
-for ac_header in openlibm.h
+if test "$IS_X64" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$OPENLIBM_INC_DIR" != "x" ; then
+   		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
+	fi
+	for ac_header in openlibm.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "openlibm.h" "ac_cv_header_openlibm_h" "$ac_includes_default"
 if test "x$ac_cv_header_openlibm_h" = xyes; then :
@@ -17620,18 +17677,20 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the openlibm.h header!" "$LINENO" 5
+		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+			as_fn_error $? "Unable to find the openlibm.h header!" "$LINENO" 5
+		fi
 
 fi
 
 done
 
 
-if test "x$OPENLIBM_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$OPENLIBM_LIB_DIR" != "x" ; then
+   		LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
+	fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for isopenlibm in -lopenlibm" >&5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for isopenlibm in -lopenlibm" >&5
 $as_echo_n "checking for isopenlibm in -lopenlibm... " >&6; }
 if ${ac_cv_lib_openlibm_isopenlibm+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -17676,10 +17735,148 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the isopenlibm() function!" "$LINENO" 5
+		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+  			as_fn_error $? "Unable to find the isopenlibm() function!" "$LINENO" 5
+		fi
 
 fi
 
+else
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		LIBM=
+case $host in
+*-*-beos* | *-*-cegcc* | *-*-cygwin* | *-*-haiku* | *-*-pw32* | *-*-darwin*)
+  # These system don't have libm, or don't need it
+  ;;
+*-ncr-sysv4.3*)
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for _mwvalidcheckl in -lmw" >&5
+$as_echo_n "checking for _mwvalidcheckl in -lmw... " >&6; }
+if ${ac_cv_lib_mw__mwvalidcheckl+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmw  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char _mwvalidcheckl ();
+int
+main ()
+{
+return _mwvalidcheckl ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_mw__mwvalidcheckl=yes
+else
+  ac_cv_lib_mw__mwvalidcheckl=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mw__mwvalidcheckl" >&5
+$as_echo "$ac_cv_lib_mw__mwvalidcheckl" >&6; }
+if test "x$ac_cv_lib_mw__mwvalidcheckl" = xyes; then :
+  LIBM=-lmw
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for cos in -lm" >&5
+$as_echo_n "checking for cos in -lm... " >&6; }
+if ${ac_cv_lib_m_cos+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lm  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cos ();
+int
+main ()
+{
+return cos ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_m_cos=yes
+else
+  ac_cv_lib_m_cos=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_cos" >&5
+$as_echo "$ac_cv_lib_m_cos" >&6; }
+if test "x$ac_cv_lib_m_cos" = xyes; then :
+  LIBM="$LIBM -lm"
+fi
+
+  ;;
+*)
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for cos in -lm" >&5
+$as_echo_n "checking for cos in -lm... " >&6; }
+if ${ac_cv_lib_m_cos+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lm  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char cos ();
+int
+main ()
+{
+return cos ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_m_cos=yes
+else
+  ac_cv_lib_m_cos=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_cos" >&5
+$as_echo "$ac_cv_lib_m_cos" >&6; }
+if test "x$ac_cv_lib_m_cos" = xyes; then :
+  LIBM=-lm
+fi
+
+  ;;
+esac
+
+
+	fi
+fi
 
 
 # Check whether --with-readline was given.
@@ -17714,7 +17911,9 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		as_fn_error $? "Unable to find the readline.h header!" "$LINENO" 5
+	fi
 
 fi
 
@@ -17770,7 +17969,9 @@ _ACEOF
 
 else
 
-  as_fn_error $? "Unable to find the readline() function!" "$LINENO" 5
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		as_fn_error $? "Unable to find the readline() function!" "$LINENO" 5
+	fi
 
 fi
 
@@ -18956,6 +19157,10 @@ if test -z "${am__fastdepCXX_TRUE}" && test -z "${am__fastdepCXX_FALSE}"; then
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
+if test -z "${TARGET_IS_SUPPORTED_TRUE}" && test -z "${TARGET_IS_SUPPORTED_FALSE}"; then
+  as_fn_error $? "conditional \"TARGET_IS_SUPPORTED\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${TARGET_IS_X64_TRUE}" && test -z "${TARGET_IS_X64_FALSE}"; then
   as_fn_error $? "conditional \"TARGET_IS_X64\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5

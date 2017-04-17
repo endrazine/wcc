@@ -30,11 +30,13 @@ AM_LDFLAGS =
 endif
 
 if TARGET_IS_LINUX
+if TARGET_IS_SUPPORTED
 bin_PROGRAMS = wsh$(EXEEXT)
 wshdir = @DATADIR@
 wsh_DATA = scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
 if HAVE_LUA
 wsh_DATA += scripts/print_G
+endif
 endif
 endif
 EXTRA_PROGRAMS = 

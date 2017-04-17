@@ -30,8 +30,18 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+
+#ifdef HAVE_LIBELF_LIBELF_H
+#include <libelf/libelf.h>
+#else
 #include <libelf.h>
+#endif
+
+#ifdef HAVE_LIBELF_GELF_H
+#include <libelf/gelf.h>
+#else
 #include <gelf.h>
+#endif
 
 #if defined(_WIN32) || defined(_WINNT)
 # include "mmap-windows.c"
@@ -172,10 +182,10 @@
 #  define ELFCLASSM ELF_CLASS
 #endif
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN
 # define ELFMAG_U32 ((uint32_t)(ELFMAG0 + 0x100 * (ELFMAG1 + (0x100 * (ELFMAG2 + 0x100 * ELFMAG3)))))
 # define ELFDATAM	ELFDATA2LSB
-#elif __BYTE_ORDER == __BIG_ENDIAN
+#elif BYTE_ORDER == BIG_ENDIAN
 # define ELFMAG_U32 ((uint32_t)((((ELFMAG0 * 0x100) + ELFMAG1) * 0x100 + ELFMAG2) * 0x100 + ELFMAG3))
 # define ELFDATAM	ELFDATA2MSB
 #endif
@@ -217,6 +227,12 @@ static __inline__ uint64_t byteswap64_to_host(uint64_t value)
 # define byteswap_to_host(x) byteswap32_to_host(x)
 #else
 # define byteswap_to_host(x) byteswap64_to_host(x)
+#endif
+
+#if UINTPTR_MAX > 0xffffffff
+#define ElfW(type) Elf64_ ## type
+#else
+#define ElfW(type) Elf32_ ## type
 #endif
 
 static ElfW(Shdr) *elf_find_section_type(uint32_t key, ElfW(Ehdr) *ehdr)
@@ -286,10 +302,10 @@ static int check_elf_header(ElfW(Ehdr) *const ehdr)
 
 	/* Check if the target endianness matches the host's endianness */
 	byteswap = 0;
-	if ( __BYTE_ORDER == __LITTLE_ENDIAN) {
+	if (BYTE_ORDER == LITTLE_ENDIAN) {
 		if (ehdr->e_ident[5] == ELFDATA2MSB)
 			byteswap = 1;
-	} else if ( __BYTE_ORDER == __BIG_ENDIAN) {
+	} else if (BYTE_ORDER == BIG_ENDIAN) {
 		if (ehdr->e_ident[5] == ELFDATA2LSB)
 			byteswap = 1;
 	}
@@ -684,8 +700,7 @@ int main(int argc, char **argv)
 	struct library *cur;
 
 	if (argc < 2) {
-		fprintf(stderr, "ldd: missing file arguments\n"
-				"Try `ldd --help' for more information.\n");
+		fprintf(stderr, "%s: missing file arguments\nTry `%s --help' for more information.\n", argv[0], argv[0]);
 		exit(EXIT_FAILURE);
 	}
 	if (argc > 2)
@@ -700,8 +715,7 @@ int main(int argc, char **argv)
 		}
 
 		if (strcmp(*argv, "--help") == 0 || strcmp(*argv, "-h") == 0) {
-			fprintf(stderr, "Usage: ldd [OPTION]... FILE...\n"
-					"\t--help\t\tprint this help and exit\n");
+			fprintf(stderr, "Usage: %s [OPTION]... FILE...\n\t--help\t\tprint this help and exit\n", argv[0]);
 			exit(EXIT_SUCCESS);
 		}
 
@@ -726,8 +740,8 @@ int main(int argc, char **argv)
 			for (cur = lib_list; cur; cur = cur->next) {
 				if (cur->resolved == 0 && cur->path) {
 					got_em_all = 1;
-					printf("checking sub-depends for '%s'\n", cur->path);
-					find_dependencies(cur->path);
+					/*printf("checking sub-depends for '%s'\n", cur->path);
+					find_dependencies(cur->path);*/
 					cur->resolved = 1;
 				}
 			}
@@ -742,7 +756,7 @@ int main(int argc, char **argv)
 			printf("\t%s => %s (0x00000000)\n", cur->name, cur->path);
 		}
 		if (interp_name && interpreter_already_found == 1)
-			printf("\t%s => %s (0x00000000)\n", interp_name, interp_name);
+			/*printf("\t%s => %s (0x00000000)\n", interp_name, interp_name)*/;
 		else
 			printf("\tnot a dynamic executable\n");
 

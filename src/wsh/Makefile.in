@@ -108,7 +108,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-@HAVE_LUA_TRUE@@TARGET_IS_LINUX_TRUE@am__append_1 = scripts/print_G
+@HAVE_LUA_TRUE@@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@am__append_1 = scripts/print_G
 EXTRA_PROGRAMS =
 subdir = src/wsh
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -267,6 +267,7 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 INTELCFLAGS = @INTELCFLAGS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LIBM = @LIBM@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -366,19 +367,31 @@ AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude
 AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
 @TARGET_IS_X64_FALSE@AM_LDFLAGS = 
 @TARGET_IS_X64_TRUE@AM_LDFLAGS = -T ./script.lds
-@TARGET_IS_LINUX_TRUE@bin_PROGRAMS = wsh$(EXEEXT)
-@TARGET_IS_LINUX_TRUE@wshdir = @DATADIR@
-@TARGET_IS_LINUX_TRUE@wsh_DATA = scripts/INDEX scripts/annotate \
-@TARGET_IS_LINUX_TRUE@	scripts/breakpoints scripts/callmain.wsh \
-@TARGET_IS_LINUX_TRUE@	scripts/debug scripts/dumpbin.wsh \
-@TARGET_IS_LINUX_TRUE@	scripts/dumptable scripts/hashing \
-@TARGET_IS_LINUX_TRUE@	scripts/headers scripts/hexdump \
-@TARGET_IS_LINUX_TRUE@	scripts/internals.lua scripts/libmain \
-@TARGET_IS_LINUX_TRUE@	scripts/main.wsh scripts/map \
-@TARGET_IS_LINUX_TRUE@	scripts/memory scripts/scope \
-@TARGET_IS_LINUX_TRUE@	scripts/search scripts/searchobj \
-@TARGET_IS_LINUX_TRUE@	scripts/store scripts/read.wsh \
-@TARGET_IS_LINUX_TRUE@	scripts/md5.wsh $(am__append_1)
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@bin_PROGRAMS = wsh$(EXEEXT)
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wshdir = @DATADIR@
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DATA =  \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/INDEX \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/annotate \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/breakpoints \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/callmain.wsh \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/debug \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/dumpbin.wsh \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/dumptable \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/hashing \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/headers \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/hexdump \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/internals.lua \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/libmain \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/main.wsh \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/map \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/memory \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/scope \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/search \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/searchobj \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/store \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/read.wsh \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	scripts/md5.wsh \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	$(am__append_1)
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
 wsh_LDADD = 
 man_MANS = 

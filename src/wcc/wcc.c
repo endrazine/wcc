@@ -58,8 +58,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifdef HAVE_LIBELF_LIBELF_H
+#include <libelf/libelf.h>
+#else
 #include <libelf.h>
+#endif
+
+#ifdef HAVE_LIBELF_GELF_H
+#include <libelf/gelf.h>
+#else
 #include <gelf.h>
+#endif
 
 #include <nametotype.h>
 #include <nametoalign.h>
@@ -3047,7 +3056,11 @@ int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend)
   return 0;
 }
 
+#ifdef HAVE_CAPSTONE_CAPSTONE_H
 #include <capstone/capstone.h>
+#else
+#include <capstone.h>
+#endif
 
 static void print_string_hex(char *comment, unsigned char *str, size_t len)
 {

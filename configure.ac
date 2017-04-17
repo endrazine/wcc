@@ -76,10 +76,23 @@ AS_CASE([$target_cpu],
        [x86_64], [IS_X64="true"],
        [IS_X64="false"]
 )
+AS_CASE([$target_cpu],
+       [x86_64], [IS_SUPPORTED="true"],
+	   [aarch64], [IS_SUPPORTED="true"],
+       [i386], [IS_SUPPORTED="true"],
+       [arm*], [IS_SUPPORTED="true"],
+       [IS_SUPPORTED="false"]
+)
 AS_CASE([$target_os],
        [linux*], [IS_LINUX="true"],
        [IS_LINUX="false"]
 )
+
+if test x$acl_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
+	AC_MSG_ERROR([Please use --with-gnu-ld to specify GNU ld for builing wsh.])
+fi
+
+AM_CONDITIONAL(TARGET_IS_SUPPORTED, [test "$IS_SUPPORTED" = "true"])
 AM_CONDITIONAL(TARGET_IS_X64, [test "$IS_X64" = "true"])
 AM_CONDITIONAL(TARGET_IS_LINUX, [test "$IS_LINUX" = "true"])
 
@@ -101,7 +114,9 @@ if test "x$LIBELF_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBELF_INC_DIR} ${CPPFLAGS}"
 fi
 AC_CHECK_HEADERS([libelf.h gelf.h], [], [
-  AC_MSG_ERROR([Unable to find the libelf headers!])
+	AC_CHECK_HEADERS([libelf/libelf.h libelf/gelf.h], [], [
+  		AC_MSG_ERROR([Unable to find the libelf headers!])
+	])
 ])
 
 if test "x$LIBELF_LIB_DIR" != "x" ; then
@@ -127,7 +142,9 @@ if test "x$CAPSTONE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${CAPSTONE_INC_DIR} ${CPPFLAGS}"
 fi
 AC_CHECK_HEADERS([capstone.h], [], [
-  AC_MSG_ERROR([Unable to find the capstone.h header!])
+	AC_CHECK_HEADERS([capstone/capstone.h], [], [
+	  AC_MSG_ERROR([Unable to find the capstone.h header!])
+	])
 ])
 
 if test "x$CAPSTONE_LIB_DIR" != "x" ; then
@@ -169,8 +186,8 @@ AC_ARG_WITH(libiberty,
             [LIBIBERTY_INC_DIR="${withval}/include";
             LIBIBERTY_LIB_DIR="${withval}/lib";],)
 AC_ARG_WITH(libiberty-incdir,
-  	   [AS_HELP_STRING([--with-libiberty-incdir],[LIBIBERTY include directory])],
-	   [LIBIBERTY_INC_DIR="${withval}";],)
+          [AS_HELP_STRING([--with-libiberty-incdir],[LIBIBERTY include directory])],
+          [LIBIBERTY_INC_DIR="${withval}";],)
 AC_ARG_WITH(libiberty-libdir,
            [AS_HELP_STRING([--with-libiberty-libdir],[LIBIBERTY library directory])],
            [LIBIBERTY_LIB_DIR="${withval}";],)
@@ -178,16 +195,14 @@ AC_ARG_WITH(libiberty-libdir,
 if test "x$LIBIBERTY_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBIBERTY_INC_DIR} ${CPPFLAGS}"
 fi
-AC_CHECK_HEADERS([libiberty.h], [], [
-  AC_MSG_ERROR([Unable to find the libiberty.h header!])
-])
+AC_CHECK_HEADERS([libiberty.h], [], [])
 
 if test "x$LIBIBERTY_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LIBIBERTY_LIB_DIR} ${LDFLAGS}"
 fi
 
 AC_CHECK_LIB([iberty], [get_run_time], [], [
-  AC_MSG_ERROR([Unable to find the get_run_time() function!])
+	AC_MSG_ERROR([Unable to find the get_run_time() function!])
 ])
 
 AC_ARG_WITH(openlibm,
@@ -201,20 +216,30 @@ AC_ARG_WITH(openlibm-libdir,
            [AS_HELP_STRING([--with-openlibm-libdir],[OPENLIBM library directory])],
            [OPENLIBM_LIB_DIR="${withval}";],)
 
-if test "x$OPENLIBM_INC_DIR" != "x" ; then
-   CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
-fi
-AC_CHECK_HEADERS([openlibm.h], [], [
-  AC_MSG_ERROR([Unable to find the openlibm.h header!])
-])
+if test "$IS_X64" = "true" -a "$IS_LINUX" = "true"; then
+	if test "x$OPENLIBM_INC_DIR" != "x" ; then
+   		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
+	fi
+	AC_CHECK_HEADERS([openlibm.h], [], [
+		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+			AC_MSG_ERROR([Unable to find the openlibm.h header!])
+		fi
+	])
 
-if test "x$OPENLIBM_LIB_DIR" != "x" ; then
-   LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
-fi
+	if test "x$OPENLIBM_LIB_DIR" != "x" ; then
+   		LDFLAGS="-L${OPENLIBM_LIB_DIR} ${LDFLAGS}"
+	fi
 
-AC_CHECK_LIB([openlibm], [isopenlibm], [], [
-  AC_MSG_ERROR([Unable to find the isopenlibm() function!])
-])
+	AC_CHECK_LIB([openlibm], [isopenlibm], [], [
+		if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+  			AC_MSG_ERROR([Unable to find the isopenlibm() function!])
+		fi
+	])
+else
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		LT_LIB_M
+	fi
+fi
 
 AC_ARG_WITH(readline,
             [AS_HELP_STRING([--with-readline],[LIBREADLINE directory (must contain ./lib and ./include)])],
@@ -231,7 +256,9 @@ if test "x$LIBREADLINE_INC_DIR" != "x" ; then
    CPPFLAGS="-I${LIBREADLINE_INC_DIR} ${CPPFLAGS}"
 fi
 AC_CHECK_HEADERS([readline.h], [], [
-  AC_MSG_ERROR([Unable to find the readline.h header!])
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		AC_MSG_ERROR([Unable to find the readline.h header!])
+	fi
 ])
 
 if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
@@ -239,7 +266,9 @@ if test "x$LIBREADLINE_LIB_DIR" != "x" ; then
 fi
 
 AC_CHECK_LIB([readline], [readline], [], [
-  AC_MSG_ERROR([Unable to find the readline() function!])
+	if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+		AC_MSG_ERROR([Unable to find the readline() function!])
+	fi
 ])
 
 AC_ARG_WITH(lua53,

@@ -15,6 +15,9 @@
 /* Define to 1 if you have the <bfd.h> header file. */
 #undef HAVE_BFD_H
 
+/* Define to 1 if you have the <capstone/capstone.h> header file. */
+#undef HAVE_CAPSTONE_CAPSTONE_H
+
 /* Define to 1 if you have the <capstone.h> header file. */
 #undef HAVE_CAPSTONE_H
 
@@ -42,8 +45,14 @@
 /* Define to 1 if you have the `elf' library (-lelf). */
 #undef HAVE_LIBELF
 
+/* Define to 1 if you have the <libelf/gelf.h> header file. */
+#undef HAVE_LIBELF_GELF_H
+
 /* Define to 1 if you have the <libelf.h> header file. */
 #undef HAVE_LIBELF_H
+
+/* Define to 1 if you have the <libelf/libelf.h> header file. */
+#undef HAVE_LIBELF_LIBELF_H
 
 /* Define to 1 if you have the `iberty' library (-liberty). */
 #undef HAVE_LIBIBERTY
