@@ -55,25 +55,10 @@
 
 #include "bswap.h"
 
-#ifdef DMALLOC
-#include <dmalloc.h>
-#endif
-
-#ifndef ARRAY_SIZE
-# define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
-
-/* For SunOS */
-#ifndef PATH_MAX
-#define PATH_MAX _POSIX_PATH_MAX
-#endif
-
 #if BYTE_ORDER == LITTLE_ENDIAN
 # define ELFMAG_U32 ((uint32_t)(ELFMAG0 + 0x100 * (ELFMAG1 + (0x100 * (ELFMAG2 + 0x100 * ELFMAG3)))))
-# define ELFDATAM	ELFDATA2LSB
 #elif BYTE_ORDER == BIG_ENDIAN
 # define ELFMAG_U32 ((uint32_t)((((ELFMAG0 * 0x100) + ELFMAG1) * 0x100 + ELFMAG2) * 0x100 + ELFMAG3))
-# define ELFDATAM	ELFDATA2MSB
 #else
 #error "PDP-endian not supported."
 #endif
@@ -528,6 +513,7 @@ int main(int argc, char **argv)
 	int multi = 0;
 	int got_em_all = 1;
 	char *filename = NULL;
+	char *tmp = NULL;
 	struct library *cur;
 
 	if (argc < 2) {
@@ -582,9 +568,14 @@ int main(int argc, char **argv)
 		got_em_all = 0;
 		for (cur = lib_list; cur; cur = cur->next) {
 			got_em_all = 1;
-			printf("\t%s => \n", cur->name);
+			tmp = calloc(strlen(cur->name),  sizeof(char));
+			sscanf(cur->name, "lib%[^.]", tmp);
+			printf("-l%s ", tmp);
+			free(tmp);
 		}
-		
+		if(got_em_all){
+			printf("\n");
+		}
 		for (cur = lib_list; cur; cur = cur->next) {
 			free(cur->name);
 			cur->name = NULL;
