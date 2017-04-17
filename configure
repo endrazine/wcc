@@ -769,7 +769,6 @@ infodir
 docdir
 oldincludedir
 includedir
-runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -824,9 +823,9 @@ with_readline_libdir
 with_lua53
 with_lua53_incdir
 with_lua53_libdir
-with_luajit20
-with_luajit20_incdir
-with_luajit20_libdir
+with_luajit53
+with_luajit53_incdir
+with_luajit53_libdir
 '
       ac_precious_vars='build_alias
 host_alias
@@ -880,7 +879,6 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
-runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1133,15 +1131,6 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
-  -runstatedir | --runstatedir | --runstatedi | --runstated \
-  | --runstate | --runstat | --runsta | --runst | --runs \
-  | --run | --ru | --r)
-    ac_prev=runstatedir ;;
-  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
-  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
-  | --run=* | --ru=* | --r=*)
-    runstatedir=$ac_optarg ;;
-
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1279,7 +1268,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir runstatedir
+		libdir localedir mandir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1432,7 +1421,6 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
-  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1523,10 +1511,10 @@ Optional Packages:
   --with-lua53            LUA 5.3 directory (must contain ./lib and ./include)
   --with-lua53-incdir     LUA 5.3 include directory
   --with-lua53-libdir     LUA 5.3 library directory
-  --with-luajit20         LUA JIT 2.0 directory (must contain ./lib and
+  --with-luajit53         LUA JIT 5.3 directory (must contain ./lib and
                           ./include)
-  --with-luajit20-incdir  LUAJIT 2.0 include directory
-  --with-luajit20-libdir  LUA JIT 2.0 library directory
+  --with-luajit53-incdir  LUAJIT 5.3 include directory
+  --with-luajit53-libdir  LUA JIT 5.3 library directory
 
 Some influential environment variables:
   CC          C compiler command
@@ -6640,7 +6628,7 @@ linux* | k*bsd*-gnu | kopensolaris*-gnu | gnu*)
   lt_cv_deplibs_check_method=pass_all
   ;;
 
-netbsd* | netbsdelf*-gnu)
+netbsd*)
   if echo __ELF__ | $CC -E - | $GREP __ELF__ > /dev/null; then
     lt_cv_deplibs_check_method='match_pattern /lib[^/]+(\.so\.[0-9]+\.[0-9]+|_pic\.a)$'
   else
@@ -10075,9 +10063,6 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
   openbsd* | bitrig*)
     with_gnu_ld=no
     ;;
-  linux* | k*bsd*-gnu | gnu*)
-    link_all_deplibs=no
-    ;;
   esac
 
   ld_shlibs=yes
@@ -10332,7 +10317,7 @@ _LT_EOF
       fi
       ;;
 
-    netbsd* | netbsdelf*-gnu)
+    netbsd*)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable $libobjs $deplibs $linker_flags -o $lib'
 	wlarc=
@@ -11002,7 +10987,6 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
 	if test yes = "$lt_cv_irix_exported_symbol"; then
           archive_expsym_cmds='$CC -shared $pic_flag $libobjs $deplibs $compiler_flags $wl-soname $wl$soname `test -n "$verstring" && func_echo_all "$wl-set_version $wl$verstring"` $wl-update_registry $wl$output_objdir/so_locations $wl-exports_file $wl$export_symbols -o $lib'
 	fi
-	link_all_deplibs=no
       else
 	archive_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -o $lib'
 	archive_expsym_cmds='$CC -shared $libobjs $deplibs $compiler_flags -soname $soname `test -n "$verstring" && func_echo_all "-set_version $verstring"` -update_registry $output_objdir/so_locations -exports_file $export_symbols -o $lib'
@@ -11024,7 +11008,7 @@ $as_echo "$lt_cv_irix_exported_symbol" >&6; }
       esac
       ;;
 
-    netbsd* | netbsdelf*-gnu)
+    netbsd*)
       if echo __ELF__ | $CC -E - | $GREP __ELF__ >/dev/null; then
 	archive_cmds='$LD -Bshareable -o $lib $libobjs $deplibs $linker_flags'  # a.out
       else
@@ -12137,18 +12121,6 @@ fi
   # people can always --disable-shared, the test was removed, and we
   # assume the GNU/Linux dynamic linker is in use.
   dynamic_linker='GNU/Linux ld.so'
-  ;;
-
-netbsdelf*-gnu)
-  version_type=linux
-  need_lib_prefix=no
-  need_version=no
-  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
-  soname_spec='${libname}${release}${shared_ext}$major'
-  shlibpath_var=LD_LIBRARY_PATH
-  shlibpath_overrides_runpath=no
-  hardcode_into_libs=yes
-  dynamic_linker='NetBSD ld.elf_so'
   ;;
 
 netbsd*)
@@ -15045,7 +15017,7 @@ lt_prog_compiler_static_CXX=
 	    ;;
 	esac
 	;;
-      netbsd* | netbsdelf*-gnu)
+      netbsd*)
 	;;
       *qnx* | *nto*)
         # QNX uses GNU C++, but need to define -shared option too, otherwise
@@ -15419,9 +15391,6 @@ $as_echo_n "checking whether the $compiler linker ($LD) supports shared librarie
       exclude_expsyms_CXX='[_]+GLOBAL_OFFSET_TABLE_|[_]+GLOBAL__[FID]_.*|[_]+head_[A-Za-z0-9_]+_dll|[A-Za-z0-9_]+_dll_iname'
       ;;
     esac
-    ;;
-  linux* | k*bsd*-gnu | gnu*)
-    link_all_deplibs_CXX=no
     ;;
   *)
     export_symbols_cmds_CXX='$NM $libobjs $convenience | $global_symbol_pipe | $SED '\''s/.* //'\'' | sort | uniq > $export_symbols'
@@ -16114,18 +16083,6 @@ fi
   # people can always --disable-shared, the test was removed, and we
   # assume the GNU/Linux dynamic linker is in use.
   dynamic_linker='GNU/Linux ld.so'
-  ;;
-
-netbsdelf*-gnu)
-  version_type=linux
-  need_lib_prefix=no
-  need_version=no
-  library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}$major ${libname}${shared_ext}'
-  soname_spec='${libname}${release}${shared_ext}$major'
-  shlibpath_var=LD_LIBRARY_PATH
-  shlibpath_overrides_runpath=no
-  hardcode_into_libs=yes
-  dynamic_linker='NetBSD ld.elf_so'
   ;;
 
 netbsd*)
@@ -17906,22 +17863,22 @@ fi
 
 
 
-# Check whether --with-luajit20 was given.
-if test "${with_luajit20+set}" = set; then :
-  withval=$with_luajit20; LUAJIT_INC_DIR="${withval}/include";
+# Check whether --with-luajit53 was given.
+if test "${with_luajit53+set}" = set; then :
+  withval=$with_luajit53; LUAJIT_INC_DIR="${withval}/include";
             LUAJIT_LIB_DIR="${withval}/lib";
 fi
 
 
-# Check whether --with-luajit20-incdir was given.
-if test "${with_luajit20_incdir+set}" = set; then :
-  withval=$with_luajit20_incdir; LUAJIT_INC_DIR="${withval}";
+# Check whether --with-luajit53-incdir was given.
+if test "${with_luajit53_incdir+set}" = set; then :
+  withval=$with_luajit53_incdir; LUAJIT_INC_DIR="${withval}";
 fi
 
 
-# Check whether --with-luajit20-libdir was given.
-if test "${with_luajit20_libdir+set}" = set; then :
-  withval=$with_luajit20_libdir; LUAJIT_LIB_DIR="${withval}";
+# Check whether --with-luajit53-libdir was given.
+if test "${with_luajit53_libdir+set}" = set; then :
+  withval=$with_luajit53_libdir; LUAJIT_LIB_DIR="${withval}";
 fi
 
 
@@ -17945,13 +17902,13 @@ if test "x$LUAJIT_LIB_DIR" != "x" ; then
    LDFLAGS="-L${LUAJIT_LIB_DIR} ${LDFLAGS}"
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -lluajit" >&5
-$as_echo_n "checking for lua_settable in -lluajit... " >&6; }
-if ${ac_cv_lib_luajit_lua_settable+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lua_settable in -lluajit-5.3" >&5
+$as_echo_n "checking for lua_settable in -lluajit-5.3... " >&6; }
+if ${ac_cv_lib_luajit_5_3_lua_settable+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lluajit  $LIBS"
+LIBS="-lluajit-5.3  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -17971,22 +17928,22 @@ return lua_settable ();
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_luajit_lua_settable=yes
+  ac_cv_lib_luajit_5_3_lua_settable=yes
 else
-  ac_cv_lib_luajit_lua_settable=no
+  ac_cv_lib_luajit_5_3_lua_settable=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_luajit_lua_settable" >&5
-$as_echo "$ac_cv_lib_luajit_lua_settable" >&6; }
-if test "x$ac_cv_lib_luajit_lua_settable" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_luajit_5_3_lua_settable" >&5
+$as_echo "$ac_cv_lib_luajit_5_3_lua_settable" >&6; }
+if test "x$ac_cv_lib_luajit_5_3_lua_settable" = xyes; then :
   cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBLUAJIT 1
+#define HAVE_LIBLUAJIT_5_3 1
 _ACEOF
 
-  LIBS="-lluajit $LIBS"
+  LIBS="-lluajit-5.3 $LIBS"
 
 fi
 

@@ -54,8 +54,8 @@
 /* Define to 1 if you have the `lua5.3' library (-llua5.3). */
 #undef HAVE_LIBLUA5_3
 
-/* Define to 1 if you have the `luajit' library (-lluajit). */
-#undef HAVE_LIBLUAJIT
+/* Define to 1 if you have the `luajit-5.3' library (-lluajit-5.3). */
+#undef HAVE_LIBLUAJIT_5_3
 
 /* Define to 1 if you have the `openlibm' library (-lopenlibm). */
 #undef HAVE_LIBOPENLIBM
