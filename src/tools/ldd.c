@@ -558,10 +558,8 @@ int main(int argc, char **argv)
 			printf("%s:\n", *argv);
 		}
 
-		/*if ((find_dependencies32(filename) != 0))
-			continue;*/
-		find_dependencies32(filename);
-		find_dependencies64(filename);
+		if ((find_dependencies32(filename) != 0) && find_dependencies64(filename))
+			continue;
 			
 		while (got_em_all) {
 			got_em_all = 0;
