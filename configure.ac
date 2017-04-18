@@ -98,7 +98,7 @@ if test x$enable_wsh != xyes; then
 	IS_LINUX="false"
 fi
 
-if test x$acl_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
+if test x$lt_cv_prog_gnu_ld != xyes -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true" -a "$IS_X64" = "true"; then
 	AC_MSG_ERROR([Please use --with-gnu-ld to specify GNU ld for building 'wsh' or disable 'wsh' with --disable-wsh.])
 fi
 
