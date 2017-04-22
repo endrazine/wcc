@@ -231,6 +231,7 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 	unsigned long int ret = 0;
 	struct link_map *handle;
 	Dl_info dli;
+  char *err = 0;
 
 	if ((!symbol) || (!*symbol)) {
 		return -1;
@@ -245,6 +246,14 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 	dlerror();		/* Clear any existing error */
 
 	ret = (unsigned long int) dlsym(handle, symbol);
+
+  /* Check dlerror() since ret == NULL is ok. */
+  err = dlerror();
+
+  if (err) {
+    fprintf(stderr, "ERROR: %s\n", err);
+    //_Exit(EXIT_FAILURE);
+  }
 
 	dladdr((void *) ret, &dli);
 
