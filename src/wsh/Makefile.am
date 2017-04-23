@@ -24,9 +24,9 @@ AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -Ilua/src
 AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
 
 if TARGET_IS_X64
-AM_LDFLAGS = -T ./script.lds
+AM_LDFLAGS = -T ./script.lds -lopenlibm
 else
-AM_LDFLAGS =
+AM_LDFLAGS = $(LIBM)
 endif
 
 if TARGET_IS_LINUX
@@ -36,7 +36,7 @@ bin_PROGRAMS = wsh$(EXEEXT)
 wshdir = @DATADIR@
 wsh_DATA = scripts/print_G scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD = $(LIBM) -Llua/src/ -lliblua
+wsh_LDADD = lua/src/liblua.a
 endif
 endif
 EXTRA_PROGRAMS = 
