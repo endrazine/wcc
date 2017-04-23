@@ -133,7 +133,7 @@ am__wsh_SOURCES_DIST = wsh.c wshmain.c helper.c linenoise.c
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	helper.$(OBJEXT) \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	linenoise.$(OBJEXT)
 wsh_OBJECTS = $(am_wsh_OBJECTS)
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DEPENDENCIES = lua/src/liblua.a
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DEPENDENCIES = lua/src/liblua.la
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -417,7 +417,7 @@ AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-va
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wshdir = @DATADIR@
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DATA = scripts/print_G scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_LDADD = lua/src/liblua.a
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_LDADD = lua/src/liblua.la
 man_MANS = 
 noinst_HEADERS = include/linenoise.h include/colors.h include/lua.h include/lualib.h include/luaconf.h
 EXTRA_DIST = $(man_MANS)
