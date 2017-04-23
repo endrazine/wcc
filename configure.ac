@@ -256,30 +256,6 @@ if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	])
 fi
 
-AC_ARG_WITH(lua53,
-            [AS_HELP_STRING([--with-lua53],[LUA 5.3 directory (must contain ./lib and ./include)])],
-            [LUA53_INC_DIR="${withval}/include";
-            LUA53_LIB_DIR="${withval}/lib";],)
-AC_ARG_WITH(lua53-incdir,
-  	   [AS_HELP_STRING([--with-lua53-incdir],[LUA 5.3 include directory])],
-	   [LUA53_INC_DIR="${withval}";],)
-AC_ARG_WITH(lua53-libdir,
-           [AS_HELP_STRING([--with-lua53-libdir],[LUA 5.3 library directory])],
-           [LUA53_LIB_DIR="${withval}";],)
-
-if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-	if test "x$LUA53_INC_DIR" != "x" ; then
-   		CPPFLAGS="-I${LUA53_INC_DIR} ${CPPFLAGS}"
-	fi
-	AC_CHECK_HEADERS([lua.h luaconf.h lauxlib.h lualib.h])
-
-	if test "x$LUA53_LIB_DIR" != "x" ; then
-		LDFLAGS="-L${LUA53_LIB_DIR} ${LDFLAGS}"
-	fi
-
-	AC_CHECK_LIB([lua5.3], [lua_settable])
-fi
-
 AC_ARG_WITH(luajit53,
             [AS_HELP_STRING([--with-luajit53],[LUA JIT 5.3 directory (must contain ./lib and ./include)])],
             [LUAJIT_INC_DIR="${withval}/include";
@@ -329,7 +305,7 @@ AS_AC_EXPAND(BINDIR, $bindir)
 AS_AC_EXPAND(DATADIR, ${datadir}/wsh)
 
 dnl generate output
-AC_CONFIG_FILES([Makefile src/wld/Makefile src/wldd/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h])
+AC_CONFIG_FILES([Makefile src/wld/Makefile src/wldd/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/lua/src/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h])
 AC_CONFIG_FILES([src/tools/wcch], [chmod +x src/tools/wcch])
 AC_CONFIG_FILES([src/wsh/scripts/print_G], [chmod +x src/wsh/scripts/print_G])
 AC_CONFIG_FILES([src/wsh/scripts/md5.wsh], [chmod +x src/wsh/scripts/md5.wsh])

@@ -33,9 +33,6 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
-/* Define to 1 if you have the <lauxlib.h> header file. */
-#undef HAVE_LAUXLIB_H
-
 /* Define to 1 if you have the `bfd' library (-lbfd). */
 #undef HAVE_LIBBFD
 
@@ -57,9 +54,6 @@
 /* Define to 1 if you have the `iberty' library (-liberty). */
 #undef HAVE_LIBIBERTY
 
-/* Define to 1 if you have the `lua5.3' library (-llua5.3). */
-#undef HAVE_LIBLUA5_3
-
 /* Define to 1 if you have the `luajit-5.3' library (-lluajit-5.3). */
 #undef HAVE_LIBLUAJIT_5_3
 
@@ -72,17 +66,8 @@
 /* Define to 1 if you have the <link.h> header file. */
 #undef HAVE_LINK_H
 
-/* Define to 1 if you have the <luaconf.h> header file. */
-#undef HAVE_LUACONF_H
-
 /* Define to 1 if you have the <luajit.h> header file. */
 #undef HAVE_LUAJIT_H
-
-/* Define to 1 if you have the <lualib.h> header file. */
-#undef HAVE_LUALIB_H
-
-/* Define to 1 if you have the <lua.h> header file. */
-#undef HAVE_LUA_H
 
 /* Define to 1 if you have the <malloc.h> header file. */
 #undef HAVE_MALLOC_H
