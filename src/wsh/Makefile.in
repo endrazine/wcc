@@ -116,11 +116,15 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(wshdir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_wsh_OBJECTS = wsh.$(OBJEXT) wshmain.$(OBJEXT) helper.$(OBJEXT) \
-	linenoise.$(OBJEXT)
+am__wsh_SOURCES_DIST = wsh.c wshmain.c helper.c linenoise.c
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@am_wsh_OBJECTS =  \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	wsh.$(OBJEXT) \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	wshmain.$(OBJEXT) \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	helper.$(OBJEXT) \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	linenoise.$(OBJEXT)
 wsh_OBJECTS = $(am_wsh_OBJECTS)
 am__DEPENDENCIES_1 =
-wsh_DEPENDENCIES = $(am__DEPENDENCIES_1)
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DEPENDENCIES = $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -160,7 +164,7 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(wsh_SOURCES)
-DIST_SOURCES = $(wsh_SOURCES)
+DIST_SOURCES = $(am__wsh_SOURCES_DIST)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -393,16 +397,16 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
-AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude
+AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -Isrc/lua/src
 AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
 @TARGET_IS_X64_FALSE@AM_LDFLAGS = 
 @TARGET_IS_X64_TRUE@AM_LDFLAGS = -T ./script.lds
+bin_PROGRAMS = wsh$(EXEEXT)
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@SUBDIRS = lua/src
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@bin_PROGRAMS = wsh$(EXEEXT)
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wshdir = @DATADIR@
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_DATA = scripts/print_G scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
-wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD = $(LIBM) -Lsrc/wsh/lua/src/ -lliblua
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@wsh_LDADD = $(LIBM) -Lsrc/wsh/lua/src/ -lliblua
 man_MANS = 
 noinst_HEADERS = include/linenoise.h include/colors.h include/lua.h include/lualib.h include/luaconf.h
 EXTRA_DIST = $(man_MANS)

@@ -20,7 +20,7 @@
 AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
-AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude
+AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -Isrc/lua/src
 AM_CFLAGS = $(INTELCFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
 
 if TARGET_IS_X64
@@ -29,18 +29,18 @@ else
 AM_LDFLAGS =
 endif
 
+bin_PROGRAMS = wsh$(EXEEXT)
+
 if TARGET_IS_LINUX
 if TARGET_IS_SUPPORTED
 SUBDIRS = lua/src
-bin_PROGRAMS = wsh$(EXEEXT)
 wshdir = @DATADIR@
 wsh_DATA = scripts/print_G scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
+wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
+wsh_LDADD = $(LIBM) -Lsrc/wsh/lua/src/ -lliblua
 endif
 endif
 EXTRA_PROGRAMS = 
-
-wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD = $(LIBM) -Lsrc/wsh/lua/src/ -lliblua
  
 man_MANS =
 noinst_HEADERS = include/linenoise.h include/colors.h include/lua.h include/lualib.h include/luaconf.h
