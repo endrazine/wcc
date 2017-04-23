@@ -36,7 +36,7 @@ bin_PROGRAMS = wsh$(EXEEXT)
 wshdir = @DATADIR@
 wsh_DATA = scripts/print_G scripts/INDEX scripts/annotate scripts/breakpoints scripts/callmain.wsh scripts/debug scripts/dumpbin.wsh scripts/dumptable scripts/hashing scripts/headers scripts/hexdump scripts/internals.lua scripts/libmain scripts/main.wsh scripts/map scripts/memory scripts/scope scripts/search scripts/searchobj scripts/store scripts/read.wsh scripts/md5.wsh
 wsh_SOURCES = wsh.c wshmain.c helper.c linenoise.c
-wsh_LDADD = $(LIBM) -Lsrc/wsh/lua/src/ -lliblua
+wsh_LDADD = $(LIBM) -Llua/src/ -lliblua
 endif
 endif
 EXTRA_PROGRAMS = 
