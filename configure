@@ -17165,7 +17165,7 @@ case $target_cpu in #(
     IS_SUPPORTED="true" ;; #(
   aarch64) :
     IS_SUPPORTED="true" ;; #(
-  i386) :
+  i386|i486|i586|i686) :
     IS_SUPPORTED="true" ;; #(
   arm*) :
     IS_SUPPORTED="true" ;; #(

@@ -79,7 +79,7 @@ AS_CASE([$target_cpu],
 AS_CASE([$target_cpu],
        [x86_64], [IS_SUPPORTED="true"],
 	   [aarch64], [IS_SUPPORTED="true"],
-       [i386], [IS_SUPPORTED="true"],
+       [i386|i486|i586|i686], [IS_SUPPORTED="true"],
        [arm*], [IS_SUPPORTED="true"],
        [IS_SUPPORTED="false"]
 )
