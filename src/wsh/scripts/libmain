@@ -17,7 +17,7 @@ function callmain (arg)
 end
 
 
--- callmain({"","-V"})
+-- callmain({"/usr/sbin/sshd","-V"})
 
 -- a,b=callmain({"","-h"})
 -- a,b=callmain({"","--help"})
