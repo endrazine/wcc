@@ -1,3 +1,9 @@
+[submodule "src/wsh/openlibm"]
+	path = src/wsh/openlibm
+	url = https://github.com/JuliaLang/openlibm.git
+[submodule "src/wsh/luajit-2.0"]
+	path = src/wsh/luajit-2.0
+	url = http://luajit.org/git/luajit-2.0.git
 [submodule "doc/wikidocs"]
 	path = doc/wikidocs
 	url = https://github.com/endrazine/wcc.wiki.git

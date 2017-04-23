@@ -49,12 +49,6 @@
 #include <sys/wait.h>
 
 
-#if defined(_WIN32) || defined(_WINNT)
-# include "mmap-windows.c"
-#else
-# include <sys/mman.h>
-#endif
-
 #ifdef HAVE_LIBELF_LIBELF_H
 #include <libelf/libelf.h>
 #else
@@ -81,7 +75,7 @@ int main(int argc, char **argv)
     int found_dynamic_section = 0, found_lib = 0;
 
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s file.\n", argv[0]);
+        fprintf(stderr, "Usage: %s filename\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -163,6 +157,8 @@ int main(int argc, char **argv)
                     fprintf(stderr, "elf_strpt() failed: %s\n", elf_errmsg ( -1));
                     goto exit_fail;
                 }
+                
+                /* Parse out the library's name */
                 tmplib = calloc(strlen(lib),  sizeof(char));
                 sscanf(lib, "lib%[^.]", tmplib);
                 printf("-l%s ", tmplib);
