@@ -19016,7 +19016,7 @@ fi
   exec_prefix=$exec_prefix_save
 
 
-ac_config_files="$ac_config_files Makefile src/wld/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h"
+ac_config_files="$ac_config_files Makefile src/wld/Makefile src/wldd/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h"
 
 ac_config_files="$ac_config_files src/tools/wcch"
 
@@ -20184,6 +20184,7 @@ do
     "libtool") CONFIG_COMMANDS="$CONFIG_COMMANDS libtool" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/wld/Makefile") CONFIG_FILES="$CONFIG_FILES src/wld/Makefile" ;;
+    "src/wldd/Makefile") CONFIG_FILES="$CONFIG_FILES src/wldd/Makefile" ;;
     "src/wcc/Makefile") CONFIG_FILES="$CONFIG_FILES src/wcc/Makefile" ;;
     "src/wsh/Makefile") CONFIG_FILES="$CONFIG_FILES src/wsh/Makefile" ;;
     "src/wsh/tests/apache2/Makefile") CONFIG_FILES="$CONFIG_FILES src/wsh/tests/apache2/Makefile" ;;

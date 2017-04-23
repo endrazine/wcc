@@ -24,12 +24,11 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_builddir)/include
 AM_LDFLAGS =
 
-bin_PROGRAMS = wld$(EXEEXT)
+bin_PROGRAMS = wldd$(EXEEXT)
 EXTRA_PROGRAMS = 
 
-wld_SOURCES = wld.c
-wld_LDADD = 
-man_MANS = $(top_builddir)/doc/manpages/wld.8
-noinst_HEADERS = 
+wldd_SOURCES = wldd.c
+wldd_LDADD = 
+noinst_HEADERS =
 EXTRA_DIST = $(man_MANS)
 

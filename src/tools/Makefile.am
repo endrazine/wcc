@@ -30,10 +30,6 @@ bin_SCRIPTS = wcch
 endif
 endif
 
-bin_PROGRAMS = wldd$(EXEEXT)
 EXTRA_PROGRAMS = 
 
-wldd_SOURCES = wldd.c
-noinst_HEADERS = bswap.h
-
-CLEANFILES = $(bin_SCRIPTS) $(bin_PROGRAMS)
+CLEANFILES = $(bin_SCRIPTS)
