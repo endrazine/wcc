@@ -149,15 +149,16 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
-liblua_la_DEPENDENCIES =
+am__DEPENDENCIES_1 =
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__liblua_la_SOURCES_DIST = lapi.c lcode.c lctype.c ldebug.c ldo.c \
 	ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c \
 	lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c \
-	lzio.c lauxlib.c lbaselib.c ldblib.c liolib.c lmathlib.c \
-	loslib.c ltablib.c lstrlib.c loadlib.c linit.c lapi.h ldebug.h \
-	lgc.h lmem.h lparser.h ltable.h lzio.h ldo.h llex.h lobject.h \
-	lstate.h ltm.h lundump.h lcode.h lfunc.h llimits.h lopcodes.h \
-	lstring.h lvm.h
+	lzio.c lcorolib.c lauxlib.c lbaselib.c ldblib.c liolib.c \
+	lmathlib.c loslib.c ltablib.c lstrlib.c loadlib.c linit.c \
+	lutf8lib.c lapi.h ldebug.h lgc.h lmem.h lparser.h ltable.h \
+	lzio.h ldo.h llex.h lobject.h lstate.h ltm.h lundump.h lcode.h \
+	lfunc.h llimits.h lopcodes.h lstring.h lvm.h
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@am_liblua_la_OBJECTS =  \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lapi.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lcode.lo \
@@ -177,6 +178,7 @@ am__liblua_la_SOURCES_DIST = lapi.c lcode.c lctype.c ldebug.c ldo.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	ltm.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lundump.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lvm.lo lzio.lo \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lcorolib.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lauxlib.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lbaselib.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	ldblib.lo \
@@ -186,7 +188,8 @@ am__liblua_la_SOURCES_DIST = lapi.c lcode.c lctype.c ldebug.c ldo.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	ltablib.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lstrlib.lo \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	loadlib.lo \
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	linit.lo
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	linit.lo \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lutf8lib.lo
 liblua_la_OBJECTS = $(am_liblua_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -397,13 +400,13 @@ ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -I$(top_builddir)/src/wsh/include
 AM_CFLAGS = -DLUA_USE_LINUX=1
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@lib_LTLIBRARIES = liblua.la
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_LIBADD = -lm -ldl
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_LIBADD = $(LIBM)
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_SOURCES = \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c  \
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lundump.c lvm.c lzio.c \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lundump.c lvm.c lzio.c lcorolib.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lauxlib.c lbaselib.c ldblib.c liolib.c lmathlib.c loslib.c ltablib.c \
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lstrlib.c loadlib.c linit.c \
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lstrlib.c loadlib.c linit.c lutf8lib.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lapi.h ldebug.h lgc.h lmem.h lparser.h ltable.h lzio.h ldo.h llex.h \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lobject.h lstate.h ltm.h lundump.h lcode.h lfunc.h llimits.h lopcodes.h \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lstring.h lvm.h
@@ -490,6 +493,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lauxlib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lbaselib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lcode.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lcorolib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lctype.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ldblib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ldebug.Plo@am__quote@
@@ -514,6 +518,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ltablib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ltm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lundump.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lutf8lib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lvm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lzio.Plo@am__quote@
 

@@ -26,13 +26,13 @@ AM_CFLAGS = -DLUA_USE_LINUX=1
 if TARGET_IS_LINUX
 if TARGET_IS_SUPPORTED
 lib_LTLIBRARIES = liblua.la
-liblua_la_LIBADD = -lm -ldl
+liblua_la_LIBADD = $(LIBM)
 liblua_la_SOURCES = \
 	lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c \
 	lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c  \
-	lundump.c lvm.c lzio.c \
+	lundump.c lvm.c lzio.c lcorolib.c \
 	lauxlib.c lbaselib.c ldblib.c liolib.c lmathlib.c loslib.c ltablib.c \
-	lstrlib.c loadlib.c linit.c \
+	lstrlib.c loadlib.c linit.c lutf8lib.c \
 	lapi.h ldebug.h lgc.h lmem.h lparser.h ltable.h lzio.h ldo.h llex.h \
 	lobject.h lstate.h ltm.h lundump.h lcode.h lfunc.h llimits.h lopcodes.h \
 	lstring.h lvm.h
