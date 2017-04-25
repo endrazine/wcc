@@ -1,12 +1,12 @@
-#!/bin/bash
+#!@SHELL@
 #
-# wlld : This file is part of the Witchcraft Compiler Collection
+# wlld : This file is part of the @PACKAGE_NAME@
 #
-# Copyright : Jonathan Brossard - endrazine@gmail.com
+# Copyright : @PACKAGE_BUGREPORT@
 #
 # This file is licensed under the MIT license
 #
-# version 0.01 Sun Jul 17 19:25:18 PDT 2016
+# version @VERSION@ Sun Jul 17 19:25:18 PDT 2016
 #
 #
 
@@ -19,7 +19,7 @@ usage () {
 }
 
 getlibs (){
-	ldd $1|grep "=> /"|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
+	@LOCAL_LDD@ $1|grep "=> /"|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
 	echo ""
 }
 

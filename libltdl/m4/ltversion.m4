@@ -1,0 +1,1 @@
+/opt/buildroot-gcc463/usr/share/aclocal/ltversion.m4
