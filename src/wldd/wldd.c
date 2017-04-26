@@ -160,7 +160,7 @@ int main(int argc, char **argv)
                 
                 /* Parse out the library's name */
                 tmplib = calloc(strlen(lib),  sizeof(char));
-                sscanf(lib, "lib%[^.]", tmplib);
+                sscanf(lib, "lib%[^.|^-]", tmplib);
                 printf("-l%s ", tmplib);
                 free(tmplib);
                 found_lib = 1;
