@@ -111,7 +111,7 @@ int main(int argc, char **argv)
         goto exit_fail;
     }
 
-    if(ehdr.e_type != ET_EXEC && ehdr.e_type != ET_EXEC) {
+    if(ehdr.e_type != ET_EXEC && ehdr.e_type != ET_DYN) {
         fprintf(stderr, "%s is not a dynamic executable.\n", argv[1]);
         goto exit_fail;
     }
