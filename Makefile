@@ -7,7 +7,7 @@
 # This file is licensed under MIT License.
 #
 
-CFLAGS := -W -Wall -Wextra -Wno-unused-parameter -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -masm=intel -rdynamic -D_fORTIFY_SOURCE=2 -O2
+CFLAGS := -W -Wall -Wno-unused-parameter -Wno-unused-function -Wno-unused-result -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -masm=intel -rdynamic -D_fORTIFY_SOURCE=2 -O2
 
 all:
 	mkdir -p bin
