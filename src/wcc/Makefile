@@ -22,11 +22,8 @@
 # capstone and libbfd are installed on the system.
 #
 
-CC :=   clang
 WCC :=  ./wcc
 FILE := file
-
-CFLAGS := -W -Wall -Wextra -Wno-unused-parameter -fpie -pie -fPIC -g3 -ggdb -O0 -I../../include -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION
 
 all::
 	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd -lelf -lcapstone

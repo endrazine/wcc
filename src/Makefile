@@ -8,10 +8,10 @@
 #
 
 all::
-	cd wcc && make
-	cd wld && make
-	cd wsh && make
-	cd tools && make
+	cd wcc && make CFLAGS=" $(CFLAGS)"
+	cd wld && make CFLAGS=" $(CFLAGS)"
+	cd wsh && make CFLAGS=" $(CFLAGS)"
+	cd tools && make CFLAGS=" $(CFLAGS)"
 clean:
 	cd wcc && make clean
 	cd wld && make clean

@@ -16,9 +16,6 @@
 # any ELF (from any architecture/OS/endianess).
 #
 
-CC := gcc # You can use clang too
-CFLAGS := -W -Wall -Wextra -fpie -pie -fPIC -g3 -ggdb -O0 -I../../include
-
 all::
 	$(CC) $(CFLAGS) wld.c -o wld -lbfd
 #	$(CC) $(CFLAGS) wld.c -o wld32 -m32 ../lib32/usr/lib/libbfd.a

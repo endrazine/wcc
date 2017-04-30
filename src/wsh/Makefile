@@ -7,11 +7,7 @@
 # This file is licensed under MIT License.
 #
 
-CC := gcc
-
-CFLAGS := -masm=intel -rdynamic -W -Wall -Wextra -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-parameter -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -fno-omit-frame-pointer -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now #-fsanitize=address
 OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
-
 
 #CFLAGS := -rdynamic -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include -rdynamic -I../../include/ -I./luajit-2.0/src/ -Wl,-E -Wl,-z,now
 #OBJLIB := ./luajit-2.0/src/libluajit.a ./openlibm/libopenlibm.a 
