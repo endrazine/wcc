@@ -36,6 +36,13 @@
 #include <uthash.h>
 #include <libgen.h>	// For basename()
 
+// address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
+#if defined(__clang__) || defined (__GNUC__)
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
+
 #ifndef __amd64__
 #define REG_RIP    16
 #endif
@@ -1837,6 +1844,14 @@ int prototypes(lua_State * L)
 
 		sscanf(line, "%10s %200s %200s %20s %200s %20s", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
 
+		// make sure tag type is correct, else discard
+		if(strncmp(l->key.ttype, "TAG", 3)){
+			printf(" !! Unknown TAG type: %s\n", l->key.ttype);
+			free(l);
+			continue;
+		}
+
+		// add to linked list if not present, else free
 		HASH_FIND(hh, protorecords, &l->key, sizeof(learn_key_t), p);
 		if(p){
 			free(l);
@@ -3853,6 +3868,7 @@ int ralloc(lua_State * L){
 * [page unmaped]
 */
 
+ATTRIBUTE_NO_SANITIZE_ADDRESS
 int xalloc(lua_State * L)
 {
 	unsigned int size;
@@ -5180,9 +5196,14 @@ int rawmemstrlen(lua_State *L) {
 	return 1;
 }
 
+/**
+* Set default environment variables in constructor
+*/
+
 __attribute__((constructor))
 static void initialize_wsh() {
-	//
+	printf("init\n");
+	setenv("LIBC_FATAL_STDERR_", "1", 1);
+	setenv("MALLOC_CHECK_", "3", 1);
 }
-
 

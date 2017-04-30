@@ -7,13 +7,12 @@
 # This file is licensed under MIT License.
 #
 
-CC := gcc-4.8
-
 CFLAGS := -masm=intel -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now -m32 #--sanitize=address
+
 
 all::
 	cd openlibm && make CFLAGS="-pie -fpie -fPIC -m32" ARCH=i386
-	cd lua && make linux CFLAGS="-march=i386 -m32" CC='/usr/bin/gcc-4.8 -m32'
+	cd lua && make linux CFLAGS="-march=i386 -m32" CC="$(CC)"
 	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -ldl -lreadline -pie -fpie -fPIC
 	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -ldl -lreadline -pie -fpie -fPIC
 	$(CC) $(CFLAGS) helper.c -o helper.o -c -pie -fpie -fPIC
@@ -30,6 +29,12 @@ clean::
 	rm wsh-i386 helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o -f
 	cd openlibm && make clean
 	cd lua && make clean
+
+requirements::
+	sudo apt-get install libreadline-dev:i386
+	sudo apt-get install libiberty-dev:i386
+	sudo apt-get install libgsl-dev:i386
+
 
 deepclean:
 	cd openlibm && make clean
