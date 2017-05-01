@@ -29,7 +29,7 @@ EXTRA_PROGRAMS =
 
 wcc_SOURCES = wcc.c
 wcc_LDADD = 
-man_MANS = $(top_builddir)/doc/manpages/wcc.8
+man_MANS = $(top_builddir)/doc/manpages/wcc.1
 noinst_HEADERS = 
 EXTRA_DIST = $(man_MANS)
 

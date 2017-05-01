@@ -41,7 +41,7 @@ endif
 endif
 EXTRA_PROGRAMS = 
  
-man_MANS =
+man_MANS = $(top_builddir)/doc/manpages/wsh.1
 noinst_HEADERS = include/linenoise.h include/colors.h include/lua.h include/lualib.h include/luaconf.h
 
 EXTRA_DIST = $(man_MANS)

@@ -30,6 +30,10 @@ bin_SCRIPTS = wcch
 endif
 endif
 
+man_MANS = $(top_builddir)/doc/manpages/wcch.1
 EXTRA_PROGRAMS = 
 
 CLEANFILES = $(bin_SCRIPTS)
+
+noinst_HEADERS = 
+EXTRA_DIST = $(man_MANS)
