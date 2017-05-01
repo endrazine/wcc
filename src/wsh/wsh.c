@@ -39,7 +39,7 @@
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
-# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((__no_sanitize__("address")))
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
 #else
 # define ATTRIBUTE_NO_SANITIZE_ADDRESS
 #endif

@@ -254,6 +254,8 @@ if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	])
 fi
 
+AX_PTHREAD
+
 AC_ARG_WITH(luajit53,
             [AS_HELP_STRING([--with-luajit53],[LUA JIT 5.3 directory (must contain ./lib and ./include)])],
             [LUAJIT_INC_DIR="${withval}/include";

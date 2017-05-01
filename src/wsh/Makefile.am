@@ -21,8 +21,8 @@ AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 
 ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -Ilua/src
-AM_CFLAGS = $(INTELCFLAGS) $(SANITIZECFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
-AM_LDFLAGS = -lopenlibm
+AM_CFLAGS = $(INTELCFLAGS) $(SANITIZECFLAGS) $(PTHREAD_CFLAGS) -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -rdynamic -Wl,-E -Wl,-z,now
+AM_LDFLAGS = -lopenlibm $(PTHREAD_LIBS)
 
 if TARGET_IS_X64
 AM_LDFLAGS += -T ./script.lds
