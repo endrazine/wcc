@@ -1,5 +1,5 @@
 #/*
-#    Copyright (C) 2013 Dovado Europe AB <markus@dovado.com>
+#    Copyright (C) 2017 Markus Gothe <nietzsche@lysator.liu.se>
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as
