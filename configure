@@ -18723,7 +18723,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags____sanitize_address" >&5
 $as_echo "$ax_cv_check_cflags____sanitize_address" >&6; }
 if test "x$ax_cv_check_cflags____sanitize_address" = xyes; then :
-  INTELCFLAGS="$INTELCFLAGS --sanitize=address"
+  SANITIZECFLAGS="--sanitize=address"
 else
   :
 fi

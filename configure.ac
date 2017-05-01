@@ -296,7 +296,7 @@ AM_CONDITIONAL(HAVE_DOXYGEN, [test -n "$DOXYGEN"])
 AX_CHECK_COMPILE_FLAG([-masm=intel], [INTELCFLAGS="$INTELCFLAGS -masm=intel"])
 AX_CHECK_COMPILE_FLAG([-mpreferred-stack-boundary=12], [INTELCFLAGS="$INTELCFLAGS -mpreferred-stack-boundary=12"])
 AX_CHECK_COMPILE_FLAG([-mstackrealign], [INTELCFLAGS="$INTELCFLAGS -mstackrealign"])
-AX_CHECK_COMPILE_FLAG([--sanitize=address], [INTELCFLAGS="$INTELCFLAGS --sanitize=address"])
+AX_CHECK_COMPILE_FLAG([--sanitize=address], [SANITIZECFLAGS="--sanitize=address"])
 AC_SUBST(INTELCFLAGS)
 
 AS_AC_EXPAND(BINDIR, $bindir)
