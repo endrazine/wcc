@@ -57,7 +57,8 @@ AC_PROG_INSTALL
 dnl /bin/mkdir -p
 AC_PROG_MKDIR_P
 
-LT_INIT([dlopen])
+LT_INIT([dlopen disable-shared])
+AC_SUBST([LIBTOOL_DEPS])
 LT_PATH_LD
 
 dnl C checks

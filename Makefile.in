@@ -276,6 +276,7 @@ LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
+LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LOCAL_APACHE2 = @LOCAL_APACHE2@
@@ -884,6 +885,8 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
+libtool: $(LIBTOOL_DEPS)
+	$(SHELL) ./config.status libtoo
 
 #endif
 

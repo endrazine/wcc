@@ -22,6 +22,11 @@ AUTOMAKE_OPTIONS = foreign 1.11 check-news dist-bzip2 std-options
 ACLOCAL_AMFLAGS = -Im4
 SUBDIRS = src/wcc src/wld src/wldd src/wsh src/tools src/wsh/tests
 
+
+LIBTOOL_DEPS = @LIBTOOL_DEPS@
+libtool: $(LIBTOOL_DEPS)
+	$(SHELL) ./config.status libtoo
+
 #if HAVE_DOXYGEN
 #doxyfile.stamp:
   

@@ -667,6 +667,7 @@ TARGET_IS_X64_FALSE
 TARGET_IS_X64_TRUE
 TARGET_IS_SUPPORTED_FALSE
 TARGET_IS_SUPPORTED_TRUE
+LIBTOOL_DEPS
 CXXCPP
 LT_SYS_LIBRARY_PATH
 OTOOL64
@@ -1481,7 +1482,7 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
-  --enable-shared[=PKGS]  build shared libraries [default=yes]
+  --enable-shared[=PKGS]  build shared libraries [default=no]
   --enable-static[=PKGS]  build static libraries [default=yes]
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
@@ -8841,14 +8842,7 @@ func_stripname_cnf ()
 
 # Set options
 enable_dlopen=yes
-
-
-
-
-  enable_win32_dll=no
-
-
-            # Check whether --enable-shared was given.
+# Check whether --enable-shared was given.
 if test "${enable_shared+set}" = set; then :
   enableval=$enable_shared; p=${PACKAGE-default}
     case $enableval in
@@ -8868,7 +8862,7 @@ if test "${enable_shared+set}" = set; then :
       ;;
     esac
 else
-  enable_shared=yes
+  enable_shared=no
 fi
 
 
@@ -8876,6 +8870,12 @@ fi
 
 
 
+
+
+
+
+
+  enable_win32_dll=no
 
 
 
@@ -16467,6 +16467,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 # Only expand once:
+
 
 
 
