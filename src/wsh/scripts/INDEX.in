@@ -1,0 +1,11 @@
+script("@DATADIR@/store")
+script("@DATADIR@/hashing")
+script("@DATADIR@/dumptable")
+script("@DATADIR@/libmain")
+script("@DATADIR@/scope")
+script("@DATADIR@/search")
+script("@DATADIR@/searchobj")
+script("@DATADIR@/hexdump")
+script("@DATADIR@/annotate")
+script("@DATADIR@/memory")
+

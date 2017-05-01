@@ -1,8 +1,7 @@
 var searchData=
 [
-  ['gencore',['gencore',['../wsh_8h.html#a1204a085ba8c42ed917b99401f1cc0ae',1,'gencore(lua_State *L):&#160;wsh.c'],['../wsh_8c.html#a1204a085ba8c42ed917b99401f1cc0ae',1,'gencore(lua_State *L):&#160;wsh.c']]],
-  ['getcharbuf',['getcharbuf',['../wsh_8h.html#a609cded031e78d37e41e183d79adf8b7',1,'getcharbuf(lua_State *L):&#160;wsh.c'],['../wsh_8c.html#a609cded031e78d37e41e183d79adf8b7',1,'getcharbuf(lua_State *L):&#160;wsh.c']]],
-  ['getsize',['getsize',['../wsh_8h.html#af106d0c6c0906499866db3afb4950b88',1,'wsh.h']]],
+  ['gencore',['gencore',['../wsh_8c.html#a1204a085ba8c42ed917b99401f1cc0ae',1,'wsh.c']]],
+  ['getcharbuf',['getcharbuf',['../wsh_8c.html#a609cded031e78d37e41e183d79adf8b7',1,'wsh.c']]],
   ['gimport_5ft',['gimport_t',['../structgimport__t.html',1,'gimport_t'],['../wcc_8c.html#a562c51994331c3e7e9d257e2c7dffc47',1,'gimport_t():&#160;wcc.c']]],
   ['gimports',['gimports',['../wcc_8c.html#a0bd5eb653d1b8c0d7bcd940d7242f5bc',1,'wcc.c']]],
   ['gimportslen',['gimportslen',['../wcc_8c.html#a2231721c9307e9f1b9f4a74c7fdae590',1,'wcc.c']]],
@@ -20,6 +19,6 @@ var searchData=
   ['globalsymtableoffset',['globalsymtableoffset',['../wcc_8c.html#a2df97bd24408d641b9d91270c2a07366',1,'wcc.c']]],
   ['gray',['GRAY',['../colors_8h.html#ae5f70677050eecd8909e0248e07b9e73',1,'colors.h']]],
   ['green',['GREEN',['../colors_8h.html#acfbc006ea433ad708fdee3e82996e721',1,'colors.h']]],
-  ['grep',['grep',['../wsh_8h.html#a6d7fcf32bbe0d140496544ce55b60b34',1,'grep(lua_State *L):&#160;wsh.c'],['../wsh_8c.html#a6d7fcf32bbe0d140496544ce55b60b34',1,'grep(lua_State *L):&#160;wsh.c']]],
-  ['grepptr',['grepptr',['../wsh_8h.html#a8124af862f999332e5ee47c39798a168',1,'grepptr(lua_State *L):&#160;wsh.c'],['../wsh_8c.html#a8124af862f999332e5ee47c39798a168',1,'grepptr(lua_State *L):&#160;wsh.c']]]
+  ['grep',['grep',['../wsh_8c.html#a6d7fcf32bbe0d140496544ce55b60b34',1,'wsh.c']]],
+  ['grepptr',['grepptr',['../wsh_8c.html#a8124af862f999332e5ee47c39798a168',1,'wsh.c']]]
 ];

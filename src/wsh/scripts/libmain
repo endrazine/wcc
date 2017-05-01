@@ -19,5 +19,5 @@ end
 
 -- callmain({"/usr/sbin/sshd","-V"})
 
--- a,b=callmain({"/usr/sbin/apache2","-h"})
--- a,b=callmain({"/usr/sbin/postgres","--help"})
+-- a,b=callmain({"","-h"})
+-- a,b=callmain({"","--help"})

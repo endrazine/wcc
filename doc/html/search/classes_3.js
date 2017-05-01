@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['gimport_5ft',['gimport_t',['../structgimport__t.html',1,'']]]
+  ['elfdata_5ft',['elfdata_t',['../structelfdata__t.html',1,'']]],
+  ['eps_5ft',['eps_t',['../structeps__t.html',1,'']]]
 ];

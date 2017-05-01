@@ -1,10 +1,11 @@
 var searchData=
 [
-  ['mainhandle',['mainhandle',['../structwsh__t.html#a1b9fb18174d182e1404fe4ee175f97c1',1,'wsh_t']]],
+  ['mainhandle',['mainhandle',['../structwsh__t.html#ae423ee64dace73d6dd2ac02c1eac9c43',1,'wsh_t']]],
   ['max',['max',['../structrange__t.html#a2cb522ab5503088bf66699838e4c4a44',1,'range_t']]],
   ['maxdata',['maxdata',['../wcc_8c.html#adc2da33af938d5886aa815c4286a41db',1,'wcc.c']]],
   ['maxnewsec',['maxnewsec',['../wcc_8c.html#a9bd22bb0eb716a26a4bff216ee0d2663',1,'wcc.c']]],
   ['maxoldsec',['maxoldsec',['../wcc_8c.html#accce5634b6cb40b8e178b61891db287f',1,'wcc.c']]],
+  ['maxrows',['maxrows',['../structlinenoiseState.html#a73f7729925e6dd43bac6e5575cf7a2a2',1,'linenoiseState']]],
   ['maxtext',['maxtext',['../wcc_8c.html#a716cd00a10026a2f42adc8de20ba0627',1,'wcc.c']]],
   ['min',['min',['../structrange__t.html#a0f6aeee464551ba80bb8b13f381c701d',1,'range_t']]],
   ['mindata',['mindata',['../wcc_8c.html#a95b1231d7903c334ffa8bc94043b4def',1,'wcc.c']]],

@@ -1,7 +1,8 @@
 var searchData=
 [
-  ['catch',['CATCH',['../longjmp_8h.html#a80c1a22862830ee59c0a13dcff37dfba',1,'longjmp.h']]],
-  ['clear',['CLEAR',['../colors_8h.html#a611cc9b5f655508482f3d7a9751c182a',1,'colors.h']]],
-  ['cs_5fmode',['CS_MODE',['../wcc_8c.html#a8d8883324e88a7c28212e4976177f7d7',1,'CS_MODE():&#160;wcc.c'],['../wsh_8c.html#a8d8883324e88a7c28212e4976177f7d7',1,'CS_MODE():&#160;wsh.c']]],
-  ['cyan',['CYAN',['../colors_8h.html#ad243f93c16bc4c1d3e0a13b84421d760',1,'colors.h']]]
+  ['bind_5fflags',['BIND_FLAGS',['../wsh_8h.html#adbfb9b1715a71ea09f83e572e6a9cfe8',1,'wsh.h']]],
+  ['black',['BLACK',['../colors_8h.html#a7b3b25cba33b07c303f3060fe41887f6',1,'colors.h']]],
+  ['blue',['BLUE',['../colors_8h.html#a79d10e672abb49ad63eeaa8aaef57c38',1,'colors.h']]],
+  ['brown',['BROWN',['../colors_8h.html#ab2baea56ece91306020afd6d77fd19f9',1,'colors.h']]],
+  ['byteswap_5fto_5fhost',['byteswap_to_host',['../ldd_8c.html#a182ec42cfd4a4e1fb55b8c346f063f20',1,'ldd.c']]]
 ];

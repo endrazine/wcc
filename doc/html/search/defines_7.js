@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['has_5fzfirst',['HAS_ZFIRST',['../helper_8c.html#a074964b9c825083c56279b502087ed4f',1,'helper.c']]],
-  ['hpermsmax',['HPERMSMAX',['../wsh_8h.html#a5bb81fae5e04e90b5941024daa0e07d1',1,'wsh.h']]]
+  ['gray',['GRAY',['../colors_8h.html#ae5f70677050eecd8909e0248e07b9e73',1,'colors.h']]],
+  ['green',['GREEN',['../colors_8h.html#acfbc006ea433ad708fdee3e82996e721',1,'colors.h']]]
 ];

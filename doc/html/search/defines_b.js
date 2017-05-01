@@ -1,5 +1,8 @@
 var searchData=
 [
-  ['normal',['NORMAL',['../colors_8h.html#a1291f416b069313021b519eea62d5bf1',1,'colors.h']]],
-  ['nullstr',['nullstr',['../wcc_8c.html#ab3f70ca7e13b3623b747dd04b660c864',1,'wcc.c']]]
+  ['magenta',['MAGENTA',['../colors_8h.html#a6f699060902f800f12aaae150f3a708e',1,'colors.h']]],
+  ['match_5fmachine',['MATCH_MACHINE',['../ldd_8c.html#af97b5fe4746695bcb64be9dd16a34b9e',1,'ldd.c']]],
+  ['max_5fsignals',['MAX_SIGNALS',['../wsh_8h.html#ac1444afccc384905184935b1e9de39bd',1,'wsh.h']]],
+  ['min_5fbin_5fsize',['MIN_BIN_SIZE',['../wsh_8h.html#af373b5352371524d80884d2e78d90b07',1,'wsh.h']]],
+  ['my_5fcpu',['MY_CPU',['../wsh_8h.html#a53fbcbfb6bc2be4dedeafc81cfa15bfa',1,'wsh.h']]]
 ];
