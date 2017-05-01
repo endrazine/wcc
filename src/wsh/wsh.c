@@ -37,6 +37,13 @@
 #include <uthash.h>
 #include <libgen.h>	// For basename()
 
+// address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
+#if defined(__clang__) || defined (__GNUC__)
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
+
 #ifndef __amd64__
 #define REG_RIP    16
 #endif
@@ -109,7 +116,7 @@ int bfmap(lua_State * L)
 	unsigned long int pcounter = 0;
 	unsigned int page_size = 4096;
 
-	unsigned long long int i, j, r;
+	unsigned long long int i = 0, j = 0, r = 0;
 
 	printf(GREEN "\n   Memory segments\n\n");
 
@@ -172,7 +179,7 @@ void fatal_error(lua_State * L, char *msg)
 */
 void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len)
 {
-	size_t i, j;
+	size_t i = 0, j = 0;
 
 	for (j = 0; j < size; j += 16) {
 
@@ -230,9 +237,9 @@ void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len)
 static unsigned long int resolve_addr(char *symbol, char *libname)
 {
 	unsigned long int ret = 0;
-	struct link_map *handle;
+	struct link_map *handle = 0;
 	Dl_info dli;
-  char *err = 0;
+	char *err = 0;
 
 	if ((!symbol) || (!*symbol)) {
 		return -1;
@@ -320,7 +327,6 @@ char *symbol_totype(int n)
 
 unsigned int ltrace(void)
 {
-
 	return 0;
 }
 
@@ -332,10 +338,10 @@ int scan_symbol(char *symbol, char *libname)
 {
 	struct link_map *handle;
 	Dl_info dli;
-	Elf_Sym *s;
+	Elf_Sym *s = 0;
 	char *htype = 0, *hbind = 0;
 	unsigned long int ret = 0;
-	unsigned int stype, sbind;
+	unsigned int stype = 0, sbind = 0;
 	int retv = 0;
 
 	handle = dlopen(libname, BIND_FLAGS);
@@ -374,8 +380,8 @@ void completion(const char *buf, linenoiseCompletions * lc)
 	* exposing all the internally available keywords dynamically
 	*/
 	char *opt, *word = 0;
-	unsigned int n, i;
-	unsigned int p, w = 0;
+	unsigned int n = 0, i = 0;
+	unsigned int p = 0, w = 0;
 
 	n = strlen(buf);
 	switch (n) {
@@ -447,7 +453,7 @@ void completion(const char *buf, linenoiseCompletions * lc)
 */
 int disable_aslr(void)
 {
-	int fd;
+	int fd = 0;
 	char c = 0x30;
 
 	fd = open(PROC_ASLR_PATH, O_RDWR);
@@ -465,7 +471,7 @@ int disable_aslr(void)
 */
 int enable_aslr(void)
 {
-	int fd;
+	int fd = 0;
 //      char c = 0x31;
 	char c = 0x32;
 
@@ -484,7 +490,7 @@ int enable_aslr(void)
 */
 int detailed_help(char *name)
 {
-	unsigned int i;
+	unsigned int i = 0;
 
 	/**
 	* Search command
@@ -517,7 +523,8 @@ int detailed_help(char *name)
 */
 int help(lua_State * L)
 {
-	const char *arg;
+	const char *arg = 0;
+
 	if (lua_isstring(L, 1)) {
 		arg = luaL_checkstring(L, 1);
 		detailed_help((char *) arg);
@@ -574,6 +581,8 @@ char *decode_flags(unsigned int flags)
 */
 char *decode_type(unsigned int type)
 {
+	char *ret = 0;
+
 	switch (type) {
 	case 0:
 		return "PT_NULL";
@@ -613,8 +622,7 @@ char *decode_type(unsigned int type)
 		break;
 
 	default:
-		;
-		char *ret = calloc(1, 200);
+		ret = calloc(1, 200);
 		snprintf(ret, 199, "Unknown: 0x%x\n", type);
 		return ret;	// leak
 		break;
@@ -628,8 +636,8 @@ int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 {
 	char *pflags = 0, *ptype = 0;
 	const char *fname = 0;
-	Elf_Phdr *p;
-	int j;
+	Elf_Phdr *p = 0;
+	int j = 0;
 
 	for (j = 0; j < info->dlpi_phnum; j++) {
 		p = (Elf_Phdr *) &info->dlpi_phdr[j];
@@ -660,8 +668,8 @@ int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 * Add a symbol to linked list
 */
 int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr){
-	symbols_t *s;
-	symbols_t *si, *stmp, *res = 0;
+	symbols_t *s = 0;
+	symbols_t *si = 0, *stmp = 0, *res = 0;
 
 	s = calloc(1, sizeof(symbols_t));
 	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return -1; }
@@ -691,7 +699,7 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 * Add a section to linked list
 */
 void section_add(unsigned long int addr, unsigned long int size, char *libname, char *name, char *perms, int flags){
-	sections_t *s;
+	sections_t *s = 0;
 
 	s = calloc(1, sizeof(sections_t));
 	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return; }
@@ -710,7 +718,7 @@ void section_add(unsigned long int addr, unsigned long int size, char *libname, 
 */
 void segment_add(unsigned long int addr, unsigned long int size, char *perms, char *fname, char *ptype, int flags){
 
-	segments_t *s;
+	segments_t *s = 0;
 
 	s = calloc(1, sizeof(segments_t));
 	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return; }
@@ -729,7 +737,7 @@ void segment_add(unsigned long int addr, unsigned long int size, char *perms, ch
 */
 void entry_point_add(unsigned long long int addr, char *fname){
 
-	eps_t *s;
+	eps_t *s = 0;
 
 	s = calloc(1, sizeof(eps_t));
 	s->name = strdup(fname);
@@ -743,8 +751,9 @@ void entry_point_add(unsigned long long int addr, char *fname){
 */
 void scan_section(Elf_Shdr * shdr, char *strTab, int shnum, char *fname, unsigned long int baseaddr)
 {
-	int i;
+	int i = 0;
 	char hperms[5];
+
 	for (i = 0; i < shnum; i++) {
 		memset(hperms, 0x00, 5);
 		snprintf(hperms, 5, "%s%s%s", (shdr[i].sh_flags & 0x02) ? "r" : "-", (shdr[i].sh_flags & 0x01) ? "w" : "-", (shdr[i].sh_flags & 0x04) ? "x" : "-");
@@ -760,11 +769,11 @@ void scan_section(Elf_Shdr * shdr, char *strTab, int shnum, char *fname, unsigne
 */
 int scan_sections(char *fname, unsigned long int baseaddr)
 {
-	void *data;
-	Elf_Ehdr *elf;
-	Elf_Shdr *shdr;
-	int fd;
-	char *strtab;
+	void *data = 0;
+	Elf_Ehdr *elf = 0;
+	Elf_Shdr *shdr = 0;
+	int fd = 0;
+	char *strtab = 0;
 
 	fd = open(fname, O_RDONLY);
 	data = mmap(NULL, lseek(fd, 0, SEEK_END), PROT_READ, MAP_SHARED, fd, 0);
@@ -805,7 +814,7 @@ int phdrs(lua_State * L)
 * Find section from address
 */
 sections_t *section_from_addr(unsigned long int addr){
-	sections_t *s, *stmp, *res = 0;
+	sections_t *s = 0, *stmp = 0, *res = 0;
 
 	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
 		if((s->addr <= addr)&&(s->addr + s->size >= addr)){
@@ -819,7 +828,7 @@ sections_t *section_from_addr(unsigned long int addr){
 * Find segment from address
 */
 segments_t *segment_from_addr(unsigned long int addr){
-	segments_t *s, *stmp, *res = 0;
+	segments_t *s = 0, *stmp = 0, *res = 0;
 
 	DL_FOREACH_SAFE(wsh->phdrs, s, stmp) {
 		if((s->addr <= addr)&&(s->addr + s->size >= addr)){
@@ -833,7 +842,7 @@ segments_t *segment_from_addr(unsigned long int addr){
 * Return a symbol from an address
 */
 symbols_t *symbol_from_addr(unsigned long int addr){
-	symbols_t *s, *stmp, *res = 0;
+	symbols_t *s = 0, *stmp = 0, *res = 0;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
 		if((s->addr <= addr)&&(s->addr + s->size >= addr)){
@@ -847,7 +856,7 @@ symbols_t *symbol_from_addr(unsigned long int addr){
 * Return a symbol from its name
 */
 symbols_t *symbol_from_name(char *fname){
-	symbols_t *s, *stmp;
+	symbols_t *s = 0, *stmp = 0;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
 		if(!strncmp(fname,s->symbol,strlen(fname))){
@@ -863,7 +872,7 @@ symbols_t *symbol_from_name(char *fname){
 */
 int headers(lua_State * L)
 {
-	symbols_t *s, *stmp, *res = 0;
+	symbols_t *s = 0, *stmp = 0, *res = 0;
 	unsigned int i, scount = 0;
 	unsigned int pcnt = 0;
 
@@ -910,7 +919,7 @@ int headers(lua_State * L)
 * Empty linked list of symbols
 */
 int empty_symbols(void){
-	symbols_t *s, *stmp;
+	symbols_t *s = 0, *stmp = 0;
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
 			DL_DELETE(wsh->symbols, s);
@@ -929,7 +938,7 @@ int empty_symbols(void){
 * Empty linked list of segments
 */
 int empty_phdrs(void){
-	segments_t *s, *stmp;
+	segments_t *s = 0, *stmp = 0;
 
 	DL_FOREACH_SAFE(wsh->phdrs, s, stmp) {
 			DL_DELETE(wsh->phdrs, s);
@@ -948,7 +957,7 @@ int empty_phdrs(void){
 * Empty linked list of sections
 */
 int empty_shdrs(void){
-	sections_t *s, *stmp;
+	sections_t *s = 0, *stmp = 0;
 
 	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
 			DL_DELETE(wsh->shdrs, s);
@@ -966,7 +975,7 @@ int empty_shdrs(void){
 * Empty linked list of entry points
 */
 int empty_eps(void){
-	eps_t *s, *stmp;
+	eps_t *s = 0, *stmp = 0;
 
 	DL_FOREACH_SAFE(wsh->eps, s, stmp) {
 			DL_DELETE(wsh->eps, s);
@@ -984,7 +993,7 @@ int empty_eps(void){
 int print_phdrs(void){
 
 	char *lastlib = "";
-	segments_t *s, *stmp;
+	segments_t *s = 0, *stmp = 0;
 	unsigned int scount = 0;
 	DL_COUNT(wsh->phdrs, s, scount);
 
@@ -1040,8 +1049,8 @@ int print_phdrs(void){
 int print_symbols(lua_State * L){
 
 	unsigned int scount = 0;
-	symbols_t *s, *stmp;
-	unsigned int i;
+	symbols_t *s = 0, *stmp = 0;
+	unsigned int i = 0;
 	unsigned int pcnt = 0;
 	char *symname = 0;
 	char *libname = 0;
@@ -1108,8 +1117,8 @@ int print_symbols(lua_State * L){
 int print_functions(lua_State * L){
 
 	unsigned int scount = 0;
-	symbols_t *s, *stmp;
-	unsigned int i;
+	symbols_t *s = 0, *stmp = 0;
+	unsigned int i = 0;
 	unsigned int pcnt = 0;
 	char *libname = 0;
 	char *symname = 0;
@@ -1186,8 +1195,8 @@ int print_functions(lua_State * L){
 int print_objects(lua_State * L){
 
 	unsigned int scount = 0;
-	symbols_t *s, *stmp;
-	unsigned int i;
+	symbols_t *s = 0, *stmp = 0;
+	unsigned int i = 0;
 	unsigned int pcnt = 0;
 
 	char *libname = 0;
@@ -1240,7 +1249,7 @@ int print_objects(lua_State * L){
 int print_libs(lua_State * L){
 
 	char *lastlib = "none";
-	sections_t *s, *stmp;
+	sections_t *s = 0, *stmp = 0;
 	unsigned int scount = 0;
 
 	/* create result table */
@@ -1299,7 +1308,7 @@ int print_libs(lua_State * L){
 int print_shdrs(void){
 
 	char *lastlib = "";
-	sections_t *s, *stmp;
+	sections_t *s = 0, *stmp = 0;
 	unsigned int scount = 0;
 	char *segmenttype = "";
 	char *segmentperms = "";
@@ -1363,9 +1372,8 @@ int print_shdrs(void){
 */
 int print_eps(void){
 
-	eps_t *s, *stmp;
+	eps_t *s = 0, *stmp = 0;
 	unsigned int scount = 0;
-
 
 	DL_COUNT(wsh->eps, s, scount);
 
@@ -1435,6 +1443,7 @@ int man(lua_State * L)
 {
 	void *arg = 0;
 	char cmd[255];
+
 	if (lua_isstring(L, 1)) {
 		arg = luaL_checkstring(L, 1);
 		memset(cmd, 0x00, 255);
@@ -1455,7 +1464,7 @@ int info(lua_State * L)
 	Dl_info dli;
 	char *error = 0;
 	Elf_Sym *s = 0;
-	unsigned int stype, sbind, i;
+	unsigned int stype = 0, sbind = 0, i = 0;
 	char *htype = 0, *hbind = 0;
 
 	unsigned long long int n = lua_tonumber(L, 1);
@@ -1535,6 +1544,7 @@ int info(lua_State * L)
 	} else {
 		printf(" !! ERROR: info requires a string argument\n");
 	}
+
 	return 0;
 }
 
@@ -1545,8 +1555,7 @@ int info(lua_State * L)
 // allocate a char **
 int alloccharbuf(lua_State * L)
 {
-
-	int n;
+	int n = 0;
 	char *ptr = 0;
 
 	n = lua_tonumber(L, 1);
@@ -1558,7 +1567,6 @@ int alloccharbuf(lua_State * L)
 // set a pointer within the char **
 int setcharbuf(lua_State * L)
 {
-
 	char **buff = 0;
 	unsigned int pos = 0;
 	char *val = 0;
@@ -1576,7 +1584,6 @@ int setcharbuf(lua_State * L)
 */
 int rdstr(lua_State * L)
 {
-
 	char *buff = 0;
 	unsigned int n = 0;
 	char *val = 0;
@@ -1597,7 +1604,6 @@ int rdstr(lua_State * L)
 */
 int rdnum(lua_State * L)
 {
-
 	int *buff = 0;
 	int val = 0;
 
@@ -1612,7 +1618,6 @@ int rdnum(lua_State * L)
 // read a pointer within the char **
 int getcharbuf(lua_State * L)
 {
-
 	char **buff = 0;
 	unsigned int pos = 0;
 	char *val = 0;
@@ -1645,7 +1650,7 @@ int luaopen_array(lua_State * L)
 int run_shell(lua_State * L)
 {
 	char *input, shell_prompt[4096];
-	int work;
+	int work = 0;
 
 	if (wsh->is_stdinscript) {	// Execute from stdin. don't display promt, read line by line
 		for (;;) {
@@ -1760,7 +1765,7 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 	char *vreason = 0;
 	char *tag = 0;
 	long int offset = 0;
-	unsigned int i, j;
+	unsigned int i = 0, j = 0;
 	unsigned int argn = 0;
 	symbols_t *s = 0;
 
@@ -1827,7 +1832,7 @@ int prototypes(lua_State * L)
 	char *patternlib = 0;
 	char *patterntag = 0;
 	char line[1024];
-	learn_t *l, *p;
+	learn_t *l = 0, *p = 0;
 
 	read_arg1(pattern);
 	read_arg2(patternlib);
@@ -1847,6 +1852,14 @@ int prototypes(lua_State * L)
 
 		sscanf(line, "%10s %200s %200s %20s %200s %20s", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
 
+		// make sure tag type is correct, else discard
+		if(strncmp(l->key.ttype, "TAG", 3)){
+			printf(" !! Unknown TAG type: %s\n", l->key.ttype);
+			free(l);
+			continue;
+		}
+
+		// add to linked list if not present, else free
 		HASH_FIND(hh, protorecords, &l->key, sizeof(learn_key_t), p);
 		if(p){
 			free(l);
@@ -2424,7 +2437,6 @@ do_tracee:
 //* This function returns 9 values: ret (returned by library call), errno, firstsignal, total number of signals, firstsicode, firsterrno, faultaddr, reason, context
 
 
-
 	/**
 	* Invoke store running function on context
 	*/
@@ -2447,6 +2459,7 @@ do_tracee:
 * Append a command to internal lua buffer
 */
 int luabuff_append(char *cmd){
+
 	/**
 	* Allocate wsh->luabuff if it hasn't been initialized
 	*/
@@ -2479,8 +2492,8 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 	unsigned long int address = 0;
 	char *demangled = 0, *symname = 0;
 	unsigned int func = 0;
-	unsigned int j;
-	unsigned skip_bl;
+	unsigned int j = 0;
+	unsigned skip_bl = 0;
 	char newname[1024];
 
 	/**
@@ -2750,6 +2763,7 @@ int parse_link_map_dyn(struct link_map *map)
 * Execute internal lua buffer
 */
 int exec_luabuff(void){
+
 	int err = 0;
 
 	if(wsh->luabuffsz == 0){ return 0; }
@@ -2810,7 +2824,7 @@ int print_procmap(unsigned int pid)
 {
 	char *path[100];
 	int n = 0;
-	int fd;
+	int fd = 0;
 	char *buff = 0;
 
 	memset(path, 0x00, 100);
@@ -2825,6 +2839,7 @@ int print_procmap(unsigned int pid)
 	}
 	free(buff);
 	close(fd);
+
 	return 0;
 }
 
@@ -2837,8 +2852,8 @@ int execlib(lua_State * L)
 {
 	int child = 0;
 	unsigned int ret = 0;
-	int i, status;
-	int pid;
+	int i = 0, status = 0;
+	int pid = 0;
 	siginfo_t si;
 
 	child = fork();
@@ -2885,17 +2900,17 @@ int traceback(lua_State * L)
 	lua_pushinteger(L, 2);
 	lua_call(L, 2, 1);
 	printf("%s\n", lua_tostring(L, -1));
+
 	return 1;
 }
 
 void print_backtrace(void)
 {
-
 	void *traceptrs[100];
-	char **funcnames;
-	size_t count;
+	char **funcnames = 0;
+	size_t count = 0;
 	unsigned int i = 0;
-	char *p;
+	char *p = 0;
 
 	count = backtrace(traceptrs, 100);
 	funcnames = backtrace_symbols(traceptrs, count);
@@ -2915,7 +2930,6 @@ void print_backtrace(void)
 
 char *sicodetoname(int code)
 {
-
 	return "Unknown";
 }
 
@@ -2927,6 +2941,7 @@ char *signaltoname(int signal)
 			return signames[i].name;
 		}
 	}
+
 	return "Unknown Signal";
 }
 
@@ -3005,7 +3020,7 @@ void affinity(int procnum){
 void btr_enable(int procnum){
 	char cpupath[200];
 	uint64_t data = 0x02;
-	int fd, ret;
+	int fd = 0, ret = 0;
 
 	memset(cpupath, 0x00, 200);
 	snprintf(cpupath, 199, "/dev/cpu/%d/msr", procnum);
@@ -3025,7 +3040,7 @@ void btr_enable(int procnum){
 void btr_disable(int procnum){
 	char cpupath[200];
 	uint64_t data = 0x00;
-	int fd, ret;
+	int fd = 0, ret = 0;
 
 	memset(cpupath, 0x00, 200);
 	snprintf(cpupath, 199, "/dev/cpu/%d/msr", procnum);
@@ -3167,6 +3182,7 @@ int mk_backtrace(void)
 		write(1, "\n", 1);
 	}
 	free(bt_syms);
+
 	return 0;
 }
 
@@ -3198,8 +3214,8 @@ void exit_group(int status){
 
 int printarg(unsigned long int val){
 	if(msync(val &~0xfff,4096,0) == 0){ // Mapped
-		int nlen, noflag, k;
-		char *ptrx;
+		int nlen = 0, noflag = 0, k = 0;
+		char *ptrx = 0;
 		noflag = 0;
 		ptrx = val;
 		nlen = strnlen(ptrx, 4096 - ((unsigned long int)ptrx & ~0xfff));
@@ -3214,17 +3230,21 @@ int printarg(unsigned long int val){
 	}else{
 		fprintf(stderr,"0x%lx", val);
 	}
+
+	return 0;
 }
 
 void traphandler(int signal, siginfo_t * s, void *ptr)
 {
 	unsigned int i = 0;
 	char *ptrd = 0x00;
-	ucontext_t *u = (ucontext_t *) ptr;
+	ucontext_t *u = 0;
 	unsigned int fault = 0;
 	char *hfault = 0;
 	char *signame = 0;
 	char *sicode = "";
+
+	u = (ucontext_t *) ptr;
 
 	if(wsh->trace_singlebranch){	// Stop tracing ourselves
 		unset_branch_flag();
@@ -3590,6 +3610,7 @@ int set_sighandlers(void)
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_sigaction = sighandler;
+
 	if (sigaction(SIGSEGV, &sa, NULL) == -1) {
 		perror("sigaction");
 		_Exit(EXIT_FAILURE);
@@ -3643,7 +3664,8 @@ int set_sighandlers(void)
 int test_stdin(void)
 {
 	struct pollfd fds;
-	int ret;
+	int ret = 0;
+
 	fds.fd = 0;		/* fd corresponding to STDIN */
 	fds.events = POLLIN;
 	ret = poll(&fds, 1, 0);
@@ -3664,6 +3686,7 @@ int wsh_appear(lua_State * L)
 	wsh->opt_appear = 1;
 	rescan();
 	parse_link_vdso();
+
 	return 0;
 }
 
@@ -3671,12 +3694,13 @@ int wsh_hide(lua_State * L)
 {
 	wsh->opt_appear = 0;
 	rescan();
+
 	return 0;
 }
 
 int verbose(lua_State * L)
 {
-	void *arg;
+	void *arg = 0;
 
 	if (lua_isnumber(L, 1)) {
 		arg = (unsigned long) lua_tonumber(L, 1);
@@ -3690,7 +3714,7 @@ int verbose(lua_State * L)
 
 int hollywood(lua_State * L)
 {
-	void *arg;
+	void *arg = 0;
 
 	if (lua_isnumber(L, 1)) {
 		arg = (unsigned long) lua_tonumber(L, 1);
@@ -3717,12 +3741,12 @@ int hollywood(lua_State * L)
 int map(lua_State * L)
 {
 	unsigned int count = 0;
-
 	char *sizes[] = { "b", "Kb", "Mb", "Gb", "Tb", "Pb", "Hb" };
-	double len;
+	double len = 0;
 	int order = 0;
+	struct section *s;
 
-	struct section *s = zfirst;
+	s = zfirst;
 	while (s != 0x00) {
 		if (wsh->opt_hollywood) {
 			char *pcolor = DARKGRAY;	// NORMAL
@@ -3762,6 +3786,7 @@ int map(lua_State * L)
 	}
 
 	printf(" --> total: %u pages mapped (%d %s)\n", count, (unsigned int) len, sizes[order]);
+
 	return 0;
 }
 
@@ -3769,9 +3794,11 @@ int map(lua_State * L)
 * Pollute .bss sections
 */
 int bsspolute(lua_State * L){
-	sections_t *s, *stmp;
+
+	sections_t *s = 0, *stmp = 0;
 	char poison = 0xff;
 	unsigned int num = 0;
+
 	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
 		if((s->name)&&(!strncmp(s->name,".bss",4))){
 			num++;
@@ -3782,6 +3809,7 @@ int bsspolute(lua_State * L){
 		}
 		s = s->next;
 	}
+
 	return 0;
 }
 
@@ -3791,8 +3819,8 @@ int bsspolute(lua_State * L){
 */
 static char *searchmem(char *start, char *pattern, unsigned int patternlen, unsigned int memsz)
 {
-	unsigned int i;
-	char *ptr;
+	unsigned int i = 0;
+	char *ptr = 0;
 	int uplim = 0;
 
 	ptr = start;
@@ -3812,11 +3840,12 @@ static char *searchmem(char *start, char *pattern, unsigned int patternlen, unsi
 * allocate 1 page set to 0x00, set size bytes to poison, remap the page R only
 */
 int ralloc(lua_State * L){
-	unsigned int size;
-	unsigned char poison;
+
+	unsigned int size = 0;
+	unsigned char poison = 0;
 	unsigned long int ret = 0;
 	char *ptr = 0;
-	unsigned long int *ptr2;
+	unsigned long int *ptr2 = 0;
 	unsigned int sz = 0;
 	unsigned long int baseaddr = 0;
 
@@ -3849,6 +3878,7 @@ int ralloc(lua_State * L){
 	mprotect(ptr, sz, PROT_READ);
 
 	lua_pushlightuserdata(L, ret);
+
 	return 1;
 }
 
@@ -3863,14 +3893,15 @@ int ralloc(lua_State * L){
 * [page unmaped]
 */
 
+ATTRIBUTE_NO_SANITIZE_ADDRESS
 int xalloc(lua_State * L)
 {
-	unsigned int size;
-	unsigned int perms;
-	unsigned char poison;
+	unsigned int size = 0;
+	unsigned int perms = 0;
+	unsigned char poison = 0;
 	unsigned long int ret = 0;
 	char *ptr = 0;
-	unsigned long int *ptr2;
+	unsigned long int *ptr2 = 0;
 	unsigned int sz = 0;
 	unsigned long int baseaddr = 0;
 
@@ -3917,8 +3948,8 @@ int xalloc(lua_State * L)
 	mprotect(ptr+2*getpagesize(), getpagesize(), PROT_NONE);	// Third page is remapped with no permissions
 
 	lua_pushlightuserdata(L, ret);
-	return 1;
 
+	return 1;
 }
 
 /**
@@ -4049,7 +4080,7 @@ int grepptr(lua_State * L)
 	unsigned int patternsz = 0;
 	unsigned int aligned = 0;
 
-	sections_t *s, *stmp;
+	sections_t *s = 0, *stmp = 0;
 
 	read_arg1(p);
 	read_arg2(patternsz);
@@ -4202,13 +4233,14 @@ int grep(lua_State * L)
 */
 static struct section *sec_from_addr(unsigned long int addr)
 {
-
 	struct section *s = zfirst;
+
 	while (s != 0x00) {
 		if ((s->init <= addr) && (s->end > addr)) {
 			return s;
 		}
 	}
+
 	return 0;
 }
 
@@ -4284,6 +4316,7 @@ int breakpoint(lua_State * L)
 	void *arg1 = 0, *arg2 = 0;
 	char *ptr = 0;
 	char *addr = 0;
+	char bk = 0;
 
 	read_arg1(arg1);
 	read_arg1(arg2);
@@ -4308,7 +4341,7 @@ int breakpoint(lua_State * L)
 	/**
 	* Backup byte at destination
 	*/
-	char bk = ptr[0x00];
+	bk = ptr[0x00];
 
 	/**
 	* Write Breakpoint
@@ -4328,14 +4361,18 @@ int breakpoint(lua_State * L)
 	wsh->bp_array[wsh->bp_num].backup = bk;
 	wsh->bp_array[wsh->bp_num].weight = arg2;
 	wsh->bp_num++;
+
+	return 0;
 }
 
 void declare_func(void *addr, char *name){
+
 	lua_pushcfunction(wsh->L, addr);
 	lua_setglobal(wsh->L, name);
 }
 
 void declare_num(int val, char *name){
+
 	lua_pushnumber(wsh->L, val);
 	lua_setglobal(wsh->L, name);
 }
@@ -4386,8 +4423,10 @@ void declare_internals(void)
 
 
 int set_alloc_opt(void){
+
 	setenv("LIBC_FATAL_STDERR_", "yes", 1);
 	mallopt(M_CHECK_ACTION, 3);
+
 	return 0;
 }
 
@@ -4395,10 +4434,12 @@ int set_alloc_opt(void){
 * Generate a core file
 */
 int gencore(lua_State * L){
+
 	enable_core(L);
 	if(!fork()){
 		kill(getpid(), SIGQUIT);
 	}
+
 	return 0;
 }
 
@@ -4406,12 +4447,16 @@ int gencore(lua_State * L){
 * Disable core files generation
 */
 int disable_core(lua_State * L){
+
 	int err = 0;
+
 	errno = 0;
 	err = prctl(PR_SET_DUMPABLE, (long)0);
+
 	if(err){
 		printf("ERROR: prctl() %s\n", strerror(errno));
 	}
+
 	return 0;
 }
 
@@ -4421,10 +4466,12 @@ int disable_core(lua_State * L){
 int enable_core(lua_State * L){
 	int err = 0;
 	errno = 0;
+
 	err = prctl(PR_SET_DUMPABLE, (long)1);
 	if(err){
 		printf("ERROR: prctl() %s\n", strerror(errno));
 	}
+
 	return 0;
 }
 
@@ -4487,7 +4534,7 @@ int lua_strerror(int err)
 int run_script(char *name)
 {
 	char myerror[200];
-	int err;
+	int err = 0;
 
 	if(!name){ return -1;}
 
@@ -4513,9 +4560,6 @@ int run_script(char *name)
 		lua_pop(wsh->L, 1);	// pop error message from the stack 
 	}
 	lua_settop(wsh->L, 0);	// remove eventual returns 
-
-	return 0;
-
 
 	return 0;
 }
@@ -4548,6 +4592,7 @@ unsigned int read_elf_sig(char *fname, struct stat *sb)
 * Execute default internal scripts
 */
 int exec_default_scripts(void){
+
 	int err = 0;
 
 	if ((err =luaL_loadfile(wsh->L, DEFAULT_SCRIPT_INDEX)) != 0) {
@@ -4563,6 +4608,7 @@ int exec_default_scripts(void){
 
 
 int load_home_user_file(char *fname){
+
 	char pathname[255];
 	struct stat sb;
 	int err = 0;
@@ -4627,7 +4673,7 @@ int load_wshrc(void){
 */
 int wsh_run(void)
 {
-	struct script_t *s;
+	struct script_t *s = 0;
 	unsigned int scriptcount = 0;
 
 	DL_COUNT(wsh->scripts, s, scriptcount);
@@ -4726,7 +4772,6 @@ int add_script_exec(char *name)
 */
 int add_binary_preload(char *name)
 {
-
 	struct preload_t *p;
 
 	p = calloc(1, sizeof(struct preload_t));
@@ -4741,7 +4786,7 @@ int add_binary_preload(char *name)
 */
 int mk_lib(char *name)
 {
-  int fd;
+  int fd = 0;
   struct stat sb;
   char *map = 0;
   Elf32_Ehdr *ehdr32;
@@ -4878,7 +4923,7 @@ int attempt_to_patch(char *libname){
 */
 struct link_map *do_loadlib(char *libname)
 {
-	struct link_map *handle;
+	struct link_map *handle = 0;
 	unsigned long int ret = 0;
 
 	if((!libname)||(!strlen(libname))){
@@ -4919,8 +4964,8 @@ struct link_map *do_loadlib(char *libname)
 */
 int wsh_loadlibs(void)
 {
-	struct preload_t *p, *tmp;
-	unsigned int count;
+	struct preload_t *p = 0, *tmp = 0;
+	unsigned int count = 0;
 
 	DL_COUNT(wsh->preload, p, count);
 
@@ -4943,7 +4988,7 @@ int wsh_getopt(int argc, char **argv)
 	const char *short_opt = "hqvVx";
 	int count = 0;
 	struct stat sb;
-	int c, i;
+	int c = 0, i = 0;
 
 	struct option long_opt[] = {
 		{"help", no_argument, NULL, 'h'},
@@ -5190,9 +5235,14 @@ int rawmemstrlen(lua_State *L) {
 	return 1;
 }
 
+/**
+* Set default environment variables in constructor
+*/
+
 __attribute__((constructor))
 static void initialize_wsh() {
-	//
+	printf("init\n");
+	setenv("LIBC_FATAL_STDERR_", "1", 1);
+	setenv("MALLOC_CHECK_", "3", 1);
 }
-
 

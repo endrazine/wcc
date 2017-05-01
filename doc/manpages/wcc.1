@@ -1,0 +1,82 @@
+.TH WCC "1" "April 2017" "Witchcraft Compiler Collection" "User Commands"
+.SH NAME
+wcc \- recompile binary files
+.SH SYNOPSIS
+.B wcc
+[\fIoptions\fR] \fIfile\fR
+.SH DESCRIPTION
+.PP
+The Witchcraft Core Compiler is part of the Witchcraft Compiler Collection.
+.PP
+The wcc compiler takes binaries (ELF, PE, ...) as an input and creates valid ELF binaries as an output. It can be used to create relocatable object files from executables or shared libraries.
+.PP
+Options:
+.TP
+\fB\-o\fR, \fB\-\-output\fR
+<output file>
+.TP
+\fB\-m\fR, \fB\-\-march\fR
+<architecture>
+.TP
+\fB\-e\fR, \fB\-\-entrypoint\fR
+<0xaddress>
+.TP
+\fB\-i\fR, \fB\-\-interpreter\fR
+<interpreter>
+.TP
+\fB\-p\fR, \fB\-\-poison\fR
+<poison>
+.HP
+\fB\-s\fR, \fB\-\-shared\fR
+.HP
+\fB\-c\fR, \fB\-\-compile\fR
+.HP
+\fB\-S\fR, \fB\-\-static\fR
+.HP
+\fB\-x\fR, \fB\-\-strip\fR
+.HP
+\fB\-X\fR, \fB\-\-sstrip\fR
+.HP
+\fB\-E\fR, \fB\-\-exec\fR
+.HP
+\fB\-C\fR, \fB\-\-core\fR
+.HP
+\fB\-O\fR, \fB\-\-original\fR
+.HP
+\fB\-D\fR, \fB\-\-disasm\fR
+.HP
+\fB\-d\fR, \fB\-\-debug\fR
+.HP
+\fB\-h\fR, \fB\-\-help\fR
+.HP
+\fB\-v\fR, \fB\-\-verbose\fR
+.HP
+\fB\-V\fR, \fB\-\-version\fR
+.SH EXAMPLES
+.TP
+wcc \-c /bin/ls \-o /tmp/ls.o
+Unlink the binary /bin/ls into a relocatable object named /tmp/ls.o
+.TP
+gcc /tmp/ls.o \-o /tmp/ls.so \-shared
+Use the gcc compiler to link the previously generated /tmp/ls.o relocatable object into a shared library /tmp/ls.so
+.SH NOTES
+The Witcraft Compiler Collection is a set of reverse engineering tools.
+.SH AUTHOR
+Written by endrazine (Jonathan Brossard)
+.SH "REPORTING BUGS"
+Witchcraft Compiler Collection online bug tracker: <https://github.com/endrazine/wcc/issues>
+.SH COPYRIGHT
+Copyright Jonathan Brossard
+.br
+License : MIT and BSD Licenses. See <https://github.com/endrazine/wcc/blob/master/LICENSE>.
+.br
+.SH "SEE ALSO"
+\fBwsh\fP(1),
+\fBwld\fP(1),
+\fBwldd\fP(1),
+\fBwcch\fP(1)
+.PP
+The full documentation of the
+.B Witchcraft Compiler Collection
+is available online at https://github.com/endrazine/wcc/wiki
+

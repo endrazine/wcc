@@ -1,0 +1,51 @@
+.TH WSH "1" "April 2017" "Witchcraft Compiler Collection" "User Commands"
+.SH NAME
+wsh \- The witchcraft shell
+.SH SYNOPSIS
+.B wsh
+[\fIscript\fR] [-h|-q|-v|-V] [\fIbinary1\fR] [\fIbinary2\fR] ... [-x [\fIscript_arg1\fR] [\fIscript_arg2\fR] ...]
+.SH DESCRIPTION
+.PP
+The Witchcraft Shell is part of the Witchcraft Compiler Collection.
+.PP
+The witchcraft shell accepts shared libraries, executables and Witchcraft Shell Scripts written in Punk-C as an input. It loads all the executables in its own address space and make their API available for programming in its embedded interpreter. This provides for binaries functionalities similar to those provided via reflection on interpreted languages like Java.
+.PP
+Options:
+
+    -x, --args      Optional script argument separator
+    -q, --quiet     Display less output
+    -v, --verbose   Display more output
+    -V, --version   Display version and build, then exit
+
+Script:
+
+    If the first argument is an existing file which is not a known binary file format,
+    it is assumed to be a lua script and gets executed.
+
+Binaries:
+
+    Any binary file name before the -x tag gets loaded before running the script.
+    The last binary loaded is the main binary analyzed.
+.SH NOTES
+The Witchcraft shell calls dlopen() on the shared libraries and executables it loads in its address space. In doing so, it may execute constructor functions from those executables. This may be unsafe if the intent is to analyse hostile code such as malware or binary exploits.
+.br
+The Witcraft Compiler Collection is a set of reverse engineering tools.
+.SH AUTHOR
+Written by endrazine (Jonathan Brossard)
+.SH "REPORTING BUGS"
+Witchcraft Compiler Collection online bug tracker: <https://github.com/endrazine/wcc/issues>
+.SH COPYRIGHT
+Copyright Jonathan Brossard
+.br
+License : MIT and BSD Licenses. See <https://github.com/endrazine/wcc/blob/master/LICENSE>.
+.br
+.SH "SEE ALSO"
+\fBwcc\fP(1),
+\fBwld\fP(1),
+\fBwldd\fP(1),
+\fBwcch\fP(1)
+.PP
+The full documentation of the
+.B Witchcraft Compiler Collection
+is available online at https://github.com/endrazine/wcc/wiki
+
