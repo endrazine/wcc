@@ -2804,9 +2804,9 @@ int save_dynsym(ctx_t * ctx, GElf_Shdr shdr, char *binary)
 int patch_symbol_index(ctx_t * ctx, Elf_Sym * s)
 {
   msec_t *sec;
-  char *sname;
+//  char *sname;
 
-  sname = globalstrtab + s->st_name;
+//  sname = globalstrtab + s->st_name;
 
   sec = section_from_index(ctx, s->st_shndx);	// section related to this object
   if (sec) {
