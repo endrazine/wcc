@@ -657,7 +657,6 @@ LOCAL_APACHE2
 HAVE_LUA_FALSE
 HAVE_LUA_TRUE
 LOCAL_LUA
-LIBM
 TARGET_IS_LINUX_FALSE
 TARGET_IS_LINUX_TRUE
 TARGET_IS_X64_FALSE
@@ -17664,7 +17663,7 @@ if test "${with_openlibm_libdir+set}" = set; then :
 fi
 
 
-if test "$IS_X64" = "true" -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+if "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi
@@ -17733,139 +17732,6 @@ else
   			as_fn_error $? "Unable to find the isopenlibm() function!" "$LINENO" 5
 
 fi
-
-elif test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-	LIBM=
-case $host in
-*-*-beos* | *-*-cegcc* | *-*-cygwin* | *-*-haiku* | *-*-pw32* | *-*-darwin*)
-  # These system don't have libm, or don't need it
-  ;;
-*-ncr-sysv4.3*)
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for _mwvalidcheckl in -lmw" >&5
-$as_echo_n "checking for _mwvalidcheckl in -lmw... " >&6; }
-if ${ac_cv_lib_mw__mwvalidcheckl+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lmw  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char _mwvalidcheckl ();
-int
-main ()
-{
-return _mwvalidcheckl ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_mw__mwvalidcheckl=yes
-else
-  ac_cv_lib_mw__mwvalidcheckl=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_mw__mwvalidcheckl" >&5
-$as_echo "$ac_cv_lib_mw__mwvalidcheckl" >&6; }
-if test "x$ac_cv_lib_mw__mwvalidcheckl" = xyes; then :
-  LIBM=-lmw
-fi
-
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for cos in -lm" >&5
-$as_echo_n "checking for cos in -lm... " >&6; }
-if ${ac_cv_lib_m_cos+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lm  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char cos ();
-int
-main ()
-{
-return cos ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_m_cos=yes
-else
-  ac_cv_lib_m_cos=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_cos" >&5
-$as_echo "$ac_cv_lib_m_cos" >&6; }
-if test "x$ac_cv_lib_m_cos" = xyes; then :
-  LIBM="$LIBM -lm"
-fi
-
-  ;;
-*)
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for cos in -lm" >&5
-$as_echo_n "checking for cos in -lm... " >&6; }
-if ${ac_cv_lib_m_cos+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lm  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char cos ();
-int
-main ()
-{
-return cos ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_m_cos=yes
-else
-  ac_cv_lib_m_cos=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_m_cos" >&5
-$as_echo "$ac_cv_lib_m_cos" >&6; }
-if test "x$ac_cv_lib_m_cos" = xyes; then :
-  LIBM=-lm
-fi
-
-  ;;
-esac
-
 
 fi
 

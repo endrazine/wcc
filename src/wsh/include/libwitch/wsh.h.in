@@ -29,7 +29,6 @@
 *
 */
 
-#define _GNU_SOURCE
 #define _XOPEN_SOURCE 500
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
@@ -66,6 +65,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/sendfile.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <poll.h>
@@ -359,6 +359,8 @@ extern char *__progname_full;
 static struct link_map *do_loadlib(char *libname);
 static int empty_phdrs(void);
 static int wsh_appear(lua_State * L);
+static int wsh_usage(char *name);
+static int wsh_print_version(void);
 static int wsh_hide(lua_State * L);
 static int empty_shdrs(void);
 //int getarray(lua_State * L);

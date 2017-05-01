@@ -1,5 +1,5 @@
 dnl/*
-dnl    Copyright (C) 2013 Dovado Europe AB <markus@dovado.com>
+dnl    Copyright (C) 2017 Dovado Europe AB <markus@dovado.com>
 dnl
 dnl    This program is free software: you can redistribute it and/or modify
 dnl    it under the terms of the GNU General Public License as
@@ -209,7 +209,7 @@ AC_ARG_WITH(openlibm-libdir,
            [AS_HELP_STRING([--with-openlibm-libdir],[OPENLIBM library directory])],
            [OPENLIBM_LIB_DIR="${withval}";],)
 
-if test "$IS_X64" = "true" -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+if "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi
@@ -222,8 +222,6 @@ if test "$IS_X64" = "true" -a "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; 
 	AC_CHECK_LIB([openlibm], [isopenlibm], [], [
   			AC_MSG_ERROR([Unable to find the isopenlibm() function!])
 	])
-elif test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
-	LT_LIB_M
 fi
 
 AC_ARG_WITH(readline,

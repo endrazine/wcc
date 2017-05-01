@@ -149,8 +149,7 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
-am__DEPENDENCIES_1 =
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
+liblua_la_DEPENDENCIES =
 am__liblua_la_SOURCES_DIST = lapi.c lcode.c lctype.c ldebug.c ldo.c \
 	ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c \
 	lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c \
@@ -301,7 +300,6 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 INTELCFLAGS = @INTELCFLAGS@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
-LIBM = @LIBM@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -401,7 +399,7 @@ ACLOCAL_AMFLAGS = -I$(top_builddir)/m4
 AM_CPPFLAGS = -I$(top_builddir)/include -Iinclude -I$(top_builddir)/src/wsh/include
 AM_CFLAGS = -DLUA_USE_LINUX=1
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@lib_LTLIBRARIES = liblua.la
-@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_LIBADD = $(LIBM)
+@TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_LIBADD = -lopenlibm
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@liblua_la_SOURCES = \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c \
 @TARGET_IS_LINUX_TRUE@@TARGET_IS_SUPPORTED_TRUE@	lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c  \

@@ -39,7 +39,7 @@
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
-# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((__no_sanitize__("address")))
 #else
 # define ATTRIBUTE_NO_SANITIZE_ADDRESS
 #endif
@@ -3917,14 +3917,14 @@ int xalloc(lua_State * L)
 	ptr = mmap(baseaddr, sz, PROT_WRITE|PROT_READ, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
 
 	if(ptr <= 0){
-		fprintf(stderr, " !! ERROR: malloc() : %s",strerror(errno));
+		fprintf(stderr, " !! ERROR: malloc() : %s\n", strerror(errno));
 		return 0;
 	}
 
 	ret = ptr + 2*getpagesize() - size;		// compute return address
 
 	if(wsh->opt_verbosetrace){
-		printf("-- ptr:%llx, size:%u, ret:%llx\t[%llx-%llx]\n", ptr, sz, ret, ret, ret + size);
+		printf("-- ptr:%llx, size:%u, ret:%llx\t[%llx-%llx]\n", ptr, sz, ret, ret, (ret + size));
 	}
 
 	mprotect(ptr, sz, PROT_EXEC | PROT_READ | PROT_WRITE);

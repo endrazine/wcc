@@ -26,7 +26,7 @@ AM_CFLAGS = -DLUA_USE_LINUX=1
 if TARGET_IS_LINUX
 if TARGET_IS_SUPPORTED
 lib_LTLIBRARIES = liblua.la
-liblua_la_LIBADD = $(LIBM)
+liblua_la_LIBADD = -lopenlibm
 liblua_la_SOURCES = \
 	lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c \
 	lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c  \
