@@ -254,14 +254,16 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 
 	ret = (unsigned long int) dlsym(handle, symbol);
 
-  /* Check dlerror() since ret == NULL is ok. */
-  err = dlerror();
+#ifdef PEDANTIC_WARNINGS
+	/* Check dlerror() since ret == NULL is ok. */
+	err = dlerror();
 
-  if (err) {
-    fprintf(stderr, "ERROR: %s\n", err);
-    //_Exit(EXIT_FAILURE);
-  }
+	if (err) {
+		fprintf(stderr, "ERROR: %s\n", err);
+		//_Exit(EXIT_FAILURE);
+	}
 
+#endif
 	dladdr((void *) ret, &dli);
 
 	// Is it the correct lib ?
