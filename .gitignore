@@ -7,3 +7,7 @@ bin/
 
 # temporary files created by some text editors
 *~
+
+#
+doc/html/
+
