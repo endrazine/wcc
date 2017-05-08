@@ -20,6 +20,8 @@ The Witchcraft Compiler Collection requires the following software to be install
 
 ### Installation Requirements on Ubuntu/Debian
 Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 14.04):
+    # Required for add-apt-repository
+    sudo apt-get install python-software-properties software-properties-common
 
     # Add repo for clang
     sudo add-apt-repository ppa:kxstudio-team/builds
