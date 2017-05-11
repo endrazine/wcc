@@ -306,7 +306,7 @@ AS_AC_EXPAND(BINDIR, $bindir)
 AS_AC_EXPAND(DATADIR, ${datadir}/wsh)
 
 dnl generate output
-AC_CONFIG_FILES([Makefile src/wld/Makefile src/wldd/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/lua/src/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h])
+AC_CONFIG_FILES([Makefile src/wld/Makefile src/wldd/Makefile src/wcc/Makefile src/wsh/Makefile src/wsh/tests/Makefile src/wsh/lua/src/Makefile src/wsh/tests/apache2/Makefile src/wsh/tests/sshd/Makefile src/wsh/tests/sshd2/Makefile src/tools/Makefile src/wsh/scripts/INDEX src/wsh/scripts/libmain src/wsh/include/libwitch/wsh.h])
 AC_CONFIG_FILES([src/tools/wcch], [chmod +x src/tools/wcch])
 AC_CONFIG_FILES([src/wsh/scripts/print_G], [chmod +x src/wsh/scripts/print_G])
 AC_CONFIG_FILES([src/wsh/scripts/md5.wsh], [chmod +x src/wsh/scripts/md5.wsh])

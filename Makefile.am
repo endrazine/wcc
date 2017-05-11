@@ -25,7 +25,7 @@ SUBDIRS = src/wcc src/wld src/wldd src/wsh src/tools src/wsh/tests
 
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 libtool: $(LIBTOOL_DEPS)
-	$(SHELL) ./config.status libtoo
+	$(SHELL) ./config.status libtool
 
 #if HAVE_DOXYGEN
 #doxyfile.stamp:

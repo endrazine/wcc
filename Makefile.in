@@ -886,7 +886,7 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 libtool: $(LIBTOOL_DEPS)
-	$(SHELL) ./config.status libtoo
+	$(SHELL) ./config.status libtool
 
 #endif
 
