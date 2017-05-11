@@ -29,7 +29,7 @@
 *
 */
 
-#include <linux/elf-em.h>
+#include "elf-em.h"
 
 typedef struct archi_t{
 	char *name;

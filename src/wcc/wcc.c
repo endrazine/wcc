@@ -30,9 +30,9 @@
 */
 #define __USE_GNU
 #define _GNU_SOURCE
+#include <config.h>
 #include <bfd.h>
 #include <dlfcn.h>
-#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -41,7 +41,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#ifdef HAVE_SYS_PROCFS_H
 #include <sys/procfs.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/ucontext.h>
@@ -56,8 +58,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifdef HAVE_LIBELF_LIBELF_H
+#include <libelf/libelf.h>
+#else
 #include <libelf.h>
+#endif
+
+#ifdef HAVE_LIBELF_GELF_H
+#include <libelf/gelf.h>
+#else
 #include <gelf.h>
+#endif
 
 #include <nametotype.h>
 #include <nametoalign.h>
@@ -66,8 +77,6 @@
 #include <nametoinfo.h>
 #include <arch.h>
 #include <inttypes.h>
-
-#include <config.h>
 
 #define DEFAULT_STRNDX_SIZE 4096
 
@@ -82,9 +91,129 @@
 
 #define EXTRA_CREATED_SECTIONS 4
 
+#define PT_LOOS    0x60000000      /* OS-specific */
+#define PT_GNU_EH_FRAME		0x6474e550
+#define PT_GNU_STACK	(PT_LOOS + 0x474e551)
 
 #define RELOC_X86_64 1
 #define RELOC_X86_32 2
+
+/* Intel 80386 specific definitions.  */
+
+/* i386 relocs.  */
+
+#define R_386_NONE	   0		/* No reloc */
+#define R_386_32	   1		/* Direct 32 bit  */
+#define R_386_PC32	   2		/* PC relative 32 bit */
+#define R_386_GOT32	   3		/* 32 bit GOT entry */
+#define R_386_PLT32	   4		/* 32 bit PLT address */
+#define R_386_COPY	   5		/* Copy symbol at runtime */
+#define R_386_GLOB_DAT	   6		/* Create GOT entry */
+#define R_386_JMP_SLOT	   7		/* Create PLT entry */
+#define R_386_RELATIVE	   8		/* Adjust by program base */
+#define R_386_GOTOFF	   9		/* 32 bit offset to GOT */
+#define R_386_GOTPC	   10		/* 32 bit PC relative offset to GOT */
+#define R_386_32PLT	   11
+#define R_386_TLS_TPOFF	   14		/* Offset in static TLS block */
+#define R_386_TLS_IE	   15		/* Address of GOT entry for static TLS
+					   block offset */
+#define R_386_TLS_GOTIE	   16		/* GOT entry for static TLS block
+					   offset */
+#define R_386_TLS_LE	   17		/* Offset relative to static TLS
+					   block */
+#define R_386_TLS_GD	   18		/* Direct 32 bit for GNU version of
+					   general dynamic thread local data */
+#define R_386_TLS_LDM	   19		/* Direct 32 bit for GNU version of
+					   local dynamic thread local data
+					   in LE code */
+#define R_386_16	   20
+#define R_386_PC16	   21
+#define R_386_8		   22
+#define R_386_PC8	   23
+#define R_386_TLS_GD_32	   24		/* Direct 32 bit for general dynamic
+					   thread local data */
+#define R_386_TLS_GD_PUSH  25		/* Tag for pushl in GD TLS code */
+#define R_386_TLS_GD_CALL  26		/* Relocation for call to
+					   __tls_get_addr() */
+#define R_386_TLS_GD_POP   27		/* Tag for popl in GD TLS code */
+#define R_386_TLS_LDM_32   28		/* Direct 32 bit for local dynamic
+					   thread local data in LE code */
+#define R_386_TLS_LDM_PUSH 29		/* Tag for pushl in LDM TLS code */
+#define R_386_TLS_LDM_CALL 30		/* Relocation for call to
+					   __tls_get_addr() in LDM code */
+#define R_386_TLS_LDM_POP  31		/* Tag for popl in LDM TLS code */
+#define R_386_TLS_LDO_32   32		/* Offset relative to TLS block */
+#define R_386_TLS_IE_32	   33		/* GOT entry for negated static TLS
+					   block offset */
+#define R_386_TLS_LE_32	   34		/* Negated offset relative to static
+					   TLS block */
+#define R_386_TLS_DTPMOD32 35		/* ID of module containing symbol */
+#define R_386_TLS_DTPOFF32 36		/* Offset in TLS block */
+#define R_386_TLS_TPOFF32  37		/* Negated offset in static TLS block */
+#define R_386_SIZE32	   38 		/* 32-bit symbol size */
+#define R_386_TLS_GOTDESC  39		/* GOT offset for TLS descriptor.  */
+#define R_386_TLS_DESC_CALL 40		/* Marker of call through TLS
+					   descriptor for
+					   relaxation.  */
+#define R_386_TLS_DESC     41		/* TLS descriptor containing
+					   pointer to code and to
+					   argument, returning the TLS
+					   offset for the symbol.  */
+#define R_386_IRELATIVE	   42		/* Adjust indirectly by program base */
+/* Keep this the last entry.  */
+#define R_386_NUM	   43
+
+/* AMD x86-64 relocations.  */
+#define R_X86_64_NONE		0	/* No reloc */
+#define R_X86_64_64		1	/* Direct 64 bit  */
+#define R_X86_64_PC32		2	/* PC relative 32 bit signed */
+#define R_X86_64_GOT32		3	/* 32 bit GOT entry */
+#define R_X86_64_PLT32		4	/* 32 bit PLT address */
+#define R_X86_64_COPY		5	/* Copy symbol at runtime */
+#define R_X86_64_GLOB_DAT	6	/* Create GOT entry */
+#define R_X86_64_JUMP_SLOT	7	/* Create PLT entry */
+#define R_X86_64_RELATIVE	8	/* Adjust by program base */
+#define R_X86_64_GOTPCREL	9	/* 32 bit signed PC relative
+					   offset to GOT */
+#define R_X86_64_32		10	/* Direct 32 bit zero extended */
+#define R_X86_64_32S		11	/* Direct 32 bit sign extended */
+#define R_X86_64_16		12	/* Direct 16 bit zero extended */
+#define R_X86_64_PC16		13	/* 16 bit sign extended pc relative */
+#define R_X86_64_8		14	/* Direct 8 bit sign extended  */
+#define R_X86_64_PC8		15	/* 8 bit sign extended pc relative */
+#define R_X86_64_DTPMOD64	16	/* ID of module containing symbol */
+#define R_X86_64_DTPOFF64	17	/* Offset in module's TLS block */
+#define R_X86_64_TPOFF64	18	/* Offset in initial TLS block */
+#define R_X86_64_TLSGD		19	/* 32 bit signed PC relative offset
+					   to two GOT entries for GD symbol */
+#define R_X86_64_TLSLD		20	/* 32 bit signed PC relative offset
+					   to two GOT entries for LD symbol */
+#define R_X86_64_DTPOFF32	21	/* Offset in TLS block */
+#define R_X86_64_GOTTPOFF	22	/* 32 bit signed PC relative offset
+					   to GOT entry for IE symbol */
+#define R_X86_64_TPOFF32	23	/* Offset in initial TLS block */
+#define R_X86_64_PC64		24	/* PC relative 64 bit */
+#define R_X86_64_GOTOFF64	25	/* 64 bit offset to GOT */
+#define R_X86_64_GOTPC32	26	/* 32 bit signed pc relative
+					   offset to GOT */
+#define R_X86_64_GOT64		27	/* 64-bit GOT entry offset */
+#define R_X86_64_GOTPCREL64	28	/* 64-bit PC relative offset
+					   to GOT entry */
+#define R_X86_64_GOTPC64	29	/* 64-bit PC relative offset to GOT */
+#define R_X86_64_GOTPLT64	30 	/* like GOT64, says PLT entry needed */
+#define R_X86_64_PLTOFF64	31	/* 64-bit GOT relative offset
+					   to PLT entry */
+#define R_X86_64_SIZE32		32	/* Size of symbol plus 32-bit addend */
+#define R_X86_64_SIZE64		33	/* Size of symbol plus 64-bit addend */
+#define R_X86_64_GOTPC32_TLSDESC 34	/* GOT offset for TLS descriptor.  */
+#define R_X86_64_TLSDESC_CALL   35	/* Marker for call through TLS
+					   descriptor.  */
+#define R_X86_64_TLSDESC        36	/* TLS descriptor.  */
+#define R_X86_64_IRELATIVE	37	/* Adjust indirectly by program base */
+#define R_X86_64_RELATIVE64	38	/* 64-bit adjust by program base */
+
+#define R_X86_64_NUM		39
+
 
 //#ifdef __x86_64__
 #ifdef __LP64__			// Generic 64b
@@ -2927,7 +3056,11 @@ int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend)
   return 0;
 }
 
+#ifdef HAVE_CAPSTONE_CAPSTONE_H
 #include <capstone/capstone.h>
+#else
+#include <capstone.h>
+#endif
 
 static void print_string_hex(char *comment, unsigned char *str, size_t len)
 {
@@ -3794,7 +3927,7 @@ int usage(char *name)
 
 int print_version(void)
 {
-  printf("%s version:%s    (%s %s)\n", WNAME, WVERSION, WTIME, WDATE);
+  printf("%s (%s %s)\n", PACKAGE_STRING, __DATE__, __TIME__);
   return 0;
 }
 

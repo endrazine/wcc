@@ -30,6 +30,7 @@
 */
 
 
+#include <config.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,9 +48,18 @@
 #include <unistd.h>
 #include <limits.h>
 #include <errno.h>
-#include <elf.h>
 
-#include <config.h>
+#ifdef HAVE_LIBELF_LIBELF_H
+#include <libelf/libelf.h>
+#else
+#include <libelf.h>
+#endif
+
+#ifdef HAVE_LIBELF_GELF_H
+#include <libelf/gelf.h>
+#else
+#include <gelf.h>
+#endif
 
 #define DEFAULT_NAME "wld"
 
@@ -107,17 +117,17 @@ int mk_lib(char *name)
 
 int print_version(void)
 {
-  printf("%s version:%s    (%s %s)\n", WNAME, WVERSION, WTIME, WDATE);
+	printf("%s (%s %s)\n", PACKAGE_STRING, __DATE__, __TIME__);
   return 0;
 }
 
 int main(int argc, char **argv)
 {
 
-  if ((argc < 2)||(strncmp(argv[1],"-libify",7))) {
+  if ((argc < 2)||(strncmp(argv[1],"--libify",8))) {
     print_version();
     printf("\nUsage: %s [options] file\n", argc > 0 ? argv[0] : DEFAULT_NAME);
-    printf("\noptions:\n\n    -libify          Set Class to ET_DYN in input ELF file.\n\n");
+    printf("\noptions:\n\n    --libify          Set Class to ET_DYN in input ELF file.\n\n");
     exit(EXIT_FAILURE);
   }
 

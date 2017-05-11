@@ -1,0 +1,4 @@
+#!@BINDIR@/wsh
+
+headers()
+exit(0)

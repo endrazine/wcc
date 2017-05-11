@@ -1,4 +1,0 @@
-#!/usr/bin/wsh
-
-headers()
-exit(0)
