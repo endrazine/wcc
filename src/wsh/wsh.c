@@ -238,7 +238,6 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 	unsigned long int ret = 0;
 	struct link_map *handle = 0;
 	Dl_info dli;
-	char *err = 0;
 
 	if ((!symbol) || (!*symbol)) {
 		return -1;
@@ -256,6 +255,7 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 
 #ifdef PEDANTIC_WARNINGS
 	/* Check dlerror() since ret == NULL is ok. */
+	char *err = 0;
 	err = dlerror();
 
 	if (err) {
@@ -779,7 +779,7 @@ int scan_sections(char *fname, unsigned long int baseaddr)
 	fd = open(fname, O_RDONLY);
 	data = mmap(NULL, lseek(fd, 0, SEEK_END), PROT_READ, MAP_SHARED, fd, 0);
 	elf = (Elf_Ehdr *) data;
-	if(elf == -1){ return -1; }
+	if(elf == (void*)-1){ return -1; }
 
 	entry_point_add(elf->e_entry + baseaddr, fname);
 
@@ -873,9 +873,8 @@ symbols_t *symbol_from_name(char *fname){
 */
 int headers(lua_State * L)
 {
-	symbols_t *s = 0, *stmp = 0, *res = 0;
-	unsigned int i, scount = 0;
-	unsigned int pcnt = 0;
+	symbols_t *s = 0, *stmp = 0;
+	unsigned int scount = 0;
 
 	char *libname = 0;
 
@@ -1030,10 +1029,10 @@ int print_phdrs(void){
 
 
 			if(wsh->opt_hollywood){
-				printf(NORMAL "%012llx-%012llx%s\t%s\t%u\t%s\t%s"NORMAL"\n", s->addr, s->addr + s->size,
+				printf(NORMAL "%012lx-%012lx%s\t%s\t%u\t%s\t%s"NORMAL"\n", s->addr, s->addr + s->size,
 					pcolor, s->perms, s->size, s->libname, s->type);
 			}else{
-				printf("%012llx-%012llx\t%s\t%u\t%s\t%s\n", s->addr, s->addr + s->size,
+				printf("%012lx-%012lx\t%s\t%u\t%s\t%s\n", s->addr, s->addr + s->size,
 					s->perms, s->size, s->libname, s->type);
 			}
 	}
@@ -1465,7 +1464,7 @@ int info(lua_State * L)
 	Dl_info dli;
 	char *error = 0;
 	Elf_Sym *s = 0;
-	unsigned int stype = 0, sbind = 0, i = 0;
+	unsigned int stype = 0, sbind = 0;
 	char *htype = 0, *hbind = 0;
 
 	unsigned long long int n = lua_tonumber(L, 1);
@@ -1482,9 +1481,9 @@ int info(lua_State * L)
 		*/
 		symbols_t *sym = symbol_from_addr(n);
 		if((sym)&&(sym->addr == n)){
-			printf(" * %s %s %s from %s\tsize:%u\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+			printf(" * %s %s %s from %s\tsize:%lu\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
 		}else if(sym){
-			printf(" * %u bytes within %s %s %s from %s\tsize:%u\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+			printf(" * %llu bytes within %s %s %s from %s\tsize:%lu\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
 		}
 
 		/**
@@ -1492,7 +1491,7 @@ int info(lua_State * L)
 		*/
 		sections_t *sec = section_from_addr(n);
 		if(sec){
-			printf(" * %u bytes within %s:%s  %s\n", n - sec->addr, sec->libname, sec->name, sec->perms);
+			printf(" * %llu bytes within %s:%s  %s\n", n - sec->addr, sec->libname, sec->name, sec->perms);
 		}
 
 		/**
@@ -1500,7 +1499,7 @@ int info(lua_State * L)
 		*/
 		sections_t *seg = segment_from_addr(n);
 		if(seg){
-			printf(" * %u bytes within %s:%s  %s\n", n - seg->addr, seg->libname, seg->name, seg->perms);
+			printf(" * %llu bytes within %s:%s  %s\n", n - seg->addr, seg->libname, seg->name, seg->perms);
 		}
 
 	}else if (lua_isstring(L, 1)) {
@@ -1651,7 +1650,6 @@ int luaopen_array(lua_State * L)
 int run_shell(lua_State * L)
 {
 	char *input, shell_prompt[4096];
-	int work = 0;
 
 	if (wsh->is_stdinscript) {	// Execute from stdin. don't display promt, read line by line
 		for (;;) {
@@ -1766,7 +1764,7 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 	char *vreason = 0;
 	char *tag = 0;
 	long int offset = 0;
-	unsigned int i = 0, j = 0;
+	unsigned int i = 0;
 	unsigned int argn = 0;
 	symbols_t *s = 0;
 
@@ -1814,7 +1812,7 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason){
 		wsh->learnfile = fopen( wsh->learnlog ? wsh->learnlog : DEFAULT_LEARN_FILE ,"a+");
 	}
 
-	fprintf(wsh->learnfile, "TAG %s %s argument%u %s %d\n", s->libname, s->symbol, argn, tag, offset);
+	fprintf(wsh->learnfile, "TAG %s %s argument%u %s %ld\n", s->libname, s->symbol, argn, tag, offset);
 	fflush(wsh->learnfile);
 
 	return 0;
@@ -2773,7 +2771,7 @@ int exec_luabuff(void){
 	* Load buffer in lua
 	*/
 	if ((err = luaL_loadbuffer(wsh->L, wsh->luabuff, strlen(wsh->luabuff), "=Wsh internal lua buffer")) != 0) {
-		printf("ERROR: Wsh internal lua initialization (%s)\n", lua_strerror(err), lua_tostring(wsh->L, -1));
+		printf("ERROR: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
 		fatal_error(wsh->L, "Wsh internal lua initialization failed");
 	}
 
@@ -4509,7 +4507,7 @@ int wsh_init(void)
 	return 0;
 }
 
-int lua_strerror(int err)
+static char *lua_strerror(int err)
 {
 	switch (err) {
 	case 1:
@@ -4572,7 +4570,7 @@ unsigned int read_elf_sig(char *fname, struct stat *sb)
 {
 	int fd = 0;
 	unsigned char sig[5];
-	unsigned char validelf[4] = "\177ELF";
+	char validelf[4] = "\177ELF";
 	if (sb->st_size < MIN_BIN_SIZE) {
 		return 0;	// Failure
 	}

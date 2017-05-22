@@ -444,6 +444,8 @@ static int rawmemusage (lua_State *L);
 static int rawmemaddr  (lua_State *L);
 static int rawmemstrlen(lua_State *L);
 
+static char *lua_strerror(int err);
+
 /**
 * Internal representation of an ELF
 */
