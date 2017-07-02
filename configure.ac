@@ -210,7 +210,7 @@ AC_ARG_WITH(openlibm-libdir,
            [AS_HELP_STRING([--with-openlibm-libdir],[OPENLIBM library directory])],
            [OPENLIBM_LIB_DIR="${withval}";],)
 
-if "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi

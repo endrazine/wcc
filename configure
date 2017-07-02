@@ -17625,7 +17625,7 @@ if test "${with_openlibm_libdir+set}" = set; then :
 fi
 
 
-if "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
+if test "$IS_SUPPORTED" = "true" -a "$IS_LINUX" = "true"; then
 	if test "x$OPENLIBM_INC_DIR" != "x" ; then
    		CPPFLAGS="-I${OPENLIBM_INC_DIR} ${CPPFLAGS}"
 	fi
