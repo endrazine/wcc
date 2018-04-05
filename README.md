@@ -170,7 +170,7 @@ The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Wi
 
 #### Example usage of wsh
 The following command loads the /usr/sbin/apache2 executable within wsh, calls the ap_get_server_banner() function within
-apache to retreive its banner and displays it within the wsh interpreter.
+apache to retrieve its banner and displays it within the wsh interpreter.
 
 	jonathan@blackbox:~$ wsh /usr/sbin/apache2
 	> a = ap_get_server_banner()
@@ -252,7 +252,7 @@ The following example illustrates how to display the main wsh help from the inte
 	> 
 
 #### Extending wsh with Witchcraft Shell Scripts
-The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow to call any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerfull combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
+The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow to call any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerful combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
 Scripts in Punk C can be invoked by specifying the full path to wsh in the magic bytes of a wsh shell. 
 The following command displays the content of a Witchcraft shell script:
 
@@ -294,7 +294,7 @@ To run this script using the API made available inside the address space of sshd
 wsh can only load shared libraries and ET_DYN dynamically linked ELF executables directly. This means ET_EXEC executables may need to be libified using wld before use in wsh. Binaries in other file formats might need to be turned into ELF files using wcc.
 
 #### Note: Analysing and Executing ARM/SPARC/MIPS binaries "natively" on Intel x86_64 cpus via JIT binary translation
-wsh can be cross compiled to ARM, SPARC, MIPS and other plateforms and used in association with the qemu's user space emulation mode to provide JIT binary translation on the fly and analyse shared libraries and binaries from other cpus without requiring emulation a full operating system in a virtual machine. On the the analyzed binaries are translated from one CPU to an other, and the analysed binaries, the wsh cross compiled analyser and the qemu binary translator share the address space of a single program. This significantly diminishes the complexity of analysing binaries accross different hardware by seemingly allowing to run ARM or SPARC binaries on a linux x86_64 machine natively and transparently.
+wsh can be cross compiled to ARM, SPARC, MIPS and other platforms and used in association with the qemu's user space emulation mode to provide JIT binary translation on the fly and analyse shared libraries and binaries from other cpus without requiring emulation a full operating system in a virtual machine. On the the analyzed binaries are translated from one CPU to an other, and the analysed binaries, the wsh cross compiled analyser and the qemu binary translator share the address space of a single program. This significantly diminishes the complexity of analysing binaries across different hardware by seemingly allowing to run ARM or SPARC binaries on a linux x86_64 machine natively and transparently.
 
 ## Other commands
 
@@ -320,7 +320,7 @@ The following command displays shared libraries compilation flags as passed to g
 	jonathan@blackbox:~$
 
 ### wcch : generate C headers from binaries
-The wcch command takes an ELF binary path as a command line, and outputs a minimal C header file declaring all the exported global variables and functions from the input binary. This automates prototypes declaration when writting C code and linking with a binary for which C header files are not available.
+The wcch command takes an ELF binary path as a command line, and outputs a minimal C header file declaring all the exported global variables and functions from the input binary. This automates prototypes declaration when writing C code and linking with a binary for which C header files are not available.
 
 #### Example usage of wcch
 
@@ -330,7 +330,7 @@ The following command instructs wcch to generate C headers from the apache2 exec
 	jonathan@blackbox:~$ 
 
 ## Downloading the source code
-The official codebase of the Witchcraft Compiler Collection is hosted on github at https://github.com/endrazine/wcc/ . It uses git modules, so some extra steps are needed to fetch all the code including depedencies. To download the source code of wcc, in a terminal, type:
+The official codebase of the Witchcraft Compiler Collection is hosted on github at https://github.com/endrazine/wcc/ . It uses git modules, so some extra steps are needed to fetch all the code including dependencies. To download the source code of wcc, in a terminal, type:
 
     git clone https://github.com/endrazine/wcc.git
     cd wcc
