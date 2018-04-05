@@ -143,7 +143,7 @@ This relocatable file can then be used as if it had been directly produced by a 
 wcc will process any file supported by libbfd and produce ELF files that will contain the same mapping when relinked and executed. This includes PE or OSX COFF files in 32 or 64 bits. However, rebuilding relocations is currently supported only for Intel ELF x86_64 binaries. Transforming a PE into an ELF and invoking pure functions is for instance supported.
 
 ### wsh : The Witchcraft shell
-The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Witchcraft Shell Scripts written in Punk-C as an input. It loads all the executables in its own address space and make their API available for programming in its embedded interpreter. This provides for binaries functionalities similar to those provided via reflection on languages like Java.
+The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Witchcraft Shell Scripts written in Punk-C as an input. It loads all the executables in its own address space and makes their API available for programming in its embedded interpreter. This provides for binaries functionalities similar to those provided via reflection on languages like Java.
 
 #### wsh command line options
 
@@ -252,7 +252,7 @@ The following example illustrates how to display the main wsh help from the inte
 	> 
 
 #### Extending wsh with Witchcraft Shell Scripts
-The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow to call any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerful combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
+The combination of a full lua interpreter in the same address space as the loaded executables and shared libraries in combination with the reflection like capabilities of wsh allow calling any function loaded in the address space from the wsh interpreter transparently. The resulting API, a powerful combination of lua and C API is called Punk-C. Wsh is fully scriptable in Punk-C, and executes Punk-C on the fly via its dynamic interpreter.
 Scripts in Punk C can be invoked by specifying the full path to wsh in the magic bytes of a wsh shell. 
 The following command displays the content of a Witchcraft shell script:
 
@@ -294,14 +294,14 @@ To run this script using the API made available inside the address space of sshd
 wsh can only load shared libraries and ET_DYN dynamically linked ELF executables directly. This means ET_EXEC executables may need to be libified using wld before use in wsh. Binaries in other file formats might need to be turned into ELF files using wcc.
 
 #### Note: Analysing and Executing ARM/SPARC/MIPS binaries "natively" on Intel x86_64 cpus via JIT binary translation
-wsh can be cross compiled to ARM, SPARC, MIPS and other platforms and used in association with the qemu's user space emulation mode to provide JIT binary translation on the fly and analyse shared libraries and binaries from other cpus without requiring emulation a full operating system in a virtual machine. On the the analyzed binaries are translated from one CPU to an other, and the analysed binaries, the wsh cross compiled analyser and the qemu binary translator share the address space of a single program. This significantly diminishes the complexity of analysing binaries across different hardware by seemingly allowing to run ARM or SPARC binaries on a linux x86_64 machine natively and transparently.
+wsh can be cross compiled to ARM, SPARC, MIPS and other platforms and used in association with the qemu's user space emulation mode to provide JIT binary translation on the fly and analyse shared libraries and binaries from other cpus without requiring emulation of a full operating system in a virtual machine. The analyzed binaries are translated from one CPU to an other, and the analysed binaries, the wsh cross compiled analyser and the qemu binary translator share the address space of a single program. This significantly diminishes the complexity of analysing binaries across different hardware by seemingly allowing to run ARM or SPARC binaries on a linux x86_64 machine natively and transparently.
 
 ## Other commands
 
 The following auxiliary commands are available with WCC. They are typically simple scripts built on top of WCC.
 
 ### wldd : print shared libraries compilation flags
-When compiling C code, it is often required to pass extra arguments to the compiler to signify which shared libraries should explicitely linked against the compile code. Figuring out those compilation parameters can be cumbersome. The wldd commands displays the shared libraries compilation flags given at compile time for any given ELF binary.
+When compiling C code, it is often required to pass extra arguments to the compiler to signify which shared libraries should be explicitly linked against the compile code. Figuring out those compilation parameters can be cumbersome. The wldd commands displays the shared libraries compilation flags given at compile time for any given ELF binary.
 
 #### wldd command line options
 
