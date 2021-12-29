@@ -47,7 +47,6 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <poll.h>
-#include <stropts.h>
 #include <signal.h>
 #include <malloc.h>
 #include <sys/mman.h>
