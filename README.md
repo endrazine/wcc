@@ -344,10 +344,10 @@ The Witchcraft Compiler Collection uses the following amazing Open Source third 
 
   - Capstone, a lightweight multi-platform, multi-architecture disassembly framework http://www.capstone-engine.org/
   - Linenoise, A small self-contained alternative to readline and libedit https://github.com/antirez/linenoise
-  - Openlibm, High quality system independent, portable, open source libm implementation http://www.openlibm.org
+  - Openlibm, High quality system independent, portable, open source libm implementation https://github.com/JuliaMath/openlibm
   - Lua, The Programming Language Lua https://www.lua.org/
   - LuaJit, a Just-In-Time Compiler for Lua http://luajit.org/
-  - Qemu, in particular its user space mode : http://wiki.qemu.org/download/qemu-doc.html#QEMU-User-space-emulator
+  - Qemu, in particular its user space mode : https://qemu-project.gitlab.io/qemu/user/main.html
   - Uthash and Utlist, Hash tables and linked list implemented as C headers https://troydhanson.github.io/uthash/
 
 ## Licence
