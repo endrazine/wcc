@@ -1,7 +1,7 @@
 /**
 * Test code for the Witchcraft Compiler Collection
 *
-* Copyright 2016 Jonathan Brossard.
+* Copyright 2016-2022 Jonathan Brossard.
 *
 * This file is licensed under the MIT License.
 *
