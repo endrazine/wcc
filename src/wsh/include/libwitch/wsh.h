@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016 Jonathan Brossard
+* Copyright (c) 2016-2022 Jonathan Brossard
 * 
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,7 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <poll.h>
-#include <stropts.h>
+//#include <stropts.h>
 #include <signal.h>
 #include <malloc.h>
 #include <sys/mman.h>
