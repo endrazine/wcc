@@ -7,7 +7,6 @@
 *******************************************************************************
 * The MIT License (MIT)
 * Copyright (c) 2016-2022 Jonathan Brossard
-* 
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
 * in the Software without restriction, including without limitation the rights
@@ -15,13 +14,13 @@
 * copies of the Software, and to permit persons to whom the Software is
 * furnished to do so, subject to the following conditions:
 *
-* The above copyright notice and this permission notice shall be included in 
+* The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
@@ -47,7 +46,6 @@
 #include <stdbool.h>
 #include <sys/wait.h>
 #include <poll.h>
-//#include <stropts.h>
 #include <signal.h>
 #include <malloc.h>
 #include <sys/mman.h>
@@ -74,8 +72,8 @@
 #include "helper.h"
 #include <colors.h>
 #include <config.h>
-#include <utlist.h>
 #include <uthash.h>
+
 
 #define DEFAULT_SCRIPT		"/usr/share/wcc/scripts/debug"
 #define DEFAULT_SCRIPT_INDEX	"/usr/share/wcc/scripts/INDEX"
@@ -366,7 +364,7 @@ static int bsspolute(lua_State * L);
 static unsigned int ltrace(void);
 static int procmap_lua(void);
 static void rescan(void);
-static void hexdump(uint8_t * data, size_t size, size_t colorstart, size_t color_len);
+static void hexdump(char * data, size_t size, size_t colorstart, size_t color_len);
 static int disable_aslr(void);
 static int enable_aslr(void);
 static int run_script(char *name);
