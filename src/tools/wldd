@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # wlld : This file is part of the Witchcraft Compiler Collection
 #
@@ -10,23 +10,21 @@
 #
 #
 
-usage () {
+usage() {
 	echo "Usage: $0 </path/to/bin>"
 	echo ""
 	echo "  Returns libraries to be passed to gcc to relink this application."
 	echo ""
-	exit
+	exit 1
 }
 
-getlibs (){
-	ldd $1|grep "=> /"|awk '{print $1}'|sed s#"\..*"##|sed s#"^lib"#"-l"#|tr "\n" " "
-	echo ""
+getlibs() {
+	ldd "$1" | awk '/=> \// {sub(/\..*/, "", $1); sub(/^lib/, "-l", $1); printf("%s ", $1)}  END {print ""}'
 }
 
-if [ "$1" == "" ]
+if [ "$#" -ne 1 ]
 then
 	usage
 fi
 
-getlibs $1
-
+getlibs "$1"
