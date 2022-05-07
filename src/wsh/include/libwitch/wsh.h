@@ -54,7 +54,7 @@
 #include <execinfo.h>
 #include <pthread.h>
 #include <sys/resource.h>
-
+#include <sys/sendfile.h>
 #include <sys/ptrace.h>
 
 #define USE_LUA 1
@@ -625,6 +625,10 @@ int wsh_getopt(int argc, char **argv);
 int wsh_loadlibs(void);
 int reload_elfs(void);
 int wsh_run(void);
+int wsh_usage(char *name);
+int wsh_print_version(void);
+void _exit(int status);
+void exit(int status);
 
 /*
 int newarray(lua_State * L);
