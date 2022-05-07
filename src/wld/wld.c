@@ -51,6 +51,8 @@
 
 #include <config.h>
 
+#include "wld.h"
+
 #define DEFAULT_NAME "wld"
 
 /**
@@ -63,6 +65,12 @@ int mk_lib(char *name)
   char *map = 0;
   Elf32_Ehdr *ehdr32;
   Elf64_Ehdr *ehdr64;
+
+  Elf_Ehdr *elf = 0;
+  Elf_Shdr *shdr = 0;
+  Elf_Dyn *dyn;
+  unsigned int shnum = 0;
+  unsigned int i = 0, j = 0;
 
   fd = open(name, O_RDWR);
   if (fd <= 0) {
@@ -99,6 +107,36 @@ int mk_lib(char *name)
     printf(" !! unknown ELF class\n");
     exit(EXIT_FAILURE);
   }
+
+  /**
+  * Work around : https://patchwork.ozlabs.org/project/glibc/patch/20190312130235.8E82C89CE49C@oldenburg2.str.redhat.com/
+  * We need to find and nullify entries DT_FLAGS, DT_FLAGS_1 and DT_BIND_NOW in dynamic section
+  */
+  elf = (Elf_Ehdr *) map;
+  shdr = (Elf_Shdr *) (map + elf->e_shoff);
+  shnum = elf->e_shnum;
+
+  for ( i = 0; i < shnum ; i++) {
+    // Find dynamic section
+    if(shdr[i].sh_type == SHT_DYNAMIC){
+      dyn = map + shdr[i].sh_offset;
+      // Patch dynamic section
+      for ( j = 0; j < (shdr[i].sh_size/sizeof(Elf_Dyn)) ; j++) {
+        switch (dyn->d_tag) {
+        case DT_FLAGS:
+        case DT_POSFLAG_1:
+        case DT_BIND_NOW:
+            dyn->d_tag = DT_NULL;
+            dyn->d_un.d_val = -1;
+            break;
+        default:
+          break;
+        }
+        dyn += 1;
+      }
+      break;
+    }
+  }  
 
   munmap(map, sb.st_size);
   close(fd);

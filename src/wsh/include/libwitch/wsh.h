@@ -100,7 +100,7 @@
 #define         DMGL_ANSI   (1 << 1)
 #define         DMGL_ARM   (1 << 11)
 
-#ifdef __x86_64__
+#ifdef __LP64__ // Generic 64b
 #define Elf_Dyn  Elf64_Dyn
 #define Elf_Ehdr Elf64_Ehdr
 #define Elf_Phdr Elf64_Phdr
