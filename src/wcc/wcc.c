@@ -67,6 +67,7 @@
 #include <arch.h>
 #include <aux.h>
 #include <inttypes.h>
+#include <capstone/capstone.h>
 
 #include <config.h>
 
@@ -310,10 +311,26 @@ typedef struct ctx_t {
 
 } ctx_t;
 
+struct symaddr {
+  struct symaddr *next;
+  char *name;
+  int addr;
+} *symaddrs;
+
+typedef struct gimport_t {
+  char *sname;
+  msec_t *sec;
+  Elf_Rela *r;
+  int rtype;
+  unsigned int sindex;
+} gimport_t;
+
+gimport_t **gimports = 0;
+unsigned int gimportslen = 0;
 
 
 /**
-* Forwardd prototypes declarations
+* Forward prototypes declarations
 */
 int craft_section(ctx_t * ctx, msec_t * m);
 unsigned int secindex_from_name(ctx_t * ctx, const char *name);
@@ -398,31 +415,12 @@ unsigned int protect_perms(unsigned int perms)
   return memperms;
 }
 
-struct symaddr {
-  struct symaddr *next;
-  char *name;
-  int addr;
-} *symaddrs;
-
-
-/*
-typedef struct {
-	Elf_Word	st_name;
-	unsigned char	st_info;
-	unsigned char	st_other;
-	Elf_Half	st_shndx;
-	Elf_Addr	st_value;
-	Elf_Xword	st_size;
-} Elf_Sym;
-*/
-
 void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
 {
-
-  struct symaddr *sa;
+  struct symaddr *sa = 0;
   Elf_Sym *s = 0;
   unsigned long int nameptr = 0;
-  unsigned int i;
+  unsigned int i = 0;
 
   if (*name == '\0')
     return;
@@ -470,7 +468,6 @@ void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
   /**
   * Append symbol to global symbol table
   */
-
   if (globalsymtab == 0) {
     globalsymtab = calloc(1, sizeof(Elf_Sym) * 2);
     globalsymtablen += sizeof(Elf_Sym);	// Skip 1 NULL entry
@@ -492,14 +489,11 @@ void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
 
   case 'C':
   case 'c':
-//      s->st_value = addr;
     ;
     // adjust value from vma
     msec_t *t = section_from_name(ctx, ".text");
-//              s->st_value -= t->s_elf->sh_addr;
     if (ctx->opt_reloc) {
       s->st_value -= t->s_bfd->vma;
-//s->st_value -= orig_text;
       s->st_shndx = 1;		// index to .text
     }
     s->st_info = STT_FUNC;
@@ -511,11 +505,6 @@ void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
   case 'b':
   case 'V':
   case 'v':
-    ;
-// adjust value from vma
-//  msec_t *t2 = section_from_addr(ctx, s->st_value);
-//  s->st_value -= t2->s_bfd->vma;
-
     s->st_info = STT_OBJECT;
     break;
 
@@ -539,7 +528,6 @@ void add_symaddr(ctx_t * ctx, const char *name, int addr, char symclass)
     s->st_info += 0x10;
   }
 
-
   globalsymtablen += sizeof(Elf_Sym);
   return;
 }
@@ -562,15 +550,15 @@ int add_extra_symbols(ctx_t * ctx)
 */
 int rd_symbols(ctx_t * ctx)
 {
-  long storage_needed;
+  long storage_needed = 0;
   asymbol **symbol_table = NULL;
-  long number_of_symbols;
-  long i;
+  long number_of_symbols = 0;
+  long i = 0;
   int ret = 0;
 
-  const char *sym_name;
-  int symclass;
-  int sym_value;
+  const char *sym_name = 0;
+  int symclass = 0;
+  int sym_value = 0;
 
   if (ctx->opt_verbose) {
     printf("\n\n -- Reading symbols\n\n");
@@ -693,7 +681,7 @@ unsigned int max(unsigned int a, unsigned int b)
 */
 msec_t *section_from_name(ctx_t * ctx, char *name)
 {
-  msec_t *s;
+  msec_t *s = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
     if (str_eq(s->name, name)) {
@@ -708,7 +696,7 @@ msec_t *section_from_name(ctx_t * ctx, char *name)
 */
 msec_t *section_from_addr(ctx_t * ctx, unsigned long int addr)
 {
-  msec_t *s;
+  msec_t *s = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
     if ((s->s_bfd->vma) && (s->s_bfd->vma <= addr)
@@ -724,7 +712,7 @@ msec_t *section_from_addr(ctx_t * ctx, unsigned long int addr)
 */
 msec_t *section_from_index(ctx_t * ctx, unsigned int index)
 {
-  msec_t *s;
+  msec_t *s = 0;
   unsigned int i = 1;		// We count from 1
   DL_FOREACH(ctx->mshdrs, s) {
     if (index == i) {
@@ -735,13 +723,12 @@ msec_t *section_from_index(ctx_t * ctx, unsigned int index)
   return 0;
 }
 
-
 /**
 * Return a section index from its name
 */
 unsigned int secindex_from_name(ctx_t * ctx, const char *name)
 {
-  msec_t *s;
+  msec_t *s = 0;
   unsigned int i = 1;		// We count from 1
 
   DL_FOREACH(ctx->mshdrs, s) {
@@ -758,9 +745,9 @@ unsigned int secindex_from_name(ctx_t * ctx, const char *name)
 */
 unsigned int secindex_from_name_after_strip(ctx_t * ctx, const char *name)
 {
-  msec_t *s;
+  msec_t *s = 0;
   unsigned int i = 1;		// We count from 1
-  unsigned int j;
+  unsigned int j = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
     if (str_eq(s->name, name)) {
@@ -780,9 +767,9 @@ unsigned int secindex_from_name_after_strip(ctx_t * ctx, const char *name)
 char *sec_name_from_index_after_strip(ctx_t * ctx, unsigned int index)
 {
 
-  msec_t *s;
+  msec_t *s = 0;
   unsigned int i = 0;
-  unsigned int j;
+  unsigned int j = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
 
@@ -798,10 +785,8 @@ char *sec_name_from_index_after_strip(ctx_t * ctx, unsigned int index)
     }
 
   }
-
   return NULL;
 }
-
 
 /**
 * Return a section link from its name
@@ -936,7 +921,7 @@ unsigned int pflag_from_section(msec_t * ms)
 
   switch (ms->s_elf->sh_flags) {
   case SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR:
-    dperms = PF_R | PF_W | PF_X;	// "rwx";
+    dperms = PF_R | PF_W | PF_X;// "rwx";
     break;
   case SHF_ALLOC:
     dperms = PF_R;		//"r--";
@@ -948,7 +933,7 @@ unsigned int pflag_from_section(msec_t * ms)
     dperms = PF_R | PF_W;	// "rw-"
     break;
   default:
-    dperms = 0;			// "---"
+    dperms = 0;		// "---"
     break;
   }
   return dperms;
@@ -960,8 +945,8 @@ unsigned int pflag_from_section(msec_t * ms)
 int phdr_cmp_premerge(mseg_t * a, mseg_t * b)
 {
   if (a->p_type != b->p_type) {
-    return a->p_type - b->p_type;
-  }				// Sort by type
+    return a->p_type - b->p_type;	// Sort by type
+  }
   return a->p_vaddr - b->p_vaddr;	// else by vma
 }
 
@@ -997,8 +982,8 @@ int sort_phdrs_premerge(ctx_t * ctx)
 */
 mseg_t *alloc_phdr(msec_t * ms)
 {
-  mseg_t *p;
-  Elf_Shdr *s;
+  mseg_t *p = 0;
+  Elf_Shdr *s = 0;
 
   s = ms->s_elf;
   p = calloc(1, sizeof(mseg_t));
@@ -1020,7 +1005,7 @@ mseg_t *alloc_phdr(msec_t * ms)
 */
 int create_phdrs(ctx_t * ctx)
 {
-  msec_t *ms, *tmp;
+  msec_t *ms = 0, *tmp = 0;
   mseg_t *p = 0;
 
   DL_FOREACH_SAFE(ctx->mshdrs, ms, tmp) {
@@ -1061,7 +1046,7 @@ int create_phdrs(ctx_t * ctx)
 */
 int merge_phdrs(ctx_t * ctx)
 {
-  mseg_t *ms, *n;
+  mseg_t *ms = 0, *n = 0;
 retry:
   ms = ctx->mphdrs;
   while (ms) {
@@ -1096,7 +1081,7 @@ retry:
 
 int adjust_baseaddress(ctx_t * ctx)
 {
-  mseg_t *ms;
+  mseg_t *ms = 0;
 
   // find base address (first allocated PT_LOAD chunk)
   ms = ctx->mphdrs;
@@ -1143,12 +1128,12 @@ int adjust_baseaddress(ctx_t * ctx)
 static unsigned int rd_phdrs(ctx_t * ctx)
 {
   struct stat sb;
-  char *p;
-  int fdin;
+  char *p = 0;
+  int fdin = 0;
   Elf_Ehdr *e = 0;
   unsigned int i = 0;
-  int nread;
-  Elf_Phdr *phdr, *eph;
+  int nread = 0;
+  Elf_Phdr *phdr = 0, *eph = 0;
 
   if (stat(ctx->binname, &sb) == -1) {
     perror("stat");
@@ -1283,7 +1268,6 @@ static unsigned int write_phdrs(ctx_t * ctx)
   return ctx->start_phdrs;
 }
 
-
 /**
 * Write Original Program Headers to disk
 */
@@ -1306,7 +1290,7 @@ static unsigned int write_phdrs_original(ctx_t * ctx)
   mseg_t *p;
   unsigned int i = 0;
   DL_FOREACH(ctx->mphdrs, p) {
-    if (i == 0) {		// First Phdr is the Program Header itself
+    if (i == 0) {			// First Phdr is the Program Header itself
       p->p_offset = ctx->start_phdrs;	// Patch offset of Program header
       i = 1;
     }
@@ -1315,10 +1299,9 @@ static unsigned int write_phdrs_original(ctx_t * ctx)
   return ctx->start_phdrs;
 }
 
-
 msec_t *mk_section(void)
 {
-  msec_t *ms;
+  msec_t *ms = 0;
 
   // allocate memory
   ms = calloc(1, sizeof(msec_t));
@@ -1336,11 +1319,8 @@ msec_t *mk_section(void)
   return ms;
 }
 
-
-
 static int write_strtab_and_reloc(ctx_t * ctx)
 {
-
   unsigned int tmpm = 0;
 
   if (ctx->opt_debug) {
@@ -1376,11 +1356,9 @@ static int write_strtab_and_reloc(ctx_t * ctx)
   return 0;
 }
 
-
 char *reloc_htype_x86_64(int thetype)
 {
-
-  char *htype;
+  char *htype = 0;
 
   switch (thetype) {
   case R_X86_64_NONE:
@@ -1459,10 +1437,9 @@ char *reloc_htype_x86_64(int thetype)
   return htype;
 }
 
-
 char *reloc_htype_x86_32(int thetype)
 {
-  char *htype;
+  char *htype = 0;
 
   switch (thetype) {
   case R_386_NONE:
@@ -1539,14 +1516,12 @@ char *reloc_htype(int thetype)
 */
 static int parse_reloc(ctx_t * ctx, msec_t * s)
 {
-
-  Elf_Shdr *shdr;
-  Elf_Rela *r;
-  unsigned int sz;
-  unsigned int i;
+  Elf_Shdr *shdr = 0;
+  Elf_Rela *r = 0;
+  unsigned int sz = 0;
+  unsigned int i = 0;
   char *htype = 0;
   unsigned int sindex = 0;
-
   unsigned int has_addend = 0;
 
   shdr = s->s_elf;
@@ -1626,10 +1601,9 @@ static int parse_reloc(ctx_t * ctx, msec_t * s)
 
 int fixup_strtab_and_symtab(ctx_t * ctx)
 {
-
   char *sname = 0;
-  Elf_Sym *s;
-  unsigned int i, sindex;
+  Elf_Sym *s = 0;
+  unsigned int i = 0, sindex = 0;
 
   if (!globalsymtab) {
     return 0;
@@ -1678,10 +1652,9 @@ int fixup_strtab_and_symtab(ctx_t * ctx)
   return 0;
 }
 
-
 int fixup_text(ctx_t * ctx)
 {
-  msec_t *s;
+  msec_t *s = 0;
 
   if (ctx->opt_debug) {
     printf(" -- Fixup .text\n\n");
@@ -1716,7 +1689,7 @@ int fixup_text(ctx_t * ctx)
 */
 static unsigned int parse_relocations(ctx_t * ctx)
 {
-  msec_t *s;
+  msec_t *s = 0;
 
   if (ctx->opt_verbose) {
     printf("\n -- Parsing existing relocations\n\n");
@@ -1736,13 +1709,11 @@ static unsigned int parse_relocations(ctx_t * ctx)
   return 0;
 }
 
-
 /**
 * Append a symbol to global symbol table
 */
 unsigned int append_sym(Elf_Sym * s)
 {
-
   if (globalsymtab == 0) {
     globalsymtab = calloc(1, sizeof(Elf_Sym) * 2);
     globalsymtablen += sizeof(Elf_Sym);	// Skip 1 NULL entry
@@ -1763,8 +1734,7 @@ unsigned int append_sym(Elf_Sym * s)
 */
 unsigned int append_strtab(char *str)
 {
-
-  unsigned int nameptr;
+  unsigned int nameptr = 0;
 
   if (globalstrtab == 0) {
     globalstrtab = calloc(1, strlen(str) + 3);
@@ -1779,18 +1749,16 @@ unsigned int append_strtab(char *str)
   return nameptr;
 }
 
-
 /**
 * Create sections in symbol table/string table
 */
 static int create_section_symbols(ctx_t * ctx)
 {
-
-  msec_t *tmp;
-  msec_t *s;
-  unsigned int nameptr;
-  Elf_Sym *sym;
-  unsigned int i, n;
+  msec_t *tmp = 0;
+  msec_t *s = 0;
+  unsigned int nameptr = 0;
+  Elf_Sym *sym = 0;
+  unsigned int i = 0, n = 0;
 
   sym = calloc(1, sizeof(Elf_Sym));
 
@@ -1868,9 +1836,8 @@ static int create_section_symbols(ctx_t * ctx)
 
 static unsigned int process_text(ctx_t * ctx)
 {
-
-  msec_t *t;
-  unsigned int delta;
+  msec_t *t = 0;
+  unsigned int delta = 0;
 
   t = section_from_name(ctx, ".text");
   delta = orig_text - textvma;
@@ -1892,7 +1859,7 @@ static unsigned int write_shdrs(ctx_t * ctx)
 {
   Elf_Shdr *shdr = 0;
   unsigned int tmpm = 0;
-  msec_t *s;
+  msec_t *s = 0;
 
   /**
   * Align section headers on 8 bytes boundaries
@@ -1933,7 +1900,6 @@ static unsigned int write_shdrs(ctx_t * ctx)
     // write section header to binary
     write(ctx->fdout, s->s_elf, sizeof(Elf_Shdr));
   }
-
 
   /**
   * Add a section header for relocations
@@ -2003,15 +1969,14 @@ static unsigned int write_shdrs(ctx_t * ctx)
   shdr = calloc(1, sizeof(Elf_Shdr));
 
   shdr->sh_name = ctx->strndx_len;	// index in string table
-  shdr->sh_type = SHT_SYMTAB;	// Section type
-  shdr->sh_flags = 0;		// Section flags
-  shdr->sh_addr = 0;		// Section virtual addr at execution
+  shdr->sh_type = SHT_SYMTAB;		// Section type
+  shdr->sh_flags = 0;			// Section flags
+  shdr->sh_addr = 0;			// Section virtual addr at execution
   shdr->sh_offset = globalsymtableoffset;	// Section file offset
   shdr->sh_size = globalsymtablen;	// Section size in bytes
   shdr->sh_link = ctx->shnum + 2;	// Link to another section (strtab)
   shdr->sh_info = ctx->shnum + 1;	// Additional section information
-  shdr->sh_addralign = 8;	// Section alignment
-//      shdr->sh_entsize = 0;   // Entry size if section holds table
+  shdr->sh_addralign = 8;		// Section alignment
   shdr->sh_entsize = entszfromname(".symtab");	// Entry size if section holds table
 
   ctx->strndx_len += 8;
@@ -2023,7 +1988,6 @@ static unsigned int write_shdrs(ctx_t * ctx)
   ctx->strndx_index = ctx->shnum + 1;
   // append sections strint table to binary
 //      write(ctx->fdout, ctx->strndx, ctx->strndx_len);
-
 
   /**
   * Append an additional section header for the Section header string table
@@ -2038,13 +2002,12 @@ static unsigned int write_shdrs(ctx_t * ctx)
   shdr->sh_type = SHT_STRTAB;	// Section type
   shdr->sh_flags = 0;		// Section flags
   shdr->sh_addr = 0;		// Section virtual addr at execution
-//      shdr->sh_offset = lseek(ctx->fdout, 0x00, SEEK_END) + 64;       // Section file offset
   shdr->sh_offset = lseek(ctx->fdout, 0x00, SEEK_END) + sizeof(Elf_Shdr);	// Section file offset
   shdr->sh_size = ctx->strndx_len + 10;	// Section size in bytes
   shdr->sh_link = 0;		// Link to another section
   shdr->sh_info = 0;		// Additional section information
   shdr->sh_addralign = 1;	// Section alignment
-  shdr->sh_entsize = 0;		// Entry size if section holds table
+  shdr->sh_entsize = 0;	// Entry size if section holds table
 
   ctx->strndx_len += 9 + 1;
 
@@ -2152,8 +2115,8 @@ static int write_section(ctx_t * ctx, msec_t * m)
 
 static int rd_extended_text(ctx_t * ctx)
 {
-  unsigned int i;
-  asection *s;
+  unsigned int i = 0;
+  asection *s = 0;
 
   if (ctx->opt_debug) {
     printf(" -- Finding .text segment boundaries\n\n");
@@ -2192,8 +2155,8 @@ static int rd_extended_text(ctx_t * ctx)
 
 static int rd_extended_data(ctx_t * ctx)
 {
-  unsigned int i, perms;
-  asection *s;
+  unsigned int i = 0, perms = 0;
+  asection *s = 0;
 
   if (ctx->opt_debug) {
     printf(" -- Finding .data segment boundaries\n\n");
@@ -2232,8 +2195,8 @@ static int rd_extended_data(ctx_t * ctx)
 
 static int extend_text(ctx_t * ctx)
 {
-  unsigned int i;
-  asection *s;
+  unsigned int i = 0;
+  asection *s = 0;
 
   if (ctx->opt_debug) {
     printf(" -- Extending .text\n\n");
@@ -2263,10 +2226,10 @@ static int extend_text(ctx_t * ctx)
 */
 int print_bfd_sections(ctx_t * ctx)
 {
-  unsigned int i;
-  asection *s;
-  unsigned perms;
-  char *hperms;
+  unsigned int i = 0;
+  asection *s = 0;
+  unsigned perms = 0;
+  char *hperms = 0;
 
   if (ctx->opt_verbose) {
     printf("\n -- Input binary sections\n\n");
@@ -2315,7 +2278,7 @@ int print_bfd_sections(ctx_t * ctx)
  */
 void hexdump(unsigned char *data, size_t size)
 {
-  size_t i, j;
+  size_t i = 0, j = 0;
 
   for (j = 0; j < size; j += 16) {
     for (i = j; i < j + 16; i++) {
@@ -2376,8 +2339,8 @@ int open_target(ctx_t * ctx)
 {
   int fd = 0;
   struct stat sb;
-  char *newname;
-  char *p;
+  char *newname = 0;
+  char *p = 0;
 
   if (stat(ctx->binname, &sb) == -1) {
     perror("stat");
@@ -2428,7 +2391,7 @@ int open_target(ctx_t * ctx)
 */
 int copy_body(ctx_t * ctx)
 {
-  msec_t *s;
+  msec_t *s = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
     write_section(ctx, s);
@@ -2481,17 +2444,17 @@ int craft_section(ctx_t * ctx, msec_t * m)
     dperms = SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR;	// "rwx";
     break;
   case 6:
-    dperms = SHF_ALLOC;		//"r--";
+    dperms = SHF_ALLOC;				//"r--";
     break;
   case 5:
-    dperms = SHF_ALLOC | SHF_EXECINSTR;	// "r-x";
+    dperms = SHF_ALLOC | SHF_EXECINSTR;		// "r-x";
     break;
   case 4:
-    dperms = SHF_ALLOC | SHF_WRITE;	// "rw-"
+    dperms = SHF_ALLOC | SHF_WRITE;			// "rw-"
     break;
   default:
     dalign = 1;
-    dperms = 0;			// "---"
+    dperms = 0;					// "---"
     break;
   }
 
@@ -2522,8 +2485,8 @@ int craft_section(ctx_t * ctx, msec_t * m)
 static int read_section(ctx_t * ctx, asection * s)
 {
   int fd = 0;
-  unsigned int n, nread = 0, nwrite = 0;
-  asection *buf;
+  unsigned int n = 0, nread = 0, nwrite = 0;
+  asection *buf = 0;
   unsigned int wantedsz = 0;
 
   // Open input binary
@@ -2602,8 +2565,8 @@ static int read_section(ctx_t * ctx, asection * s)
 */
 int print_msec(ctx_t * ctx)
 {
-  msec_t *ms;
-  unsigned int count;
+  msec_t *ms = 0;
+  unsigned int count = 0;
 
   DL_COUNT(ctx->mshdrs, ms, count);
   printf(" -- %u elements\n", count);
@@ -2619,7 +2582,7 @@ int print_msec(ctx_t * ctx)
 */
 int rd_sections(ctx_t * ctx)
 {
-  unsigned int i;
+  unsigned int i = 0;
 
   asection *s = ctx->abfd->sections;
   for (i = 0; i < ctx->shnum; i++) {
@@ -2629,10 +2592,8 @@ int rd_sections(ctx_t * ctx)
   return 0;
 }
 
-
 int save_dynstr(ctx_t * ctx, GElf_Shdr shdr, char *binary)
 {
-
   if (globalstrtab == 0) {
     globalstrtab = calloc(1, shdr.sh_size + 3);
     globalstrtablen++;		// Start with a null byte
@@ -2646,14 +2607,10 @@ int save_dynstr(ctx_t * ctx, GElf_Shdr shdr, char *binary)
   return 0;
 }
 
-
-
 int save_dynsym(ctx_t * ctx, GElf_Shdr shdr, char *binary)
 {
-
   if (globalsymtab == 0) {
     globalsymtab = calloc(1, sizeof(Elf_Sym) + shdr.sh_size);
-//              globalsymtablen += sizeof(Elf_Sym);             // Skip 1 NULL entry
   } else {
     globalsymtab = realloc(globalsymtab, shdr.sh_size + globalsymtablen);
   }
@@ -2667,13 +2624,9 @@ int save_dynsym(ctx_t * ctx, GElf_Shdr shdr, char *binary)
   return 0;
 }
 
-
 int patch_symbol_index(ctx_t * ctx, Elf_Sym * s)
 {
-  msec_t *sec;
-//  char *sname;
-
-//  sname = globalstrtab + s->st_name;
+  msec_t *sec = 0;
 
   sec = section_from_index(ctx, s->st_shndx);	// section related to this object
   if (sec) {
@@ -2689,9 +2642,8 @@ int patch_symbol_index(ctx_t * ctx, Elf_Sym * s)
 
 int fixup_symtab_section_index(ctx_t * ctx)
 {
-
-  Elf_Sym *s;
-  unsigned int sindex;
+  Elf_Sym *s = 0;
+  unsigned int sindex = 0;
 
   for (sindex = maxnewsec + 1; sindex < globalsymtablen / sizeof(Elf_Sym);
        sindex++) {
@@ -2709,9 +2661,8 @@ int fixup_symtab_section_index(ctx_t * ctx)
 
 int append_reloc(Elf_Rela * r)
 {
-
-  unsigned int i;
-  Elf_Rela *s;
+  unsigned int i = 0;
+  Elf_Rela *s = 0;
 
   // search this address in reloc table
   for (i = 0; i < globalreloclen / sizeof(Elf_Rela); i++) {
@@ -2737,22 +2688,11 @@ int append_reloc(Elf_Rela * r)
 
 }
 
-typedef struct gimport_t {
-  char *sname;
-  msec_t *sec;
-  Elf_Rela *r;
-  int rtype;
-  unsigned int sindex;
-} gimport_t;
-
-gimport_t **gimports = 0;
-unsigned int gimportslen = 0;
-
 int save_global_import(ctx_t * ctx, char *sname, msec_t * sec, Elf_Rela * r, unsigned int sindex)
 {
-  int rtype;
-  gimport_t *g;
-  Elf_Rela *rnew;
+  int rtype = 0;
+  gimport_t *g = 0;
+  Elf_Rela *rnew = 0;
 
   rtype = ELF_R_TYPE(r->r_info);
 
@@ -2787,7 +2727,7 @@ int save_global_import(ctx_t * ctx, char *sname, msec_t * sec, Elf_Rela * r, uns
 */
 int check_global_import(unsigned long int addr)
 {
-  unsigned i;
+  unsigned int i = 0;
 
   if (addr < 4096) {
     return -1;
@@ -2804,16 +2744,15 @@ int check_global_import(unsigned long int addr)
 
 int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend)
 {
-
-  Elf_Sym *s;
+  Elf_Sym *s = 0;
   char *sname = 0;
-  unsigned int i;
+  unsigned int i = 0;
 
-  int rtype, outtype;
-  char *htype;
-  msec_t *sec;
+  int rtype = 0, outtype = 0;
+  char *htype = 0;
+  msec_t *sec = 0;
 
-  Elf_Rela *rout;
+  Elf_Rela *rout = 0;
 
   rout = calloc(1, sizeof(Elf_Rela));	// Work on a copy of the relocation instead of the original one
   memcpy(rout, r, sizeof(Elf_Rela));
@@ -2891,25 +2830,21 @@ int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend)
       printf(" * Not saving Relative relocation %lu %lu\n", rout->r_offset,
              rout->r_addend);
     }
-//              rout->r_offset -= textvma;
+
     return 0;
   } else {			// Jump slots
     if (ctx->opt_debug) {
       printf(" no section info for symbol: %s\n", sname);
     }
-//#define R_386_JUMP_SLOT 7
 
 #ifdef __x86_64__
     outtype = R_X86_64_64;
 #else
     outtype = R_386_32;
-//printf("textvma: %llx\n", textvma);
-//      rout->r_addend = +4;
 #endif
     rout->r_offset -= textvma;
     rout->r_info = ELF_R_INFO(sindex, outtype);
   }
-
 
   if (ctx->opt_debug) {
     htype = reloc_htype(outtype);
@@ -2918,15 +2853,12 @@ int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend)
   }
 
   append_reloc(rout);
-
   return 0;
 }
 
-#include <capstone/capstone.h>
-
 static void print_string_hex(char *comment, unsigned char *str, size_t len)
 {
-  unsigned char *c;
+  unsigned char *c = 0;
 
   printf("%s", comment);
   for (c = str; c < str + len; c++) {
@@ -2941,8 +2873,8 @@ static void print_string_hex(char *comment, unsigned char *str, size_t len)
 static void print_insn_detail(ctx_t * ctx, csh handle, cs_mode mode,
                               cs_insn * ins)
 {
-  int count, i;
-  cs_x86 *x86;
+  int count = 0, i = 0;
+  cs_x86 *x86 = 0;
 
   // detail can be NULL on "data" instruction if SKIPDATA option is turned ON
   if (ins->detail == NULL)
@@ -3052,7 +2984,7 @@ static int create_text_data_reloc(ctx_t * ctx, cs_insn * ins, msec_t * m,
   unsigned int wheretowrite = 0;
   unsigned int n = 0;
   int gimport = -1;
-  cs_x86 *x86;
+  cs_x86 *x86 = 0;
 
   x86 = &(ins->detail->x86);
   n = x86->op_count;
@@ -3257,8 +3189,7 @@ static int create_text_data_reloc(ctx_t * ctx, cs_insn * ins, msec_t * m,
 
 int internal_function_store(ctx_t * ctx, unsigned long long int addr)
 {
-
-  unsigned int i;
+  unsigned int i = 0;
   char buff[200];
   Elf_Sym *s = 0;
 
@@ -3288,9 +3219,9 @@ int internal_function_store(ctx_t * ctx, unsigned long long int addr)
 static void parse_text_data_reloc(ctx_t * ctx, csh ud, cs_mode mode,
                                   cs_insn * ins)
 {
-  int i;
-  cs_x86 *x86;
-  msec_t *m;
+  int i = 0;
+  cs_x86 *x86 = 0;
+  msec_t *m = 0;
   // detail can be NULL on "data" instruction if SKIPDATA option is turned ON
   if (ins->detail == NULL)
     return;
@@ -3365,9 +3296,9 @@ int analyze_text(ctx_t * ctx, char *data, unsigned int datalen,
                  unsigned long int addr)
 {
   csh handle;
-  cs_insn *insn;
-  size_t count;
-  size_t j;
+  cs_insn *insn = 0;
+  size_t count = 0;
+  size_t j = 0;
 
   if (cs_open(CS_ARCH_X86, CS_MODE, &handle)) {
     printf("error: Failed to initialize capstone library\n");
@@ -3411,13 +3342,13 @@ int analyze_text(ctx_t * ctx, char *data, unsigned int datalen,
 */
 int rd_symtab(ctx_t * ctx)
 {
-  Elf *elf;
+  Elf *elf = 0;
   Elf_Scn *scn = NULL;
   GElf_Shdr shdr;
-  int fd;
-  const char *binary;
+  int fd = 0;
+  const char *binary = 0;
   struct stat sb;
-  size_t shstrndx;
+  size_t shstrndx = 0;
   char *sname = 0;
 
   if (ctx->opt_debug) {
@@ -3501,7 +3432,7 @@ int rd_symtab(ctx_t * ctx)
 */
 int rm_section(ctx_t * ctx, char *name)
 {
-  msec_t *s;
+  msec_t *s = 0;
   msec_t *rmsec = 0;
 
   DL_FOREACH(ctx->mshdrs, s) {
@@ -3528,8 +3459,8 @@ int rm_section(ctx_t * ctx, char *name)
 */
 int strip_binary_reloc(ctx_t * ctx)
 {
-  msec_t *s, *tmp;
-  unsigned int allowed, i;
+  msec_t *s = 0, *tmp = 0;
+  unsigned int allowed = 0, i = 0;
 
   if (ctx->opt_verbose) {
     printf("\n -- Stripping\n\n");
@@ -3636,12 +3567,10 @@ unsigned int libify(ctx_t * ctx)
   */
   add_extra_symbols(ctx);
 
-
   /**
   * Parse relocations
   */
   parse_relocations(ctx);
-
 
   /**
   * Fix section indexes in symtab
@@ -3733,6 +3662,7 @@ int print_maps(void)
 {
   char cmd[1024];
 
+  memset(cmd, 0x00, 1024);
   sprintf(cmd, "cat /proc/%u/maps", getpid());
   system(cmd);
   return 0;
@@ -3743,7 +3673,7 @@ int print_maps(void)
 */
 ctx_t *ctx_init(void)
 {
-  ctx_t *ctx;
+  ctx_t *ctx = 0;
 
   bfd_init();
   errno = 0;
@@ -3818,7 +3748,7 @@ int ctx_getopt(ctx_t * ctx, int argc, char **argv)
   const char *short_opt = "ho:i:scSEsxCvVXp:Odm:e:f:D";
   int count = 0;
   struct stat sb;
-  int c;
+  int c = 0;
 
   struct option long_opt[] = {
     {"help", no_argument, NULL, 'h'},
@@ -3982,7 +3912,7 @@ int ctx_getopt(ctx_t * ctx, int argc, char **argv)
 */
 int main(int argc, char **argv)
 {
-  ctx_t *ctx;
+  ctx_t *ctx = 0;
 
   ctx = ctx_init();
   ctx_getopt(ctx, argc, argv);
