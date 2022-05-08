@@ -11,11 +11,14 @@ all::
 	cd wcc && make CFLAGS=" $(CFLAGS)"
 	cd wld && make CFLAGS=" $(CFLAGS)"
 	cd wsh && make CFLAGS=" $(CFLAGS)"
+	cd wldd && make CFLAGS=" $(CFLAGS)"
 	cd tools && make CFLAGS=" $(CFLAGS)"
+
 clean:
 	cd wcc && make clean
 	cd wld && make clean
 	cd wsh && make clean
+	cd wldd && make clean
 	cd tools && make clean
 
 install:
