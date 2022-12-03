@@ -4627,7 +4627,7 @@ unsigned int read_elf_sig(char *fname, struct stat *sb)
 		return 0;	// Failure
 	}
 	fd = open(fname, O_RDONLY);
-	if (errno) {
+	if (fd < 0) {
 		perror("open");
 		return 0;
 	}
