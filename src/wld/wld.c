@@ -123,12 +123,13 @@ int mk_lib(char *name)
       // Patch dynamic section
       for ( j = 0; j < (shdr[i].sh_size/sizeof(Elf_Dyn)) ; j++) {
         switch (dyn->d_tag) {
-        case DT_FLAGS:
-        case DT_POSFLAG_1:
         case DT_BIND_NOW:
             dyn->d_tag = DT_NULL;
             dyn->d_un.d_val = -1;
             break;
+        case DT_FLAGS_1: // Remove PIE flag if present
+          dyn->d_un.d_val = dyn->d_un.d_val & ~DF_1_PIE;
+          break;
         default:
           break;
         }
