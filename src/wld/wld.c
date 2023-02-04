@@ -127,7 +127,8 @@ int mk_lib(char *name)
             dyn->d_tag = DT_NULL;
             dyn->d_un.d_val = -1;
             break;
-        case DT_FLAGS_1: // Remove PIE flag if present
+        case DT_FLAGS_1: // Remove DF_1_NOOPEN and DF_1_PIE flags if present
+          dyn->d_un.d_val = dyn->d_un.d_val & ~DF_1_NOOPEN;
           dyn->d_un.d_val = dyn->d_un.d_val & ~DF_1_PIE;
           break;
         default:
@@ -137,7 +138,13 @@ int mk_lib(char *name)
       }
       break;
     }
-  }  
+
+    // Find .gnu.version section and wipe it clear
+    if(shdr[i].sh_type == SHT_GNU_versym){
+	memset(map + shdr[i].sh_offset, 0x00, shdr[i].sh_size);
+    }
+
+  }
 
   munmap(map, sb.st_size);
   close(fd);

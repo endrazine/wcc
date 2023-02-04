@@ -616,7 +616,8 @@ dynsym:
   if (storage_needed < 0) {
     bfd_perror("warning: bfd_get_dynamic_symtab_upper_bound");
     ret = 0;
-    goto out;
+//    goto out;
+    exit(EXIT_FAILURE);
   }
   if (storage_needed == 0) {
     fprintf(stderr, "warning: no symbols\n");
@@ -1671,6 +1672,15 @@ int fixup_text(ctx_t * ctx)
       s->s_elf->sh_size = newsz;
       // extend data
       s->data = realloc(s->data, newsz);
+      if(!s->data){
+        printf(" ERROR: realloc() %s\n", strerror(errno));
+        exit(EXIT_FAILURE);  
+      }
+
+      if (ctx->opt_debug) {
+        printf("newsize:%x s->len:%x\n",newsz,s->len);
+      }
+
       // pad
       memset(s->data + s->len, 0x00, newsz - s->len);
       s->s_elf->sh_offset = orig_sz;
