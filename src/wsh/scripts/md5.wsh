@@ -1,4 +1,4 @@
-#!/home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wsh/wsh
+#!/usr/bin/wsh
 
 -- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
 

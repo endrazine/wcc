@@ -244,7 +244,7 @@ static unsigned long int resolve_addr(char *symbol, char *libname)
 		return -1;
 	}
 
-	handle = dlopen(libname, BIND_FLAGS);
+	handle = dlopen(libname, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 	if (!handle) {
 		fprintf(stderr, "ERROR: %s\n", dlerror());
 		_Exit(EXIT_FAILURE);
@@ -316,6 +316,7 @@ char *symbol_totype(int n)
 	case 1:
 		return "Object";
 	case 2:
+	case STT_GNU_IFUNC:
 		return "Function";
 	case 3:
 		return "SECTION";
@@ -351,7 +352,7 @@ int scan_symbol(char *symbol, char *libname)
 	unsigned int stype = 0, sbind = 0;
 	int retv = 0;
 
-	handle = dlopen(libname, BIND_FLAGS);
+	handle = dlopen(libname, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 	if (!handle) {
 		fprintf(stderr, "ERROR: %s\n", dlerror());
 		_Exit(EXIT_FAILURE);
@@ -1064,6 +1065,179 @@ int print_phdrs(void)
 	return 0;
 }
 
+const char* indirect_function_names[] = {
+	"__gettimeofday",
+	"__memcmpeq",
+	"__memcpy_chk",
+	"__memmove_chk",
+	"__mempcpy",
+	"__mempcpy_chk",
+	"__memset_chk",
+	"__rawmemchr",
+	"__stpcpy",
+	"__stpncpy",
+	"__strcasecmp",
+	"__strcasecmp_l",
+	"__strncasecmp_l",
+	"__wmemset_chk",
+	"bcmp",
+	"gettimeofday",
+	"index",
+	"memchr",
+	"memcmp",
+	"memcpy",
+	"memmove",
+	"mempcpy",
+	"memrchr",
+	"memset",
+	"rawmemchr",
+	"rindex",
+	"stpcpy",
+	"stpncpy",
+	"strcasecmp",
+	"strcasecmp_l",
+	"strcat",
+	"strchr",
+	"strchrnul",
+	"strcmp",
+	"strcpy",
+	"strcspn",
+	"strlen",
+	"strncasecmp",
+	"strncasecmp_l",
+	"strncat",
+	"strncmp",
+	"strncpy",
+	"strnlen",
+	"strpbrk",
+	"strrchr",
+	"strspn",
+	"strstr",
+	"time",
+	"wcschr",
+	"wcscmp",
+	"wcscpy",
+	"wcslen",
+	"wcsncmp",
+	"wcsnlen",
+	"wcsrchr",
+	"wmemchr",
+	"wmemcmp",
+	"wmemset",
+	NULL
+};
+
+/**
+* Helper function
+*/
+/*
+uintptr_t find_libc_base() {
+    uintptr_t libc_pointer;
+    for(libc_pointer = (uintptr_t)printf & (~0xFFF); *(uint32_t*)libc_pointer != 0x464c457f; libc_pointer-=0x1000);
+    return libc_pointer;
+}
+*/
+#define MAX_NUM_IMPL 256
+
+//From "include/ifunc-impl-list.h"
+struct libc_ifunc_impl
+{
+  /* The name of function to be tested.  */
+  const char *name;
+  /* The address of function to be tested.  */
+  void (*fn) (void);
+  /* True if this implementation is usable on this machine.  */
+  bool usable;
+};
+
+extern size_t __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array, size_t max);
+
+
+/**
+* Load Indirect functions
+*/
+int load_indirect_functions(lua_State * L)
+{
+    struct libc_ifunc_impl entries[MAX_NUM_IMPL];
+
+	int retv = 0;
+
+    for(const char** function_name = indirect_function_names; *function_name; function_name++) {
+        size_t num_entries = __libc_ifunc_impl_list(*function_name, entries, MAX_NUM_IMPL);
+
+	void *addr =  dlsym(NULL, *function_name);
+//	printf("%s %p\n", *function_name, addr);
+
+	Dl_info info;
+	Elf64_Sym *mydlsym = calloc(1, sizeof(Elf64_Sym));
+	if (dladdr1(addr, &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
+//		printf("INFO:dli_fname:%s\n", info.dli_fname);
+//		printf("INFO:dli_fbase:%p\n", info.dli_fbase);
+
+		retv = add_symbol(*function_name, info.dli_fname, "Function", "Global", dlsym(NULL, *function_name)-info.dli_fbase, 8, dlsym(NULL, *function_name));
+	}else{
+		retv = add_symbol(*function_name, "indirect:libc.so", "Function", "Global", dlsym(NULL, *function_name), 8, dlsym(NULL, *function_name));
+	}
+
+	char *luacmd = calloc(1, 2048);
+	snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%p, a, b, c, d, e, f, g, h); return j, k; end\n", *function_name, dlsym(NULL, *function_name));
+	luabuff_append(luacmd);
+	exec_luabuff();
+	free(luacmd);
+
+        for(size_t i = 0; i < num_entries; i++) {
+
+		if (dladdr1((void*)((uintptr_t)entries[i].fn), &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
+//			printf("INFO:dli_fname:%s\n", info.dli_fname);
+//			printf("INFO:dli_fbase:%p\n", info.dli_fbase);
+
+			retv = add_symbol(entries[i].name, info.dli_fname, "Function", "Global", (void*)((uintptr_t)entries[i].fn)-info.dli_fbase, 8, (void*)((uintptr_t)entries[i].fn));
+		}else{
+			retv = add_symbol(entries[i].name, "indirect:libc.so", "Function", "Global", (void*)((uintptr_t)entries[i].fn), 8, (void*)((uintptr_t)entries[i].fn));
+		}
+		char *luacmd = calloc(1, 2048);
+		snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%p, a, b, c, d, e, f, g, h); return j, k; end\n", entries[i].name, (void*)((uintptr_t)entries[i].fn));
+		luabuff_append(luacmd);
+		exec_luabuff();
+		free(luacmd);
+        }
+    }
+
+    return 0;
+
+	return 0;
+}
+
+/**
+* Display Indirect functions
+*/
+int print_indirect_functions(lua_State * L)
+{
+    struct libc_ifunc_impl entries[MAX_NUM_IMPL];
+
+	int retv = 0;
+
+    for(const char** function_name = indirect_function_names; *function_name; function_name++) {
+        size_t num_entries = __libc_ifunc_impl_list(*function_name, entries, MAX_NUM_IMPL);
+
+	void *addr =  dlsym(NULL, *function_name);
+
+	Dl_info info;
+	if (dladdr(addr, &info)) {
+		printf("%p %s %s %p %p\n", addr, *function_name,info.dli_fname, info.dli_fbase, addr - info.dli_fbase);
+	}
+        for(size_t i = 0; i < num_entries; i++) {
+		addr =  dlsym(NULL, *function_name);
+		if (dladdr(addr, &info)) {
+			printf("  %p %s %s %p %p\n", addr, entries[i].name,info.dli_fname, info.dli_fbase, addr - info.dli_fbase);
+		}
+
+        }
+    }
+
+    return 0;
+}
+
 /**
 * Display symbols
 */
@@ -1674,7 +1848,7 @@ int run_shell(lua_State * L)
 {
 	char *input, shell_prompt[4096];
 
-	if (wsh->is_stdinscript) {	// Execute from stdin. don't display promt, read line by line
+	if (wsh->is_stdinscript) {	// Execute from stdin. don't display prompt, read line by line
 		for (;;) {
 			if (fgets(shell_prompt, sizeof(shell_prompt), stdin) == 0 || strcmp(shell_prompt, "cont\n") == 0){
 				return 0;
@@ -2535,6 +2709,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 		* Extract Symbol type
 		*/
 		switch (ELF_ST_TYPE(sym->st_info)) {
+		case STT_GNU_IFUNC:	// Indirect function call (architecture dependant implementation/optimization)
 		case STT_FUNC:
 			htype = "Function";
 			func = 1;
@@ -2823,10 +2998,11 @@ void parse_link_vdso(void)
 {
 	// add extra vdso
 	struct link_map *vdso = 0;
-	vdso = dlopen(EXTRA_VDSO, RTLD_NOW);
+	vdso = dlopen(EXTRA_VDSO, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 	if(wsh->opt_verbose){ printf(" -- Adding extra (arch specific) vdso library: %s at %p\n", EXTRA_VDSO, vdso); }
 	parse_link_map_dyn(vdso);
 }
+
 /**
 * Rescan address space
 */
@@ -2837,7 +3013,7 @@ void rescan(void)
 	empty_symbols();
 	wsh->opt_rescan = 1;
 	parse_link_map_dyn(wsh->mainhandle);
-//	parse_link_vdso();
+	parse_link_vdso();
 	wsh->opt_rescan = 0;
 	exec_luabuff();
 }
@@ -4547,6 +4723,9 @@ int wsh_init(void)
 	// Declare internal functions
 	declare_internals();
 
+	// Load indirect functions
+	load_indirect_functions(wsh->L);
+
 	// Default is to disable core files
 //	disable_core(wsh->L);
 
@@ -4636,6 +4815,29 @@ unsigned int read_elf_sig(char *fname, struct stat *sb)
 	close(fd);
 
 	return strncmp(sig, validelf, 4) ? 0 : 1;
+}
+
+/**
+* Verify ar archive signature in a binary
+*/
+unsigned int read_archive_sig(char *fname, struct stat *sb)
+{
+	int fd = 0;
+	char sig[10];
+//	char validelf[4] = "\177ELF";
+	if (sb->st_size < 20) {
+		return 0;	// Failure
+	}
+	fd = open(fname, O_RDONLY);
+	if (fd < 0) {
+		perror("open");
+		return 0;
+	}
+	memset(sig, 0x00, 10);
+	read(fd, sig, 10);
+	close(fd);
+
+	return strncmp(sig, "!<arch>", 7) ? 0 : 1;
 }
 
 
@@ -4835,6 +5037,40 @@ int add_binary_preload(char *name)
 }
 
 /**
+* Turn a static library into a dynamic library
+*/
+char *ar2lib(char *name)
+{
+	char cmd[1024];
+	char *tmp_dirname = 0;
+
+	/**
+	* Create temporary directory under /tmp/
+	*
+	* NOTE: The directory name written to is predictable.
+	*/
+	tmp_dirname = calloc(20, 1);
+	snprintf(tmp_dirname, 19, "/tmp/.wsh-%u", getpid());
+	if(mkdir(tmp_dirname, 0700)){
+		fprintf(stderr, "!! ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
+		return NULL;
+	}
+
+	// Recompile static library as dynamic library
+	memset(cmd, 0x00, 1024);
+	snprintf(cmd, 1023, "gcc -Wl,--whole-archive %s -Wl,--no-whole-archive  -o /tmp/.wsh-%u/%s.so -shared -rdynamic -ggdb -g3", name, getpid(), basename(name));
+	system(cmd);
+
+	memset(cmd, 0x00, 1024);
+	snprintf(cmd, 1023, "/tmp/.wsh-%u/%s.so", getpid(), basename(name));
+
+	if(verbose){
+		printf(" -- relinked static library (ar archive) %s into dynamic shared library %s\n", name, cmd);	
+	}
+	return strdup(cmd);
+}
+
+/**
 * Patch ELF ehdr->e_type to ET_DYN
 */
 int mk_lib(char *name)
@@ -5003,7 +5239,7 @@ int attempt_to_patch(char *libname)
 		printf("\n\n Libifying more than once per process is likely to crash...\n\n");
 	}
 
-	return dlopen(outlib, RTLD_NOW);
+	return dlopen(outlib, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 }
 
 
@@ -5024,7 +5260,7 @@ struct link_map *do_loadlib(char *libname)
 		printf("  * Loading %s\n", libname);
 	}
 
-	handle = dlopen(libname, RTLD_NOW);
+	handle = dlopen(libname, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 	if (!handle) {
 		fprintf(stderr, "ERROR: dlopen() %s \n", dlerror());
 
@@ -5074,7 +5310,7 @@ int wsh_loadlibs(void)
 */
 int wsh_getopt(int argc, char **argv)
 {
-	const char *short_opt = "hqvVx";
+	const char *short_opt = "hqvVxg";
 	int count = 0;
 	struct stat sb;
 	int c = 0, i = 0;
@@ -5083,6 +5319,7 @@ int wsh_getopt(int argc, char **argv)
 		{"help", no_argument, NULL, 'h'},
 		{"args", no_argument, NULL, 'x'},
 		{"quiet", no_argument, NULL, 'q'},
+		{"global", no_argument, NULL, 'g'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"version", no_argument, NULL, 'V'},
 		{NULL, 0, NULL, 0}
@@ -5102,6 +5339,10 @@ int wsh_getopt(int argc, char **argv)
 		case 'h':
 			wsh_usage(argv[0]);
 			_Exit(EXIT_SUCCESS);
+			break;
+
+		case 'g':
+			wsh->opt_global = 1;
 			break;
 
 		case 'q':
@@ -5145,12 +5386,17 @@ nomoreargs:
 			add_script_arguments(argc, argv, i + 1);
 			break;
 		} else if (!stat(argv[i], &sb)) {	// file exists. Determine if this is a binary or a script
-			if (read_elf_sig(argv[i], &sb)) {
+			if (read_elf_sig(argv[i], &sb)) {		// Process as ELF file
 				if (wsh->opt_verbose) {
 					printf("  * User binary %s\n", argv[i]);
 				}
 				add_binary_preload(argv[i]);
-			} else {
+			}else if (read_archive_sig(argv[i], &sb)) {	// Process as ar archive
+				if (wsh->opt_verbose) {
+					printf("  * ar archive %s\n", argv[i]);
+				}
+				add_binary_preload(ar2lib(argv[i]));
+			} else {					// Process as a script
 				if (wsh->opt_verbose) {
 					printf("  * User script %s\n", argv[i]);
 				}
@@ -5182,12 +5428,13 @@ int wsh_print_version(void)
 */
 int wsh_usage(char *name)
 {
-	printf("Usage: %s [script] [-h|-q|-v|-V] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]\n", name);
+	printf("Usage: %s [script] [-h|-q|-v|-V|-g] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]\n", name);
 	printf("\n");
 	printf("Options:\n\n");
 	printf("    -x, --args                Optional script argument separator\n");
 	printf("    -q, --quiet               Display less output\n");
 	printf("    -v, --verbose             Display more output\n");
+	printf("    -g, --global              Bind symbols globally\n");
 	printf("    -V, --version             Display version and build, then exit\n");
 	printf("\n");
 	printf("Script:\n\n");
@@ -5325,12 +5572,34 @@ int rawmemstrlen(lua_State *L) {
 }
 
 /**
+* int wrptr(addr, data, len)
+*
+* returns number of bytes written.
+*/
+
+int wrptr (lua_State *L) {
+	char *data = 0;
+	size_t offset = 0;
+	char *ptr = 0;
+	read_arg1(data);
+	read_arg2(offset);
+	read_arg3(ptr);
+
+	if(data == NULL){ return 0; }
+	if((unsigned long int)data < 4096){ printf("ERROR: Write to first page forbidden\n"); return 0; }	// 1st page detection
+
+	data[offset] = ptr;
+	lua_pushinteger(L, data);
+	return 1;
+}
+
+/**
 * Set default environment variables in constructor
 */
 
 __attribute__((constructor))
 static void initialize_wsh() {
-	printf("init\n");
+//	printf("init\n");
 	setenv("LIBC_FATAL_STDERR_", "1", 1);
 	setenv("MALLOC_CHECK_", "3", 1);
 }

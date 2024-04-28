@@ -1,3 +1,5 @@
+#!/usr/bin/wsh
+
 -- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
 
 function str2md5(input)

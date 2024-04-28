@@ -1,3 +1,4 @@
+#!/usr/bin/wsh
 
 f = io.open("/bin/pwd", "rb")
 block = 48

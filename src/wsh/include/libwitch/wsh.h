@@ -296,6 +296,7 @@ static int empty_shdrs(void);
 static int getsize(lua_State * L);
 static int newarray(lua_State * L);
 static int print_functions(lua_State * L);
+static int print_indirect_functions(lua_State * L);
 static int print_libs(lua_State * L);
 static int print_objects(lua_State * L);
 static int print_phdrs(void);
@@ -390,6 +391,7 @@ static int rawmemstr   (lua_State *L);
 static int rawmemusage (lua_State *L);
 static int rawmemaddr  (lua_State *L);
 static int rawmemstrlen(lua_State *L);
+static int wrptr (lua_State *L);
 
 static char *lua_strerror(int err);
 
@@ -526,6 +528,7 @@ typedef struct wsh_t {
 
 	unsigned int opt_verbose;
 	unsigned int opt_quiet;
+	unsigned int opt_global;
 	unsigned int opt_hollywood;	// Default = 1;
 
 	unsigned int opt_rescan;

@@ -1,4 +1,8 @@
-#!/home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wsh/wsh
+#!/usr/bin/wsh
+
+libs()
+
+ symbols(0,0,1)
 
  fname="/etc/passwd"
  printf("\n ** Reading file %s\n", fname)
