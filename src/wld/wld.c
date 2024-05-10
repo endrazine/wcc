@@ -6,8 +6,8 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2022 Jonathan Brossard
-* 
+* Copyright (c) 2016-2024 Jonathan Brossard
+*
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
 * in the Software without restriction, including without limitation the rights
@@ -15,13 +15,13 @@
 * copies of the Software, and to permit persons to whom the Software is
 * furnished to do so, subject to the following conditions:
 *
-* The above copyright notice and this permission notice shall be included in 
+* The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
@@ -58,7 +58,7 @@
 /**
 * Patch ELF ehdr->e_type to ET_DYN
 */
-int mk_lib(char *name)
+int mk_lib(char *name, unsigned int noinit)
 {
   int fd;
   struct stat sb;
@@ -123,7 +123,7 @@ int mk_lib(char *name)
       // Patch dynamic section
       for ( j = 0; j < (shdr[i].sh_size/sizeof(Elf_Dyn)) ; j++) {
         switch (dyn->d_tag) {
-        case DT_BIND_NOW:
+        case DT_BIND_NOW: // Remove BIND_NOW flag if present
             dyn->d_tag = DT_NULL;
             dyn->d_un.d_val = -1;
             break;
@@ -131,6 +131,29 @@ int mk_lib(char *name)
           dyn->d_un.d_val = dyn->d_un.d_val & ~DF_1_NOOPEN;
           dyn->d_un.d_val = dyn->d_un.d_val & ~DF_1_PIE;
           break;
+
+        // Optionally ignore constructors and destructors.
+	case DT_INIT_ARRAYSZ:
+            if (noinit) {
+              dyn->d_un.d_val = 0;
+            }
+          break;
+	case DT_INIT_ARRAY:            
+            if (noinit) {
+              dyn->d_un.d_val = 0;
+            }
+          break;
+	case DT_FINI_ARRAYSZ:
+            if (noinit) {
+              dyn->d_un.d_val = 0;
+            }
+          break;
+	case DT_FINI_ARRAY:            
+            if (noinit) {
+              dyn->d_un.d_val = 0;
+            }
+          break;
+
         default:
           break;
         }
@@ -162,12 +185,17 @@ int main(int argc, char **argv)
 
   if ((argc < 2)||(strncmp(argv[1],"-libify",7))) {
     print_version();
-    printf("\nUsage: %s [options] file\n", argc > 0 ? argv[0] : DEFAULT_NAME);
-    printf("\noptions:\n\n    -libify          Set Class to ET_DYN in input ELF file.\n\n");
+    printf("\nUsage: %s -libify [-noinit] file\n", argc > 0 ? argv[0] : DEFAULT_NAME);
+    printf("\nOptions:\n    -libify          Transform executable into shared library.\n");
+    printf("    -noinit          Ignore constructors and desctructors in output library.\n");
     exit(EXIT_FAILURE);
   }
 
-  mk_lib(argv[2]);
+  if ((argc >= 3)&&(!strncmp(argv[2],"-noinit",7))) {
+    mk_lib(argv[3], 1);
+  } else {
+    mk_lib(argv[2], 0);
+  }
 
   return 0;
 }

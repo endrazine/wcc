@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2022 Jonathan Brossard
+* Copyright (c) 2016-2024 Jonathan Brossard
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
 * in the Software without restriction, including without limitation the rights
@@ -632,6 +632,8 @@ int wsh_usage(char *name);
 int wsh_print_version(void);
 void _exit(int status);
 void exit(int status);
+int luabuff_append(char *cmd);
+int exec_luabuff(void);
 
 /*
 int newarray(lua_State * L);

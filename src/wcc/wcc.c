@@ -6,8 +6,8 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2022 Jonathan Brossard
-* 
+* Copyright (c) 2016-2024 Jonathan Brossard
+*
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
 * in the Software without restriction, including without limitation the rights
@@ -1678,7 +1678,7 @@ int fixup_text(ctx_t * ctx)
       }
 
       if (ctx->opt_debug) {
-        printf("newsize:%x s->len:%x\n",newsz,s->len);
+        printf("newsize:%x s->len:%lx\n",newsz,s->len);
       }
 
       // pad
