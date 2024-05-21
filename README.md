@@ -352,5 +352,5 @@ The Witchcraft Compiler Collection uses the following amazing Open Source third 
 
 ## Licence
 The Witchcraft Compiler Collection is published under the MIT License.
-Please refer to the file named LICENSE for more information.
+Please refer to the file named [LICENSE](LICENSE) for more information.
 
