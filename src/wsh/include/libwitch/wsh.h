@@ -357,6 +357,8 @@ static int shdrs(lua_State * L);
 static int verbose(lua_State * L);
 static int xalloc(lua_State * L);
 static int ralloc(lua_State * L);
+static int getptr(lua_State * L);
+static int mkptr(lua_State * L);
 
 static int headers(lua_State * L);
 static int prototypes(lua_State * L);

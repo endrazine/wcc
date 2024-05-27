@@ -120,7 +120,9 @@ char *default_options[] = {
 "script",
 "enablecore",
 "disablecore",
-"gencore"
+"gencore",
+"getptr",
+"mkptr"
 };
 
 // All lua 5.3 Functions and global variables
@@ -382,7 +384,9 @@ tuple_t exposed[] = {
 {wsh_appear, "appear"},
 {wsh_hide, "hide"},
 {wsh_appear, "unhide"},
-{wsh_hide, "unappear"}
+{wsh_hide, "unappear"},
+{getptr, "getptr"},
+{mkptr, "mkptr"}
 };
 
 range_t ranges[] = {

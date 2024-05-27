@@ -7,11 +7,22 @@
 # This file is licensed under MIT License.
 #
 
-CFLAGS := -W -Wall -Wno-discarded-qualifiers -Wno-int-conversion -Wno-unused-parameter -Wno-unused-function -Wno-unused-result -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -masm=intel -rdynamic -D_FORTIFY_SOURCE=2 -O2
+COMPILER_VERSION := $(shell $(CC) --version)
+ifneq '' '$(findstring clang,$(COMPILER_VERSION))'
+  ASAN   := -fsanitize=address -static-libsan
+else
+  ASAN   := -fsanitize=address -static-libasan
+endif
+
+CFLAGS := -W -Wall -Wno-discarded-qualifiers -Wno-int-conversion -Wno-unused-parameter -Wno-unused-function -Wno-unused-result -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -masm=intel -rdynamic -D_FORTIFY_SOURCE=2 -O2 
+
 
 all:
 	mkdir -p bin
 	cd src && make CFLAGS=" $(CFLAGS)"
+
+asan: CFLAGS += $(ASAN)
+asan: all
 
 documentation:
 	cd src && doxygen ./tex/project.cfg

@@ -36,13 +36,25 @@
 #include <uthash.h>
 #include <utlist.h>
 #include <libgen.h>	// For basename()
+#include <lauxlib.h>
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
-# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address)) __attribute__((disable_sanitizer_instrumentation))
 #else
 # define ATTRIBUTE_NO_SANITIZE_ADDRESS
 #endif
+
+#if defined(__has_feature)
+#   if __has_feature(address_sanitizer) // clang
+#       define __SANITIZE_ADDRESS__ 	// GCC
+#   endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+#define HAS_ASAN 1
+#endif
+
 
 #ifndef __amd64__
 #define REG_RIP    16
@@ -2226,6 +2238,35 @@ void print_syscall(pid_t child, int syscall_req) {
 }
 */
 
+#ifdef HAS_ASAN
+ATTRIBUTE_NO_SANITIZE_ADDRESS
+size_t mystrlen(char *ptr)
+{
+	unsigned int ret = 0;
+
+	while(ptr[ret] != 0){ ret++;}
+
+	return ret;
+}
+
+ATTRIBUTE_NO_SANITIZE_ADDRESS
+void *mymemset(void *s, int c, size_t n)
+{
+	unsigned int i = 0;
+	char *ptr = 0;
+
+	ptr = s;
+	for(i = 0; i < n ; i++){
+		ptr[i] = c;
+	}
+
+	return s;
+}
+#else
+#define mystrlen strlen
+#define mymemset memset
+#endif
+
 /**
 * Main wrapper around a library call.
 * This function returns 9 values: ret (returned by library call), errno, firstsignal, total number of signals, firstsicode, firsterrno, faultaddr, reason, context
@@ -2388,17 +2429,21 @@ static int libcall(lua_State * L)
 
 		// is it a string ?
 		char *ptr = ret;
-		for (j = 0; j < strlen(ret); j++) {
+		for (j = 0; j < mystrlen(ret); j++) {
 			if (!isascii((ptr[j]))) {
 				notascii = 1;
 				break;
 			}
 		}
 
+#ifdef HAS_ASAN
+		if ((!notascii)&&(mystrlen(ret) >= 1)) {
+#else
 		if (!notascii) {
+#endif
 			lua_pushstring(L, ret);	// Ascii : push string
 		} else {
-			lua_pushinteger(L, ret);	// Push as a number
+			lua_pushinteger(L, ret);// Push as a number
 		}
 	} else {
 		lua_pushinteger(L, ret);	// Push as a number
@@ -4084,10 +4129,10 @@ int ralloc(lua_State * L)
 
 	mprotect(ptr, sz, PROT_EXEC | PROT_READ | PROT_WRITE);
 
-	memset(ptr, poison ? poison : default_poison + global_xalloc, sz);	// map with default poison bytes
+	mymemset(ptr, poison ? poison : default_poison + global_xalloc, sz);	// map with default poison bytes
 	global_xalloc++;
 
-	memset(ptr,poison, size % 4096);
+	mymemset(ptr,poison, size % 4096);
 
 	mprotect(ptr, sz, PROT_READ);
 
@@ -4143,7 +4188,7 @@ int xalloc(lua_State * L)
 
 	mprotect(ptr, sz, PROT_EXEC | PROT_READ | PROT_WRITE);
 
-	memset(ptr, poison ? poison : default_poison + global_xalloc, sz);	// map with default poison bytes
+	mymemset(ptr, poison ? poison : default_poison + global_xalloc, sz);	// map with default poison bytes
 	global_xalloc++;
 
 	if(!poison){	// If autoref, overwrite all the content with address of our own buffer
@@ -5603,4 +5648,123 @@ static void initialize_wsh() {
 	setenv("LIBC_FATAL_STDERR_", "1", 1);
 	setenv("MALLOC_CHECK_", "3", 1);
 }
+
+
+/**
+* Methods for manipulating arrays of strings from lua
+*
+
+
+// metatable method for handling "array[index]"
+static int array_index (lua_State* L) { 
+   int** parray = luaL_checkudata(L, 1, "array");
+   int index = luaL_checkinteger(L, 2);
+   lua_pushnumber(L, (*parray)[index-1]);
+   return 1; 
+}
+
+// metatable method for handle "array[index] = value"
+static int array_newindex (lua_State* L) { 
+   int** parray = luaL_checkudata(L, 1, "array");
+   int index = luaL_checkinteger(L, 2);
+   int value = luaL_checkinteger(L, 3);
+   (*parray)[index-1] = value;
+   return 0; 
+}
+
+void luaL_openlib(lua_State *L, const char *libname, const luaL_Reg *l, int nup) {
+
+  if ( libname ) {
+    lua_getglobal(L, libname); 
+    if (lua_isnil(L, -1)) { 
+      lua_pop(L, 1); 
+      lua_newtable(L); 
+    }
+  }
+  luaL_setfuncs(L, l, 0); 
+  if ( libname )   lua_setglobal(L, libname);
+}
+
+// create a metatable for our array type
+static void create_array_type(lua_State* L) {
+   static const struct luaL_reg array[] = {
+      { "__index",  array_index  },
+      { "__newindex",  array_newindex  },
+      NULL, NULL
+   };
+   luaL_newmetatable(L, "array");
+   luaL_openlib(L, NULL, array, 0);
+}
+
+// expose an array to lua, by storing it in a userdata with the array metatable
+static int expose_array(lua_State* L, int array[]) {
+   int** parray = lua_newuserdata(L, sizeof(int**));
+   *parray = array;
+   luaL_getmetatable(L, "array");
+   lua_setmetatable(L, -2);
+   return 1;
+}
+
+// test data
+int mydata[] = { 1, 2, 3, 4 };
+
+// test routine which exposes our test array to Lua 
+static int getarray (lua_State* L) { 
+   return expose_array( L, mydata ); 
+}
+
+int  luaopen_array (lua_State* L) {
+   create_array_type(L);
+
+   // make our test routine available to Lua
+   lua_register(L, "array", getarray);
+   return 0;
+}
+
+*/
+
+
+
+
+
+/**
+* Get a pointer to a variable
+*/
+int getptr(lua_State * L)
+{
+	char *vname = 0;
+
+	read_arg1(vname);
+	if(!vname){
+		printf("ERROR: missing name of variable\n");
+		return 0;
+	}
+
+	lua_pushlightuserdata(L, vname);
+
+	return 1;
+}
+
+/**
+* Create a pointer to a variable
+*/
+int mkptr(lua_State * L)
+{
+	char *vname = 0;
+	char **newptr = 0;
+
+	read_arg1(vname);
+	if(!vname){
+		printf("ERROR: missing name of variable\n");
+		return 0;
+	}
+
+	newptr = calloc(1, sizeof(char*));
+	newptr[0] = vname;
+
+	lua_pushinteger(L, newptr);
+
+	return 1;
+}
+
 

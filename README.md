@@ -19,23 +19,9 @@ The Witchcraft Compiler Collection requires the following software to be install
     capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make
 
 ### Installation Requirements on Ubuntu/Debian
-Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 14.04):
+Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 22.04):
     
-    # Required for add-apt-repository
-    sudo apt-get install python-software-properties software-properties-common
-
-    # Add repo for clang
-    sudo add-apt-repository ppa:kxstudio-team/builds
-    sudo apt-get update
-
-    # Install dependencies
-    sudo apt-get install binutils-dev clang libelf-dev libgsl0-dev libiberty-dev libreadline6 libreadline6-dev make uthash-dev
-
-    # Install latest capstone and capstone-dev from "Ubuntu 14.04 - DEB packages" http://www.capstone-engine.org/download.html
-    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
-    sudo dpkg -i libcapstone3_3.0.4-0.1ubuntu1_amd64.deb
-    wget http://www.capstone-engine.org/download/3.0.4/ubuntu-14.04/libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
-    sudo dpkg -i libcapstone-dev_3.0.4-0.1ubuntu1_amd64.deb
+    sudo apt-get install -y clang libbfd-dev uthash-dev libelf-dev libcapstone-dev  libreadline-dev libiberty-dev libgsl-dev build-essential git debootstrap file
 
 ## Building and Installing:
 
@@ -76,14 +62,13 @@ The following commands constitute the core of the Witchcraft Compiler Collection
 wld takes an ELF executable as an input and modifies it to create a shared library.
 #### wld command line options
 	jonathan@blackbox:~$ wld
-	Witchcraft Compiler Collection (WCC) version:0.0.1    (23:11:13 Jul 21 2016)
+	Witchcraft Compiler Collection (WCC) version:0.0.6    (18:10:51 May 10 2024)
 
-	Usage: wld [options] file
+	Usage: wld -libify [-noinit] file
 
-	options:
-
-	    -libify          Set Class to ET_DYN in input ELF file.
-
+	Options:
+	    -libify          Transform executable into shared library.
+	    -noinit          Ignore constructors and desctructors in output library.
 	jonathan@blackbox:~$ 
 #### Example usage of wld
 The following example libifies the executable /bin/ls into a shared library named /tmp/ls.so.
@@ -100,7 +85,7 @@ The wcc compiler takes binaries (ELF, PE, ...) as an input and creates valid ELF
 
 #### wcc command line options
 	jonathan@blackbox:~$ wcc
-	Witchcraft Compiler Collection (WCC) version:0.0.1    (01:47:53 Jul 29 2016)
+	Witchcraft Compiler Collection (WCC) version:0.0.6    (18:10:50 May 10 2024)
 
 	Usage: wcc [options] file
 
@@ -125,6 +110,7 @@ The wcc compiler takes binaries (ELF, PE, ...) as an input and creates valid ELF
 	    -v, --verbose
 	    -V, --version
 
+
 	jonathan@blackbox:~$ 
 
 #### Example usage of wcc
@@ -148,13 +134,15 @@ The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Wi
 #### wsh command line options
 
 	jonathan@blackbox:~$ wsh -h
-	Usage: wsh [script] [options] [binary1] [binary2] ... [-x] [script_arg1] [script_arg2] ...
+	Usage: wsh [script] [-h|-q|-v|-V|-g] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]
 
 	Options:
 
-	    -x, --args                Optional script argument separator.
-	    -v, --verbose
-	    -V, --version
+	    -x, --args                Optional script argument separator
+	    -q, --quiet               Display less output
+	    -v, --verbose             Display more output
+	    -g, --global              Bind symbols globally
+	    -V, --version             Display version and build, then exit
 
 	Script:
 
@@ -167,6 +155,7 @@ The witchcraft shell accepts ELF shared libraries, ELF ET_DYN executables and Wi
 	    The last binary loaded is the main binary analyzed.
 
 	jonathan@blackbox:~$ 
+
 
 #### Example usage of wsh
 The following command loads the /usr/sbin/apache2 executable within wsh, calls the ap_get_server_banner() function within
