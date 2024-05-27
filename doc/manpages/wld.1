@@ -3,7 +3,7 @@
 wld \- transform executables into shared libaries
 .SH SYNOPSIS
 .B wld
-[\fIoptions\fR] \fIfile\fR
+\fI-libify\fR [\fI-noinit\fR] \fIfile\fR
 .SH DESCRIPTION
 The Witchcraft Linker is part of the Witchcraft Compiler Collection.
 .PP
@@ -11,6 +11,9 @@ Options:
 .TP
 \fB\-libify\fR
 Libifies input ELF executable into a shared library.
+.TP
+\fB\-noinit\fR
+Ignore constructors and desctructors in output library.
 .SH EXAMPLES
 .TP
 cp /bin/cat /tmp && wld -libify /tmp/cat
