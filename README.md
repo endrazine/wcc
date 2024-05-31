@@ -339,6 +339,10 @@ The Witchcraft Compiler Collection uses the following amazing Open Source third 
   - Qemu, in particular its user space mode : https://qemu-project.gitlab.io/qemu/user/main.html
   - Uthash and Utlist, Hash tables and linked list implemented as C headers https://troydhanson.github.io/uthash/
 
+## Testing
+
+The following companion repository exsists to help test WCC: https://github.com/endrazine/wcc-tests
+
 ## Licence
 The Witchcraft Compiler Collection is published under the MIT License.
 Please refer to the file named [LICENSE](LICENSE) for more information.
