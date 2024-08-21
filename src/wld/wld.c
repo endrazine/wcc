@@ -55,6 +55,8 @@
 
 #define DEFAULT_NAME "wld"
 
+#define DF_1_PIE        0x08000000
+
 /**
 * Patch ELF ehdr->e_type to ET_DYN
 */
