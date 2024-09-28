@@ -173,7 +173,7 @@ int process_sections64(char *map, unsigned int noinit, unsigned int strip_vernum
 	shnum = elf64->e_shnum;
 
 	if (!shnum) {
-		printf(" !! ERROR: Binary has no section headers\n");
+		printf(" !! ERROR: Binary has no section headers, try using option -S\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -349,7 +349,7 @@ int process_sections32(char *map, unsigned int noinit, unsigned int strip_vernum
 	shnum = elf32->e_shnum;
 
 	if (!shnum) {
-		printf(" !! ERROR: Binary has no section headers\n");
+		printf(" !! ERROR: Binary has no section headers, try using option -S\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -526,7 +526,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 
-		c = getopt_long(argc, argv, "lnNs", long_options, &option_index);
+		c = getopt_long(argc, argv, "lnNsS", long_options, &option_index);
 		if (c == -1)
 			break;
 
