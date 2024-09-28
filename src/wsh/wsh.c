@@ -1462,7 +1462,7 @@ int print_libs(lua_State * L)
 	/* create result table */
 	lua_newtable(L);
 
-	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
+	DL_FOREACH_SAFE(wsh->phdrs, s, stmp) {
 			if(strncmp(lastlib,s->libname,strlen(lastlib))){
 				scount++;
 				printf("%s\n",s->libname);
@@ -1471,8 +1471,6 @@ int print_libs(lua_State * L)
 				lua_pushnumber(L, scount);		/* push key */
 			        lua_pushstring(L, s->libname);		/* push value */
 			        lua_settable(L, -3);
-
-
 			}
 			lastlib = s->libname;
 	}
@@ -1488,25 +1486,25 @@ int print_libs(lua_State * L)
 	lua_settable(L, -3);
 
 	/* add self and vdso as shared library */
-/*	if(wsh->opt_appear){
+	if(wsh->opt_appear){
 		// self
 		scount++;
 		printf("%s\n",wsh->selflib);
 
-		// Add function to Lua table //
+		// Add function to Lua table
 		lua_pushnumber(L, scount);
 	        lua_pushstring(L, wsh->selflib);
 	        lua_settable(L, -3);
 
 	}
-*/
+
 	printf("\n");
 	printf(" -- Total: %u libraries\n", scount);	
 
 	// Return scount as second return value
 	lua_pushinteger(L, scount);
 
-	return 2;	// Return 1 table + number of match
+	return 2;	// Return 1 table + number of matches
 }
 
 /**
@@ -1520,7 +1518,6 @@ int print_shdrs(void)
 	char *segmenttype = "";
 	char *segmentperms = "";
 	segments_t *seg = 0;
-
 
 	DL_COUNT(wsh->shdrs, s, scount);
 
@@ -2992,7 +2989,6 @@ int parse_link_map_dyn(struct link_map *map)
 		if (map->l_next) {	// expose ourselved
 			map = map->l_next;
 		}
-
 	}
 
 	while (map) {
