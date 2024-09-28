@@ -50,3 +50,9 @@ int main(int argc, char **argv, char **envp)
 	return 42;
 }
 
+//int wshmain(int argc, char **argv, char **envp) __attribute__((alias("main"))); 
+
+int wshmain()
+{
+    main(1, &"wsh", environ);
+}

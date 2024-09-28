@@ -22,7 +22,8 @@ all::
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o wshmain.o -o wsh -Wl,-T -Wl,script.lds -liberty $(OBJLIB) -ldl
-
+	cp wsh libwsh.so
+	../wld/wld -l libwsh.so
 	cp wsh ../../bin/
 
 test:
@@ -43,7 +44,7 @@ install::
 	mkdir -p $(DESTDIR)/usr/share/wcc/
 	cp -r ./scripts $(DESTDIR)/usr/share/wcc/
 	cp wsh $(DESTDIR)/usr/bin/wsh
-
+	cp libwsh.so $(DESTDIR)/lib/x86_64-linux-gnu/
 uninstall::
 	rm -rf $(DESTDIR)/usr/share/wcc/
 	rm -f $(DESTDIR)/usr/bin/wsh

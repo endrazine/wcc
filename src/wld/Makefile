@@ -20,7 +20,7 @@ CFLAGS	:= -W -Wall -Wno-discarded-qualifiers -Wno-int-conversion -Wno-unused-par
 
 all::
 	$(CC) $(CFLAGS) wld.c -o wld -lbfd
-#	$(CC) $(CFLAGS) wld.c -o wld32 -m32 ../lib32/usr/lib/libbfd.a
+#	$(CC) $(CFLAGS) wld.c -o wld32 -m32
 
 	cp wld ../../bin/
 #	cp wld32 ../../bin/
