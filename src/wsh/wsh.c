@@ -5127,9 +5127,9 @@ int mk_lib(char *name)
   Elf64_Ehdr *ehdr64;
 
   Elf_Ehdr *elf = 0;
-  Elf_Shdr *shdr = 0;
+  Elf_Phdr *phdr = 0;
   Elf_Dyn *dyn;
-  unsigned int shnum = 0;
+  unsigned int phnum = 0;
   unsigned int i = 0, j = 0;
 
   fd = open(name, O_RDWR);
@@ -5171,17 +5171,18 @@ int mk_lib(char *name)
   /**
   * Work around : https://patchwork.ozlabs.org/project/glibc/patch/20190312130235.8E82C89CE49C@oldenburg2.str.redhat.com/
   * We need to find and nullify entries DT_FLAGS, DT_FLAGS_1 and DT_BIND_NOW in dynamic section
+  * Use segments instead of sections so we may load ELFs without section headers.
   */
   elf = (Elf_Ehdr *) map;
-  shdr = (Elf_Shdr *) (map + elf->e_shoff);
-  shnum = elf->e_shnum;
+  phdr = (Elf_Phdr *) (map + elf->e_phoff);
+  phnum = elf->e_phnum;
 
-  for ( i = 0; i < shnum ; i++) {
-    // Find dynamic section
-    if(shdr[i].sh_type == SHT_DYNAMIC){
-      dyn = map + shdr[i].sh_offset;
-      // Patch dynamic section
-      for ( j = 0; j < (shdr[i].sh_size/sizeof(Elf_Dyn)) ; j++) {
+  for ( i = 0; i < phnum ; i++) {
+    // Find dynamic segment
+    if(phdr[i].p_type == PT_DYNAMIC){
+      dyn = map + phdr[i].p_offset;
+      // Patch dynamic segment
+      for ( j = 0; j < (phdr[i].p_filesz/sizeof(Elf_Dyn)) ; j++) {
         switch (dyn->d_tag) {
         case DT_FLAGS:
         case DT_POSFLAG_1:
@@ -5210,7 +5211,6 @@ int mk_lib(char *name)
 int attempt_to_patch(char *libname)
 {
 	struct stat sb;
-//	int err = 0;
 	int fdin = 0, fdout = 0;
 	unsigned int copied = 0;
 	char *tmp_dirname = 0;
@@ -5243,7 +5243,6 @@ int attempt_to_patch(char *libname)
 	snprintf(tmp_dirname, 19, "/tmp/.wsh-%u", getpid());
 	if(mkdir(tmp_dirname, 0700)){
 		fprintf(stderr, "!! ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
-//		return 0; // Fail
 	}
 
 	/**
@@ -5260,8 +5259,6 @@ int attempt_to_patch(char *libname)
 		fprintf(stderr, "!! ERROR : open(%s, O_RDWR) %s\n", outlib, strerror(errno));
 		return 0; // Fail
 	}
-
-//	printf(" ** Zero copy\n");
 
 	/**
 	* Copy binary under newly created directory, with Zero copy data (sendfile())
