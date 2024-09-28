@@ -30,7 +30,7 @@ test:
 	cd tests && make
 
 clean::
-	rm wsh helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o learnwitch.log -f
+	rm wsh helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o learnwitch.log libwsh.so -f
 	cd openlibm && make clean
 	cd lua && make clean
 	cd tests && make clean
@@ -48,6 +48,7 @@ install::
 uninstall::
 	rm -rf $(DESTDIR)/usr/share/wcc/
 	rm -f $(DESTDIR)/usr/bin/wsh
+	rm -f $(DESTDIR)/lib/x86_64-linux-gnu/libwsh.so
 
 binfmt:
 	sudo update-binfmts --install wsh /usr/bin/wsh --extension wsh
