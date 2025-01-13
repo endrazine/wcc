@@ -37,6 +37,11 @@
 #include <utlist.h>
 #include <libgen.h>	// For basename()
 #include <lauxlib.h>
+#include <sys/sendfile.h> // For sendfile()
+
+// Forward declarations
+int wsh_usage(char *name);
+int wsh_print_version(void);
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
