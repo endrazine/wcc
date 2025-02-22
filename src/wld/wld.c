@@ -173,7 +173,7 @@ int process_sections64(char *map, unsigned int noinit, unsigned int strip_vernum
 	shnum = elf64->e_shnum;
 
 	if (!shnum) {
-		printf(" !! ERROR: Binary has no section headers, try using option -S\n");
+		printf("!! ERROR: Binary has no section headers, try using option -S\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -349,7 +349,7 @@ int process_sections32(char *map, unsigned int noinit, unsigned int strip_vernum
 	shnum = elf32->e_shnum;
 
 	if (!shnum) {
-		printf(" !! ERROR: Binary has no section headers, try using option -S\n");
+		printf("!! ERROR: Binary has no section headers, try using option -S\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -439,23 +439,23 @@ int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned 
 
 	fd = open(name, O_RDWR);
 	if (fd <= 0) {
-		printf(" !! couldn't open %s : %s\n", name, strerror(errno));
+		printf("!! ERROR: couldn't open %s : %s\n", name, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
 	if (fstat(fd, &sb) == -1) {
-		printf(" !! couldn't stat %s : %s\n", name, strerror(errno));
+		printf("!! ERROR: couldn't stat %s : %s\n", name, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
 	if ((unsigned int) sb.st_size < sizeof(Elf32_Ehdr)) {
-		printf(" !! file %s is too small (%u bytes) to be a valid ELF.\n", name, (unsigned int) sb.st_size);
+		printf("!! ERROR: file %s is too small (%u bytes) to be a valid ELF.\n", name, (unsigned int) sb.st_size);
 		exit(EXIT_FAILURE);
 	}
 
 	map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (map == MAP_FAILED) {
-		printf(" !! couldn't mmap %s : %s\n", name, strerror(errno));
+		printf("!! ERROR: couldn't mmap %s : %s\n", name, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -479,7 +479,7 @@ int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned 
 		}
 		break;
 	default:
-		printf(" !! unknown ELF class\n");
+		printf("!! ERROR: unknown ELF class\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -553,24 +553,24 @@ int main(int argc, char **argv)
 			break;
 
 		default:
-			fprintf(stderr, " [!!] unknown option : '%c'\n", c);
+			fprintf(stderr, "!! ERROR: unknown option : '%c'\n", c);
 			return NULL;
 
 		}
 	}
 
 	if (optind == argc) {
-		printf("\nNot enough parameters\n\n");
+		printf("\n!! ERROR: Not enough parameters\n\n");
 		usage(argv[0]);
 	}
 
 	if (optind != argc - 1) {
-		printf("\nToo many parameters\n\n");
+		printf("\n!! ERROR: Too many parameters\n\n");
 		usage(argv[0]);
 	}
 
 	if (!libify_flag) {
-		printf("\n--libify option not set : not processing\n\n");
+		printf("\n!! ERROR: --libify option not set : not processing\n\n");
 		usage(argv[0]);
 	}
 	// assume given argument is an input file, find absolute path
