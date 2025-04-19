@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2024 Jonathan Brossard
+* Copyright (c) 2016-2025 Jonathan Brossard
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -424,7 +424,7 @@ void completion(const char *buf, linenoiseCompletions * lc)
 
 		return;
 		break;
-	default:		// Input buffer is non empty:
+	default:// Input buffer is non empty:
 		// the n first characters need to stay,
 		// the last word needs to be completed with possible options
 		opt = strdup(buf);
@@ -497,7 +497,6 @@ int disable_aslr(void)
 int enable_aslr(void)
 {
 	int fd = 0;
-//      char c = 0x31;
 	char c = 0x32;
 
 	fd = open(PROC_ASLR_PATH, O_RDWR);
@@ -1183,7 +1182,6 @@ int load_indirect_functions(lua_State * L)
         size_t num_entries = __libc_ifunc_impl_list(*function_name, entries, MAX_NUM_IMPL);
 
 	void *addr =  dlsym(NULL, *function_name);
-//	printf("%s %p\n", *function_name, addr);
 
 	Dl_info info;
 	Elf64_Sym *mydlsym = calloc(1, sizeof(Elf64_Sym));
@@ -1232,8 +1230,6 @@ int print_indirect_functions(lua_State * L)
 {
     struct libc_ifunc_impl entries[MAX_NUM_IMPL];
 
-//	int retv = 0;
-
     for(const char** function_name = indirect_function_names; *function_name; function_name++) {
         size_t num_entries = __libc_ifunc_impl_list(*function_name, entries, MAX_NUM_IMPL);
 
@@ -1248,7 +1244,6 @@ int print_indirect_functions(lua_State * L)
 		if (dladdr(addr, &info)) {
 			printf("  %p %s %s %p %lx\n", addr, entries[i].name,info.dli_fname, info.dli_fbase, addr - info.dli_fbase);
 		}
-
         }
     }
 
@@ -3009,16 +3004,46 @@ int parse_link_map_dyn(struct link_map *map)
 */
 int exec_luabuff(void)
 {
+	char *buff = 0;
+	unsigned int n = 0;
+	char line[4096];
+
 	int err = 0;
 
 	if(wsh->luabuffsz == 0){ return 0; }
+
 
 	/**
 	* Load buffer in lua
 	*/
 	if ((err = luaL_loadbuffer(wsh->L, wsh->luabuff, strlen(wsh->luabuff), "=Wsh internal lua buffer")) != 0) {
 		printf("ERROR: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
-		fatal_error(wsh->L, "Wsh internal lua initialization failed");
+		//
+		// Run line by line instead...
+		//
+		memset(line, 0x00, 4096);
+
+		buff = wsh->luabuff;
+		while (sscanf(buff, "%[^\n]\n%n", line, &n) == 1) {		    
+			if ((err = luaL_loadbuffer(wsh->L, line, strlen(line), "=Wsh internal lua buffer")) != 0) {
+				goto skipthisone;
+			}
+		    
+	    		if(lua_pcall(wsh->L, 0, 0, 0)){
+				fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+			}
+skipthisone:
+		    
+			buff += n;            
+			memset(line, 0x00, 4096);
+		}
+
+		free(wsh->luabuff);
+		wsh->luabuff = 0;
+		wsh->luabuffsz = 0;
+
+		return 0;
+
 	}
 
 	/**
@@ -5227,8 +5252,6 @@ int attempt_to_patch(char *libname)
 		return 0; // Fail
 	}
 
-//	printf("%s : %u bytes\n", libname, sb.st_size);
-
 	fdin = open(libname, O_RDONLY, 0700);
 	if (fdin < 0) {
 		fprintf(stderr, "!! ERROR : open(%s, O_RDONLY) %s\n", libname, strerror(errno));
@@ -5292,7 +5315,6 @@ int attempt_to_patch(char *libname)
 struct link_map *do_loadlib(char *libname)
 {
 	struct link_map *handle = 0;
-//	unsigned long int ret = 0;
 
 	if((!libname)||(!strlen(libname))){
 		printf("ERROR: missing name of binary to load\n");
@@ -5318,11 +5340,10 @@ struct link_map *do_loadlib(char *libname)
 	}
 
 	if (wsh->opt_verbose) {
-//		printf("  * Base address: %p for %s\n", (void *) handle->l_addr, libname);
 		printf("  * Base address: %p\n", (void *) handle->l_addr);
 	}
 
-	dlerror();		// Clear any existing load error
+	dlerror();			// Clear any existing load error
 	wsh->mainhandle = handle;	// Last loaded object is always the new handle
 	return handle;
 }

@@ -1,6 +1,6 @@
 #
 # This file is part of the Witchcraft Compiler Collection
-# Copyright 2016-2024 Jonathan Brossard
+# Copyright 2016-2025 Jonathan Brossard
 #
 # Homepage: https://github.com/endrazine/wcc/
 #

@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2024 Jonathan Brossard
+* Copyright (c) 2016-2025 Jonathan Brossard
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -2373,16 +2373,81 @@ void hexdump(unsigned char *data, size_t size)
 	}
 }
 
+int list_matching_formats(char **q)
+{
+        char **p = q;
+
+        if (!p || !*p) {
+                return -1;
+        }
+
+        printf(" ** Matching formats:\n    ");
+        while (*p) {
+                printf(" %s", *p++);
+        }
+
+        printf("\n");
+
+        return 0;
+}
+
+
 /**
 * Open a binary the best way we can
 */
 unsigned int open_best(ctx_t *ctx)
 {
 	int formatok = 0;
+	int ok = 0;
+	char *target = NULL;
 
+        char **matching = 0;
+        unsigned int retries = 0;
+
+      retry:
 	// Open as object
 	formatok = bfd_check_format(ctx->abfd, bfd_object);
+	if(!formatok) { 
+                fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
+                err("bfd_check_format() failed\n");
+        }else{
+        	printf("Fileformat ok: %x\n", formatok);
+        }
+        ok = bfd_check_format_matches(ctx->abfd, bfd_object, &matching);
+	
+        if (!ok) {
+                fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
+                err("bfd_check_format_matches() failed\n");
+
+                if (bfd_get_error() != bfd_error_file_ambiguously_recognized || (matching == NULL && target == NULL)) {
+                        fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
+                        err("ambiguous BFD executable file format\n");
+                        return -1;
+                } else if (retries < 3) {
+                        retries++;
+                        printf(" ** Multiple matching BFD file formats\n");
+                        list_matching_formats(matching);
+
+                        bfd_close(ctx->abfd);
+
+                        bfd_init();
+                        target = strdup(matching[retries]);
+                        printf(" ** Using BFD target: %s\n", target);
+
+                        goto retry;
+                }
+
+        }else{
+        	printf(" -- matching formats:\n");
+                list_matching_formats(matching);
+                printf(" -- BFD parsing: ok\n");        
+                printf(" -- arch size: %u\n", bfd_get_arch_size(ctx->abfd));
+        }
+	
 	ctx->shnum = bfd_count_sections(ctx->abfd);
+	
+	printf("ctx->shnum = %lx\n", ctx->shnum);
+	
 	ctx->corefile = 0;
 
 	// Open as core file
@@ -2479,6 +2544,12 @@ int load_binary(ctx_t *ctx)
 {
 	ctx->abfd = bfd_openr(ctx->binname, NULL);
 	ctx->shnum = open_best(ctx);
+	
+	if (!ctx->shnum) {
+		printf("error: ctx->shnum is null\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	ctx->archsz = bfd_get_arch_size(ctx->abfd);
 	if (ctx->opt_verbose) {
 		printf(" -- Architecture size: %u\n", ctx->archsz);
