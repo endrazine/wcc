@@ -42,6 +42,7 @@
 // Forward declarations
 int wsh_usage(char *name);
 int wsh_print_version(void);
+int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
@@ -5333,6 +5334,7 @@ struct link_map *do_loadlib(char *libname)
 		handle = attempt_to_patch(libname);
 		if(!handle){
 			fprintf(stderr, "ERROR: dlopen() of patched file! %s \n", dlerror());
+			userland_load_binary(libname);
 			return 0;
 		}else{
 			printf(" ** loading of libified binary succeeded\n");
