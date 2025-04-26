@@ -3906,6 +3906,31 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	* Get access type
 	*/
 
+	    // Try to access fault_address and error_code if they exist
+	    unsigned long fault_address = (unsigned long)s->si_addr;
+	    unsigned long error_code = 0;
+	    
+	    // Check if error_code is available in uc_mcontext
+	    if (sizeof(u->uc_mcontext) >= (2 * sizeof(unsigned long))) {
+		// error_code might be stored right after fault_address
+		error_code = *((unsigned long *)&u->uc_mcontext + 1);
+	    }
+
+    printf("Fault address: 0x%lx\n", fault_address);
+    printf("Error code: 0x%lx\n", error_code);
+    
+    // Try to decode access type from error_code
+    if (error_code) {
+        if (error_code & (1 << 6)) {  // Check WnR bit (bit 6)
+            printf("Fault caused by write attempt\n");
+        } else {
+            printf("Fault caused by read attempt\n");
+        }
+        if (error_code & (1 << 24)) {  // Check IFSC/DFSC bits
+            printf("Fault during instruction fetch (execute)\n");
+        }
+    }
+
 	unsigned long int esr = u->uc_mcontext.__esr;
 
 	if (!esr) {
