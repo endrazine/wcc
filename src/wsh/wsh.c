@@ -129,7 +129,6 @@ uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_si
         struct _aarch64_ctx *ctx = (struct _aarch64_ctx *)(reserved + offset);
         
         if (ctx->magic == 0 && ctx->size == 0) {
-            // End marker
             break;
         }
 
@@ -138,13 +137,11 @@ uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_si
                 struct esr_context *esr_ctx = (struct esr_context *)(reserved + offset);
                 return esr_ctx->esr;
             } else {
-                // Malformed context
                 break;
             }
         }
         
         if (ctx->size == 0) {
-            // Prevent infinite loop
             break;
         }
         
@@ -153,7 +150,6 @@ uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_si
         offset = (offset + 15) & ~15;
     }
     
-    // Not found
     return 0;
 }
 #endif
@@ -3974,7 +3970,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
 		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
 
-		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.pc&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
+		if((fault != FAULT_EXEC)||(u->uc_mcontext.pc&~0xfff)||(!msync(u->uc_mcontext.pc&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
 			print_backtrace();
 		}
 	}
