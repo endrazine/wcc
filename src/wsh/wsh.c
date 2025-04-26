@@ -119,28 +119,6 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #define EXTRA_VDSO  "linux-gate.so.1"
 #endif
 
-#ifdef __aarch64__
-#define ESR_MAGIC 0x45535201
-
-uint64_t get_esr_from_reserved(void *reserved, size_t reserved_size) {
-    size_t offset = 0;
-    while (offset + sizeof(struct _aarch64_ctx) <= reserved_size) {
-        struct _aarch64_ctx *hdr = (struct _aarch64_ctx *)((char *)reserved + offset);
-        if (hdr->magic == 0 && hdr->size == 0)
-            break;  // end marker
-        if (hdr->magic == ESR_MAGIC) {
-            struct esr_context *esr_ctx = (struct esr_context *)hdr;
-            return esr_ctx->esr;
-        }
-        if (hdr->size == 0)
-            break; // corrupted frame
-        offset += hdr->size;
-    }
-    return 0; // not found
-}
-
-#endif
-
 learn_t *protorecords = NULL;
 
 /**
@@ -3915,54 +3893,32 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 		// error_code might be stored right after fault_address
 		error_code = *((unsigned long *)&u->uc_mcontext + 1);
 	    }
-
-    printf("Fault address: 0x%lx\n", fault_address);
-    printf("Error code: 0x%lx\n", error_code);
     
-    // Try to decode access type from error_code
-    if (error_code) {
-        if (error_code & (1 << 6)) {  // Check WnR bit (bit 6)
-            printf("Fault caused by write attempt\n");
-        } else {
-            printf("Fault caused by read attempt\n");
-        }
-        if (error_code & (1 << 24)) {  // Check IFSC/DFSC bits
-            printf("Fault during instruction fetch (execute)\n");
-        }
-    }
-
-	unsigned long int esr = u->uc_mcontext.__esr;
-
-	if (!esr) {
-		printf(" !! No ESR context found\n");
-	}
-
-	unsigned int ec = (esr >> 26) & 0x3f;
-	unsigned int iss = esr & 0xffffff;
-
-	if (ec == 0xb100000 || ec == 0xb100001) {
-		fault = FAULT_EXEC;	// Exec fault
-		hfault = "Exec";
-		r = 4;
-		accesscolor = RED;
-	} else if (ec == 0xb100100 || ec == 0xb100101) {
-	    if (iss & (1 << 6)) {
-		fault = FAULT_WRITE;	// Write fault
-		hfault = "Write";
-		r = 2;
-		accesscolor = YELLOW;
+	    // Try to decode access type from error_code
+	    if (error_code) {
+		if (error_code & (1 << 6)) {  // Check WnR bit (bit 6)
+			fault = FAULT_WRITE;	// Write fault
+			hfault = "Write";
+			r = 2;
+			accesscolor = YELLOW;
+		} else {
+			fault = FAULT_READ;	// Read fault
+			hfault = "Read";
+			r = 1;
+			accesscolor = GREEN;
+		}
+		if (error_code & (1 << 24)) {  // Check IFSC/DFSC bits
+			fault = FAULT_EXEC;	// Exec fault
+			hfault = "Exec";
+			r = 4;
+			accesscolor = RED;
+		}
 	    } else {
-		fault = FAULT_READ;	// Read fault
-		hfault = "Read";
-		r = 1;
-		accesscolor = GREEN;
+			fault = FAULT_UNKNOWN;	// Unknown fault
+			hfault = "Unknown";
+			r = 8;
+			accesscolor = BLUE;	    
 	    }
-	} else {
-		fault = FAULT_UNKNOWN;	// Unknown fault
-		hfault = "Unknown";
-		r = 1;
-		accesscolor = BLUE;
-	}
 
 	/**
 	* Get signal name
