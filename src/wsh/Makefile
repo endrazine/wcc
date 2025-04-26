@@ -44,8 +44,8 @@ deepclean:
 install::
 	mkdir -p $(DESTDIR)/usr/share/wcc/
 	cp -r ./scripts $(DESTDIR)/usr/share/wcc/
-	cp wsh $(DESTDIR)/usr/bin/wsh
-	cp libwsh.so $(DESTDIR)/lib/x86_64-linux-gnu/
+	cp wsh $(DESTDIR)/usr/bin/wsh || :
+	cp libwsh.so $(DESTDIR)/lib/x86_64-linux-gnu/  || :
 uninstall::
 	rm -rf $(DESTDIR)/usr/share/wcc/
 	rm -f $(DESTDIR)/usr/bin/wsh
