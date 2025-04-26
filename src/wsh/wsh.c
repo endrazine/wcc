@@ -122,36 +122,23 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #ifdef __aarch64__
 #define ESR_MAGIC 0x45535201
 
-uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_size) {
+uint64_t get_esr_from_reserved(void *reserved, size_t reserved_size) {
     size_t offset = 0;
-    
     while (offset + sizeof(struct _aarch64_ctx) <= reserved_size) {
-        struct _aarch64_ctx *ctx = (struct _aarch64_ctx *)(reserved + offset);
-        
-        if (ctx->magic == 0 && ctx->size == 0) {
-            break;
+        struct _aarch64_ctx *hdr = (struct _aarch64_ctx *)((char *)reserved + offset);
+        if (hdr->magic == 0 && hdr->size == 0)
+            break;  // end marker
+        if (hdr->magic == ESR_MAGIC) {
+            struct esr_context *esr_ctx = (struct esr_context *)hdr;
+            return esr_ctx->esr;
         }
-
-        if (ctx->magic == ESR_MAGIC) {
-            if (ctx->size >= sizeof(struct esr_context)) {
-                struct esr_context *esr_ctx = (struct esr_context *)(reserved + offset);
-                return esr_ctx->esr;
-            } else {
-                break;
-            }
-        }
-        
-        if (ctx->size == 0) {
-            break;
-        }
-        
-        offset += ctx->size;
-        // Align to 16 bytes
-        offset = (offset + 15) & ~15;
+        if (hdr->size == 0)
+            break; // corrupted frame
+        offset += hdr->size;
     }
-    
-    return 0;
+    return 0; // not found
 }
+
 #endif
 
 learn_t *protorecords = NULL;
