@@ -122,16 +122,6 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #ifdef __aarch64__
 #define ESR_MAGIC 0x45535201
 
-struct _aarch64_ctx {
-    uint32_t magic;
-    uint32_t size;
-};
-
-struct esr_context {
-    struct _aarch64_ctx head;
-    uint64_t esr;
-};
-
 uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_size) {
     size_t offset = 0;
     
@@ -3980,9 +3970,9 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
 		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
 
-//		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.gregs[REG_RIP]&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
+		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.pc&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
 			print_backtrace();
-//		}
+		}
 	}
 
 	if (!wsh->totsignals) {	// Save informations relative to first signal
