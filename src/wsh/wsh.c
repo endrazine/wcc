@@ -3904,7 +3904,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 
 	fault = FAULT_UNKNOWN;	// Unknown fault
 	hfault = "Unknown";
-	r = 1;
+	r = 8;
 	accesscolor = BLUE;
     
 	/**
@@ -3954,7 +3954,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	*/
 	fault = FAULT_UNKNOWN;	// Unknown fault
 	hfault = "Unknown";
-	r = 1;
+	r = 8;
 	accesscolor = BLUE;
 
 	/**
