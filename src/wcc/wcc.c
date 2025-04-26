@@ -2446,7 +2446,7 @@ unsigned int open_best(ctx_t *ctx)
 	
 	ctx->shnum = bfd_count_sections(ctx->abfd);
 	
-	printf("ctx->shnum = %lx\n", ctx->shnum);
+	printf("ctx->shnum = %x\n", ctx->shnum);
 	
 	ctx->corefile = 0;
 
