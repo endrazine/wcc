@@ -66,7 +66,7 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #define REG_RIP    16
 #endif
 
-#if !defined(__arm__) && !defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__)
 #define REG_EFL 0
 #define REG_ERR 0
 #endif
@@ -3399,7 +3399,7 @@ void bushandler(int signal, siginfo_t * s, void *ptr)
 	printf(" -- SIGBUS: %llx\t%llx:%s\n", u->uc_mcontext.gregs[REG_RIP], s->si_addr, hfault);
 */
 
-#if !defined(__arm__) && !defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__)
 	if(wsh->trace_unaligned){
 		if(wsh->opt_verbosetrace){
 			symbols_t *s = symbol_from_addr(u->uc_mcontext.gregs[REG_RIP]);
@@ -3483,7 +3483,7 @@ void exit(int status)
 	restore_exit();
 }
 
-#if !defined(__arm__) && !defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__)
 void _exit(int status)
 {
 	fprintf(stderr, " + Called _exit(%d), restoring...\n", status);
@@ -3537,7 +3537,7 @@ void traphandler(int signal, siginfo_t * s, void *ptr)
 //		u->uc_mcontext.gregs[REG_EFL] ^= 0x100;		// Set Trace flag
 	}
 
-#if !defined(__arm__) && !defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__)
 	/**
 	* Search corresponding Breakpoint
 	*/
@@ -3812,7 +3812,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	unsigned int r = 0;
 	char *accesscolor = "";
 
-#if !defined(__arm__) && !defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__)
 	/**
 	* Get access type
 	*/
