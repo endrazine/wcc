@@ -18,6 +18,12 @@ ifeq ($(unamep), x86_64)
 CFLAGS += -masm=intel
 endif
 
+ifeq ($(unamep), x86_64)
+WLINK	:= -Wl,-T -Wl,script.lds
+else
+WLINK	:=
+endif
+
 all::
 	cd openlibm && make CFLAGS="-fpie -fPIC"
 	cd lua && make linux CFLAGS="-fpie -fPIC"
@@ -28,7 +34,7 @@ all::
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
-	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh -Wl,-T -Wl,script.lds -liberty $(OBJLIB) -ldl
+	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(WLINK) -liberty $(OBJLIB) -ldl
 	cp wsh libwsh.so
 	../wld/wld -l libwsh.so
 	cp wsh ../../bin/
