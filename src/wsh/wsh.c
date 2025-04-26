@@ -3923,7 +3923,11 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	* Get access type
 	*/
 
-	unsigned long int esr = get_esr_from_reserved(u->uc_mcontext.__reserved, sizeof(u->uc_mcontext.__reserved));
+	unsigned long int esr = get_esr_from_reserved(u->uc_mcontext.__reserved, 4096);
+
+	if (!esr) {
+		printf(" !! No ESR context found\n");
+	}
 
 	unsigned int ec = (esr >> 26) & 0x3f;
 	unsigned int iss = esr & 0xffffff;
