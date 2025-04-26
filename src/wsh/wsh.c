@@ -3906,7 +3906,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	* Get access type
 	*/
 
-	unsigned long int esr = u->uc_mcontext.esr;
+	unsigned long int esr = u->uc_mcontext.__esr;
 
 	if (!esr) {
 		printf(" !! No ESR context found\n");
