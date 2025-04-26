@@ -119,6 +119,55 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #define EXTRA_VDSO  "linux-gate.so.1"
 #endif
 
+#ifdef __aarch64__
+#define ESR_MAGIC 0x45535201
+
+struct _aarch64_ctx {
+    uint32_t magic;
+    uint32_t size;
+};
+
+struct esr_context {
+    struct _aarch64_ctx head;
+    uint64_t esr;
+};
+
+uint64_t get_esr_from_reserved(const unsigned char *reserved, size_t reserved_size) {
+    size_t offset = 0;
+    
+    while (offset + sizeof(struct _aarch64_ctx) <= reserved_size) {
+        struct _aarch64_ctx *ctx = (struct _aarch64_ctx *)(reserved + offset);
+        
+        if (ctx->magic == 0 && ctx->size == 0) {
+            // End marker
+            break;
+        }
+
+        if (ctx->magic == ESR_MAGIC) {
+            if (ctx->size >= sizeof(struct esr_context)) {
+                struct esr_context *esr_ctx = (struct esr_context *)(reserved + offset);
+                return esr_ctx->esr;
+            } else {
+                // Malformed context
+                break;
+            }
+        }
+        
+        if (ctx->size == 0) {
+            // Prevent infinite loop
+            break;
+        }
+        
+        offset += ctx->size;
+        // Align to 16 bytes
+        offset = (offset + 15) & ~15;
+    }
+    
+    // Not found
+    return 0;
+}
+#endif
+
 learn_t *protorecords = NULL;
 
 /**
@@ -3884,7 +3933,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	* Get access type
 	*/
 
-	unsigned long int esr = u->uc_mcontext.esr_el1;
+	unsigned long int esr = get_esr_from_reserved(u->uc_mcontext.__reserved, sizeof(u->uc_mcontext.__reserved));
 
 	unsigned int ec = (esr >> 26) & 0x3f;
 	unsigned int iss = esr & 0xffffff;
