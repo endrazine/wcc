@@ -23,9 +23,9 @@ all::
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
 	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh -Wl,-T -Wl,script.lds -liberty $(OBJLIB) -ldl
-	cp wsh libwsh.so
-	../wld/wld -l libwsh.so
-	cp wsh ../../bin/
+	cp wsh libwsh.so  || :
+	../wld/wld -l libwsh.so  || :
+	cp wsh ../../bin/  || :
 
 test:
 	cd tests && make
