@@ -260,6 +260,7 @@
 #define FAULT_READ 	1
 #define FAULT_WRITE	2
 #define FAULT_EXEC	4
+#define FAULT_UNKNOWN	8
 
 #define default_poison 0x61
 

@@ -3483,13 +3483,13 @@ void exit(int status)
 	restore_exit();
 }
 
-#if defined(__i386__) || defined(__amd64__)
+//#if defined(__i386__) || defined(__amd64__)
 void _exit(int status)
 {
 	fprintf(stderr, " + Called _exit(%d), restoring...\n", status);
 	restore_exit();
 }
-#endif
+//#endif
 
 void exit_group(int status)
 {
@@ -3813,6 +3813,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	char *accesscolor = "";
 
 #if defined(__i386__) || defined(__amd64__)
+//#if defined(__toto__)
 	/**
 	* Get access type
 	*/
@@ -3877,7 +3878,161 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	fprintf(stderr, " !! FATAL ERROR: Instruction Pointer 0x%012llx addr:%012llx\n", u->uc_mcontext.gregs[REG_RIP], s->si_addr);
 #endif
 
-#endif // end arm
+#elif defined(__aarch64__)
+
+	/**
+	* Get access type
+	*/
+
+	unsigned long int esr = u->uc_mcontext.esr_el1;
+
+	unsigned int ec = (esr >> 26) & 0x3f;
+	unsigned int iss = esr & 0xffffff;
+
+	if (ec == 0xb100000 || ec == 0xb100001) {
+		fault = FAULT_EXEC;	// Exec fault
+		hfault = "Exec";
+		r = 4;
+		accesscolor = RED;
+	} else if (ec == 0xb100100 || ec == 0xb100101) {
+	    if (iss & (1 << 6)) {
+		fault = FAULT_WRITE;	// Write fault
+		hfault = "Write";
+		r = 2;
+		accesscolor = YELLOW;
+	    } else {
+		fault = FAULT_READ;	// Read fault
+		hfault = "Read";
+		r = 1;
+		accesscolor = GREEN;
+	    }
+	} else {
+		fault = FAULT_UNKNOWN;	// Unknown fault
+		hfault = "Unknown";
+		r = 1;
+		accesscolor = BLUE;
+	}
+
+	/**
+	* Get signal name
+	*/
+	signame = signaltoname(signal);
+
+	/**
+	* Get signal code
+	*/
+	sicode = sicode_strerror(signal, s);
+	if (!sicode) {
+		memset(defsicode, 0x00, 200);
+		snprintf(defsicode, 199, "Error code %d", s->si_code);
+		sicode = defsicode;
+	}
+
+	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
+		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
+
+//		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.gregs[REG_RIP]&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
+			print_backtrace();
+//		}
+	}
+
+	if (!wsh->totsignals) {	// Save informations relative to first signal
+		wsh->firstsignal = signal;
+		wsh->firstsicode = s->si_code;
+		wsh->faultaddr = s->si_addr;
+		wsh->reason = r;
+		memcpy(wsh->errcontext, u, sizeof(ucontext_t));
+		wsh->btcaller = u->uc_mcontext.pc;
+	}
+
+	if (!wsh->firsterrno) {
+		wsh->firsterrno = errno;
+	}			// Save first errno as firsterrno (treated separately)
+
+	wsh->totsignals += 1;
+	wsh->globalsignals += 1;
+
+#else	// Non intel, non Aarch64
+
+
+	/**
+	* Get access type
+	*/
+/*	if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
+		fault = FAULT_WRITE;	// Write fault
+		hfault = "Write";
+		r = 2;
+		accesscolor = YELLOW;
+	} else if (s->si_addr == (void*)u->uc_mcontext.gregs[REG_RIP]) {
+		fault = FAULT_EXEC;	// Exec fault
+		hfault = "Exec";
+		r = 4;
+		accesscolor = RED;
+	} else {
+		fault = FAULT_READ;	// Read fault
+		hfault = "Read";
+		r = 1;
+		accesscolor = GREEN;
+	}
+*/
+	switch(s->si_code) {
+	case SEGV_MAPERR:
+	case SEGV_ACCERR:
+	case SEGV_BNDERR:
+	case SEGV_PKUERR:
+	case SEGV_ACCADI:
+	case SEGV_ADIDERR:
+	case SEGV_ADIPERR:
+	case SEGV_MTEAERR:
+	case SEGV_MTESERR:
+	case SEGV_ACCERR_READ:
+	default:
+		break;
+	
+	}
+
+
+	/**
+	* Get signal name
+	*/
+	signame = signaltoname(signal);
+
+	/**
+	* Get signal code
+	*/
+	sicode = sicode_strerror(signal, s);
+	if (!sicode) {
+		memset(defsicode, 0x00, 200);
+		snprintf(defsicode, 199, "Error code %d", s->si_code);
+		sicode = defsicode;
+	}
+
+	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
+		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
+
+		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.gregs[REG_RIP]&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
+			print_backtrace();
+		}
+
+	}
+
+	if (!wsh->totsignals) {	// Save informations relative to first signal
+		wsh->firstsignal = signal;
+		wsh->firstsicode = s->si_code;
+		wsh->faultaddr = s->si_addr;
+		wsh->reason = r;
+		memcpy(wsh->errcontext, u, sizeof(ucontext_t));
+		wsh->btcaller = u->uc_mcontext.gregs[REG_RIP];
+	}
+
+	if (!wsh->firsterrno) {
+		wsh->firsterrno = errno;
+	}			// Save first errno as firsterrno (treated separately)
+
+	wsh->totsignals += 1;
+	wsh->globalsignals += 1;
+
+#endif // end of non Intel
 
 	/**
 	* Restore execution from known good point
