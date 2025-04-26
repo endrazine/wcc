@@ -3970,7 +3970,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
 		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
 
-		if((fault != FAULT_EXEC)||(u->uc_mcontext.pc&~0xfff)||(!msync(u->uc_mcontext.pc&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
+		if((fault != FAULT_EXEC)&&(fault != FAULT_UNKNOWN)&&(u->uc_mcontext.pc&~0xfff)&&(!msync(u->uc_mcontext.pc&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
 			print_backtrace();
 		}
 	}
