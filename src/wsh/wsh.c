@@ -3902,50 +3902,11 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 
 #elif defined(__aarch64__)
 
-	/**
-	* Get access type
-	*/
-
-	    // Try to access fault_address and error_code if they exist
-	    unsigned long fault_address = (unsigned long)s->si_addr;
-	    unsigned long error_code = 0;
-	    
-	    // Check if error_code is available in uc_mcontext
-	    if (sizeof(u->uc_mcontext) >= (2 * sizeof(unsigned long))) {
-		// error_code might be stored right after fault_address
-		error_code = *((unsigned long *)&u->uc_mcontext + 1);
-	    }
-
-//    printf("Fault address: 0x%lx\n", fault_address);
-//    printf("Error code: 0x%lx\n", error_code);
+	fault = FAULT_UNKNOWN;	// Unknown fault
+	hfault = "Unknown";
+	r = 1;
+	accesscolor = BLUE;
     
-    // Try to decode access type from error_code
-    if (error_code) {
-        if (error_code & (1 << 6)) {  // Check WnR bit (bit 6)
-		fault = FAULT_WRITE;	// Write fault
-		hfault = "Write";
-		r = 2;
-		accesscolor = YELLOW;
-        } else {
-		fault = FAULT_READ;	// Read fault
-		hfault = "Read";
-		r = 1;
-		accesscolor = GREEN;
-        }
-        if (error_code & (1 << 24)) {  // Check IFSC/DFSC bits
-		fault = FAULT_EXEC;	// Exec fault
-		hfault = "Exec";
-		r = 4;
-		accesscolor = RED;
-        }
-    }else{
-		fault = FAULT_UNKNOWN;	// Unknown fault
-		hfault = "Unknown";
-		r = 1;
-		accesscolor = BLUE;
-    
-    }
-
 	/**
 	* Get signal name
 	*/
@@ -3991,39 +3952,10 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	/**
 	* Get access type
 	*/
-/*	if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
-		fault = FAULT_WRITE;	// Write fault
-		hfault = "Write";
-		r = 2;
-		accesscolor = YELLOW;
-	} else if (s->si_addr == (void*)u->uc_mcontext.gregs[REG_RIP]) {
-		fault = FAULT_EXEC;	// Exec fault
-		hfault = "Exec";
-		r = 4;
-		accesscolor = RED;
-	} else {
-		fault = FAULT_READ;	// Read fault
-		hfault = "Read";
-		r = 1;
-		accesscolor = GREEN;
-	}
-*/
-	switch(s->si_code) {
-	case SEGV_MAPERR:
-	case SEGV_ACCERR:
-	case SEGV_BNDERR:
-	case SEGV_PKUERR:
-	case SEGV_ACCADI:
-	case SEGV_ADIDERR:
-	case SEGV_ADIPERR:
-	case SEGV_MTEAERR:
-	case SEGV_MTESERR:
-	case SEGV_ACCERR_READ:
-	default:
-		break;
-	
-	}
-
+	fault = FAULT_UNKNOWN;	// Unknown fault
+	hfault = "Unknown";
+	r = 1;
+	accesscolor = BLUE;
 
 	/**
 	* Get signal name
@@ -4043,10 +3975,6 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	if ((wsh->totsignals == 0) || (wsh->opt_verbose)) {
 		fprintf(stderr, "\n%s[%s]\t%s\t%p" BLUE "        (%s)\n" NORMAL, accesscolor, signame, hfault, s->si_addr, sicode);
 
-		if((fault != FAULT_EXEC)||(!msync(u->uc_mcontext.gregs[REG_RIP]&~0xfff, getpagesize(), 0))){	// Avoid segfaults on generating backtraces...
-			print_backtrace();
-		}
-
 	}
 
 	if (!wsh->totsignals) {	// Save informations relative to first signal
@@ -4055,7 +3983,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 		wsh->faultaddr = s->si_addr;
 		wsh->reason = r;
 		memcpy(wsh->errcontext, u, sizeof(ucontext_t));
-		wsh->btcaller = u->uc_mcontext.gregs[REG_RIP];
+//		wsh->btcaller = u->uc_mcontext.gregs[REG_RIP];
 	}
 
 	if (!wsh->firsterrno) {
