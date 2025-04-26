@@ -15,7 +15,7 @@ CFLAGS := -masm=intel -rdynamic -W -Wall -Wextra -O0 -mpreferred-stack-boundary=
 all::
 	cd openlibm && make CFLAGS="-fpie -fPIC"
 	cd lua && make linux CFLAGS="-fpie -fPIC"
-	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline
+	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline -masm=intel
 	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -fpie -fPIC -ldl -lreadline
 	$(CC) $(CFLAGS) helper.c -o helper.o -c -fpie -fPIC
 	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -fpie -fPIC
