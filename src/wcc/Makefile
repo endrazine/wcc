@@ -29,7 +29,7 @@ all::
 	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd -lelf -lcapstone
 #	$(CC) $(CFLAGS) -m32 -Wl,-rpath /home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wcc/lib32/  wcc.c -o wcc32 -lelf ./lib32/libbfd-2.24-system.so ./lib32/libcapstone.so.3
 
-	cp wcc ../../bin/
+	cp wcc ../../bin/  || :
 #	cp wcc32 ../../bin/
 
 test::
@@ -40,8 +40,8 @@ clean:
 	rm -f wcc a.out wcc.o core wcc32 ls.o ls.so
 
 install:
-	cp wcc $(DESTDIR)/usr/bin/wcc
-#	cp wcc32 $(DESTDIR)/usr/bin/wcc32
+	cp wcc $(DESTDIR)/usr/bin/wcc || :
+#	cp wcc32 $(DESTDIR)/usr/bin/wcc32 || :
 
 uninstall:
 	rm $(DESTDIR)/usr/bin/wcc -f
