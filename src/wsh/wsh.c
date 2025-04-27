@@ -39,7 +39,14 @@
 #include <lauxlib.h>
 #include <sys/sendfile.h> // For sendfile()
 
-// Forward declarations
+/**
+* Imported function prototypes
+*/
+int userland_load_binary(char *fname);
+
+/**
+* Forward declarations
+*/
 int wsh_usage(char *name);
 int wsh_print_version(void);
 int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
