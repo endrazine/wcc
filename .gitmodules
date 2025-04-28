@@ -3,7 +3,7 @@
 	url = https://github.com/antirez/linenoise.git
 [submodule "src/wsh/openlibm"]
 	path = src/wsh/openlibm
-	url = https://github.com/JuliaLang/openlibm.git
+	url = https://github.com/JuliaMath/openlibm.git
 [submodule "src/wsh/luajit-2.0"]
 	path = src/wsh/luajit-2.0
 	url = http://luajit.org/git/luajit-2.0.git
