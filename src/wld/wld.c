@@ -344,6 +344,11 @@ int fix_relocations_sections64(char *map)
 				if (ELF64_R_TYPE(rela64->r_info) == 5) {
 					printf("Relocation at index %u Found R_X86_64_COPY : turning into R_X86_64_GLOB_DAT for symbol %lu\n", j, ELF64_R_SYM(rela64->r_info));
 					rela64->r_info++; // 0x008000000006;
+
+					if(sym_to_patch_index >= 10240-10) {
+						printf("!! ERROR: Too many relocations to patch\n");
+						exit(EXIT_FAILURE);
+					}
 					
 					sym_to_patch[sym_to_patch_index++] = ELF64_R_SYM(rela64->r_info);
 
