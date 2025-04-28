@@ -319,7 +319,7 @@ int fix_relocations_sections64(char *map)
 	Elf64_Sym *sym64 = 0;
 	unsigned int shnum = 0;
 	unsigned int i = 0, j = 0, k = 0;
-	long int sym_to_patch[100];
+	long int sym_to_patch[10240];
 	unsigned int sym_to_patch_index = 0;
 
 	memset(sym_to_patch, 0x00, sizeof(sym_to_patch));
