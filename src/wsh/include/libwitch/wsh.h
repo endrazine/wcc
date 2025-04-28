@@ -264,6 +264,8 @@
 
 #define default_poison 0x61
 
+#define SIGSTKFLT 16
+
 /**
 * Backtrace parameters
 */
