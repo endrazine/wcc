@@ -14,11 +14,11 @@ else
   ASAN   := -fsanitize=address -static-libasan
 endif
 
-unamep := $(shell uname -p)
+unamem := $(shell uname -m)
 
 CFLAGS := -W -Wall -Wno-discarded-qualifiers -Wno-int-conversion -Wno-unused-parameter -Wno-unused-function -Wno-unused-result -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -rdynamic -D_FORTIFY_SOURCE=2 -O2 
 
-ifeq ($(unamep), x86_64)
+ifeq ($(unamem), x86_64)
 CFLAGS += -masm=intel
 endif
 

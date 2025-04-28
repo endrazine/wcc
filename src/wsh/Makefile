@@ -12,9 +12,9 @@ OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
 CFLAGS := -rdynamic -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include -rdynamic -I../../include/ -I./luajit-2.0/src/ -Wl,-E -Wl,-z,now
 #OBJLIB := ./luajit-2.0/src/libluajit.a ./openlibm/libopenlibm.a 
 
-unamep := $(shell uname -p)
+unamem := $(shell uname -m)
 
-ifeq ($(unamep), x86_64)
+ifeq ($(unamem), x86_64)
 CFLAGS += -masm=intel
 endif
 
