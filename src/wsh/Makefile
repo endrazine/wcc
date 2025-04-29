@@ -35,6 +35,7 @@ all::
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
 	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(WLINK) -liberty $(OBJLIB) -ldl
+	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-`uname -m`-static $(WLINK) -liberty $(OBJLIB) -ldl -static
 	cp wsh libwsh.so
 	../wld/wld -l libwsh.so
 	cp wsh ../../bin/

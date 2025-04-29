@@ -3505,7 +3505,7 @@ void restore_exit(void)
 	errno = ECANCELED;
 	longjmp(wsh->longjmp_ptr, 1);
 }
-
+/*
 void exit(int status)
 {
 	fprintf(stderr, " + Called exit(%d), restoring...\n", status);
@@ -3519,7 +3519,7 @@ void _exit(int status)
 	restore_exit();
 }
 //#endif
-
+*/
 void exit_group(int status)
 {
 	fprintf(stderr, " + Called exit_group(%d), restoring...\n", status);
