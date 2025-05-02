@@ -326,12 +326,12 @@ int fix_relocations_sections64(char *map)
 	for (i = 0; i < shnum; i++) {
 		// Find relocation sections
 		if (shdr64[i].sh_type == SHT_RELA) {
-			printf("found SHT_RELA section with index %u\n", i);
+//			printf("found SHT_RELA section with index %u\n", i);
 			rela64 = map + shdr64[i].sh_offset;
 			for (j = 0; j < (shdr64[i].sh_size / sizeof(Elf64_Rela)); j++) {
 
 				if (ELF64_R_TYPE(rela64->r_info) == 5) {
-					printf("Relocation at index %u Found R_X86_64_COPY : turning into R_X86_64_GLOB_DAT for symbol %lu\n", j, ELF64_R_SYM(rela64->r_info));
+//					printf("Relocation at index %u Found R_X86_64_COPY : turning into R_X86_64_GLOB_DAT for symbol %lu\n", j, ELF64_R_SYM(rela64->r_info));
 					rela64->r_info++; // 0x008000000006;
 
 					if(sym_to_patch_index >= 10240-10) {
@@ -342,8 +342,8 @@ int fix_relocations_sections64(char *map)
 					sym_to_patch[sym_to_patch_index++] = ELF64_R_SYM(rela64->r_info);
 
 				}
-				printf("[%03u] 0x%ld %s 0x%ld 0x%lx\n", j, rela64->r_offset, display_relocation_type(ELF64_R_TYPE(rela64->r_info)),
-					ELF64_R_SYM(rela64->r_info), rela64->r_addend);
+//				printf("[%03u] 0x%ld %s 0x%ld 0x%lx\n", j, rela64->r_offset, display_relocation_type(ELF64_R_TYPE(rela64->r_info)),
+//					ELF64_R_SYM(rela64->r_info), rela64->r_addend);
 				rela64 += 1;
 			}	
 		}
@@ -358,7 +358,7 @@ int fix_relocations_sections64(char *map)
 			for (j = 0; j < (shdr64[i].sh_size / sizeof(Elf64_Sym)); j++) {
 
 				if (j == sym_to_patch[k]) {
-					printf("Patching symbol at index: %u\n", j);
+//					printf("Patching symbol at index: %u\n", j);
 //					sym64->st_value = 0;
 					sym64->st_size  += 100;
 //					sym64->st_shndx = 0;
@@ -366,7 +366,7 @@ int fix_relocations_sections64(char *map)
 					k++;
 				}
 
-				printf("[%03u] %016lx  %02lu %s %s %s % 4u  %s\n", j, sym64->st_value, sym64->st_size, sym_type(ELF64_ST_TYPE(sym64->st_info)), sym_binding(ELF64_ST_BIND(sym64->st_info)), sym_visibility(sym64->st_other), sym64->st_shndx ,sym64->st_name + dynstr);
+//				printf("[%03u] %016lx  %02lu %s %s %s % 4u  %s\n", j, sym64->st_value, sym64->st_size, sym_type(ELF64_ST_TYPE(sym64->st_info)), sym_binding(ELF64_ST_BIND(sym64->st_info)), sym_visibility(sym64->st_other), sym64->st_shndx ,sym64->st_name + dynstr);
 				sym64 += 1;
 			}
 		}
