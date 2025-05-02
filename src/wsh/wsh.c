@@ -514,7 +514,7 @@ int disable_aslr(void)
 
 	fd = open(PROC_ASLR_PATH, O_RDWR);
 	if (fd < 0) {
-		fprintf(stderr, "!! ERROR : open(%s, O_RDWR) %s\n", PROC_ASLR_PATH, strerror(errno));
+		fprintf(stderr, "ERROR : open(%s, O_RDWR) %s\n", PROC_ASLR_PATH, strerror(errno));
 		return -1;
 	}
 	write(fd, &c, 1);
@@ -532,7 +532,7 @@ int enable_aslr(void)
 
 	fd = open(PROC_ASLR_PATH, O_RDWR);
 	if (fd < 0) {
-		fprintf(stderr, "!! ERROR : open(%s,O_RDWR) %s\n", PROC_ASLR_PATH, strerror(errno));
+		fprintf(stderr, "ERROR : open(%s,O_RDWR) %s\n", PROC_ASLR_PATH, strerror(errno));
 		return -1;
 	}
 	write(fd, &c, 1);
@@ -732,7 +732,7 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 	symbols_t *si = 0, *stmp = 0, *res = 0;
 
 	s = calloc(1, sizeof(symbols_t));
-	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return -1; }
+	if(!s){ fprintf(stderr, "Error: calloc() = %s\n", strerror(errno)); return -1; }
 	s->addr = addr;
 	s->symbol = strdup(symbol);
 	s->size = size;
@@ -763,7 +763,7 @@ void section_add(unsigned long int addr, unsigned long int size, char *libname, 
 	sections_t *s = 0;
 
 	s = calloc(1, sizeof(sections_t));
-	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return; }
+	if(!s){ fprintf(stderr, "Error: calloc() = %s\n", strerror(errno)); return; }
 	s->addr = addr;
 	s->size = size;
 	s->flags = flags;
@@ -782,7 +782,7 @@ void segment_add(unsigned long int addr, unsigned long int size, char *perms, ch
 	segments_t *s = 0;
 
 	s = calloc(1, sizeof(segments_t));
-	if(!s){ fprintf(stderr, " !! Error: calloc() = %s\n", strerror(errno)); return; }
+	if(!s){ fprintf(stderr, "Error: calloc() = %s\n", strerror(errno)); return; }
 	s->addr = addr;
 	s->size = size;
 	s->flags = flags;
@@ -1779,7 +1779,7 @@ int info(lua_State * L)
 			printf(" * symbol %s does not exist.\n", (char *)symbol);
 		}
 	} else {
-		printf(" !! ERROR: info requires a string argument\n");
+		printf("ERROR: info requires a string argument\n");
 	}
 
 	return 0;
@@ -2092,7 +2092,7 @@ int prototypes(lua_State * L)
 
 		// make sure tag type is correct, else discard
 		if(strncmp(l->key.ttype, "TAG", 3)){
-			printf(" !! Unknown TAG type: %s\n", l->key.ttype);
+			printf("WARNING: Unknown TAG type: %s\n", l->key.ttype);
 			free(l);
 			continue;
 		}
@@ -2127,7 +2127,7 @@ int prototypes(lua_State * L)
 /*
 void enable_trace(void){
 	if(prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)){	// Anyone can trace us
-		printf(" !! ERROR: prctl() %s\n", strerror(errno));
+		printf("ERROR: prctl() %s\n", strerror(errno));
 		return;
 	}
 }
@@ -3000,7 +3000,7 @@ void parse_dyn(struct link_map *map)
 int parse_link_map_dyn(struct link_map *map)
 {
 	if (!map) {
-		if(!wsh->opt_quiet){
+		if ((!wsh->opt_quiet)&&(!wsh->userland_loaded)) {
 			fprintf(stderr, "WARNING: No binary loaded in memory. Try loadbin(). For help type help(\"loadbin\").\n");
 		}
 		return -1;
@@ -3048,7 +3048,7 @@ int exec_luabuff(void)
 	* Load buffer in lua
 	*/
 	if ((err = luaL_loadbuffer(wsh->L, wsh->luabuff, strlen(wsh->luabuff), "=Wsh internal lua buffer")) != 0) {
-		printf("ERROR: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
+		printf("WARNING: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
 		//
 		// Run line by line instead...
 		//
@@ -3134,7 +3134,7 @@ int print_procmap(unsigned int pid)
 	snprintf(path, 99, "/proc/%u/maps", pid);
 	buff = calloc(1, 4096);
 	fd = open(path, O_RDONLY);
-	if(fd < 0){ printf(" !! ERROR: open %s : %s\n", path, strerror(errno)); return -1; }
+	if(fd < 0){ printf("ERROR: open %s : %s\n", path, strerror(errno)); return -1; }
 
 	while ((n = read(fd, buff, 4096)) > 0){
 		write(1, buff, n);
@@ -3318,7 +3318,7 @@ void affinity(int procnum)
 	CPU_SET(procnum, &set);
 
         if (sched_setaffinity(getpid(), sizeof(set), &set) == -1){
-		fprintf(stderr, " !! ERROR: sched_setaffinity(%u): %s\n", procnum, strerror(errno));
+		fprintf(stderr, "ERROR: sched_setaffinity(%u): %s\n", procnum, strerror(errno));
 	}
 }
 
@@ -3905,7 +3905,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	wsh->globalsignals += 1;
 
 #ifdef DEBUG
-	fprintf(stderr, " !! FATAL ERROR: Instruction Pointer 0x%012llx addr:%012llx\n", u->uc_mcontext.gregs[REG_RIP], s->si_addr);
+	fprintf(stderr, "FATAL ERROR: Instruction Pointer 0x%012llx addr:%012llx\n", u->uc_mcontext.gregs[REG_RIP], s->si_addr);
 #endif
 
 #elif defined(__aarch64__)
@@ -4268,7 +4268,7 @@ int ralloc(lua_State * L)
 	ptr = mmap(baseaddr, sz, PROT_WRITE|PROT_READ, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
 
 	if(ptr == 0){
-		fprintf(stderr, " !! ERROR: malloc() : %s",strerror(errno));
+		fprintf(stderr, "ERROR: malloc() : %s",strerror(errno));
 		return 0;
 	}
 
@@ -4327,7 +4327,7 @@ int xalloc(lua_State * L)
 	ptr = mmap(baseaddr, sz, PROT_WRITE|PROT_READ, MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
 
 	if(ptr == 0){
-		fprintf(stderr, " !! ERROR: malloc() : %s",strerror(errno));
+		fprintf(stderr, "ERROR: malloc() : %s",strerror(errno));
 		return 0;
 	}
 
@@ -4460,7 +4460,7 @@ void singlebranch(lua_State * L)
 	// sudo setcap cap_sys_rawio=ep ./wsh
 
 	if(getuid() != 0){
-		fprintf(stderr, "!! ERROR: You need root privileges to use Branch Tracing\n");
+		fprintf(stderr, "ERROR: You need root privileges to use Branch Tracing\n");
 		return;
 	}
 
@@ -5199,7 +5199,9 @@ int add_script_arguments(int argc, char **argv, unsigned int i)
 
 	for (j = 0; j < wsh->script_argnum; j++) {
 		wsh->script_args[j] = strdup(argv[j + i]);
-		printf("argument[%u]: %s\n", j, wsh->script_args[j]);
+		if(wsh->opt_verbose){
+			printf("argument[%u]: %s\n", j, wsh->script_args[j]);
+		}
 	}
 	return wsh->script_argnum;
 }
@@ -5248,7 +5250,7 @@ char *ar2lib(char *name)
 	tmp_dirname = calloc(20, 1);
 	snprintf(tmp_dirname, 19, "/tmp/.wsh-%u", getpid());
 	if(mkdir(tmp_dirname, 0700)){
-		fprintf(stderr, "!! ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
+		fprintf(stderr, "ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
 		return NULL;
 	}
 
@@ -5376,7 +5378,7 @@ int attempt_to_patch(char *libname)
 
 	fdin = open(libname, O_RDONLY, 0700);
 	if (fdin < 0) {
-		fprintf(stderr, "!! ERROR : open(%s, O_RDONLY) %s\n", libname, strerror(errno));
+		fprintf(stderr, "ERROR : open(%s, O_RDONLY) %s\n", libname, strerror(errno));
 		return 0; // Fail
 	}
 
@@ -5388,7 +5390,7 @@ int attempt_to_patch(char *libname)
 	tmp_dirname = calloc(20, 1);
 	snprintf(tmp_dirname, 19, "/tmp/.wsh-%u", getpid());
 	if(mkdir(tmp_dirname, 0700)){
-		fprintf(stderr, "!! ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
+		fprintf(stderr, "ERROR : mkdir(%s, ...) %s\n", tmp_dirname, strerror(errno));
 	}
 
 	/**
@@ -5402,7 +5404,7 @@ int attempt_to_patch(char *libname)
 
 	fdout = open(outlib, O_RDWR|O_CREAT|O_TRUNC, 0700);
 	if (fdout < 0) {
-		fprintf(stderr, "!! ERROR : open(%s, O_RDWR) %s\n", outlib, strerror(errno));
+		fprintf(stderr, "ERROR : open(%s, O_RDWR) %s\n", outlib, strerror(errno));
 		return 0; // Fail
 	}
 
@@ -5411,7 +5413,7 @@ int attempt_to_patch(char *libname)
 	*/
 	copied = sendfile(fdout, fdin, 0, sb.st_size);
 	if(copied != sb.st_size){
-		fprintf(stderr, "!! ERROR: sendfile(); Copy failed: %s\n", strerror(errno));
+		fprintf(stderr, "ERROR: sendfile(); Copy failed: %s\n", strerror(errno));
 		return 0; // Fail
 	}
 
@@ -5452,10 +5454,17 @@ struct link_map *do_loadlib(char *libname)
 		fprintf(stderr, "ERROR: dlopen() %s \n", dlerror());
 
 		// attempt to patch binary as ET_DYN if was ET_EXEC
-		handle = attempt_to_patch(libname);
-		if(!handle){
-			fprintf(stderr, "ERROR: dlopen() of patched file! %s \n", dlerror());
+		if (wsh->opt_userland_load) {
+			handle = 0;		
+		}else{
+			handle = attempt_to_patch(libname);
+		}
+		if (!handle) {
+			if (!wsh->opt_userland_load) {
+				fprintf(stderr, "ERROR: dlopen() of patched file! %s \n", dlerror());
+			}
 			userland_load_binary(libname);
+			wsh->userland_loaded = 1;
 			return 0;
 		}else{
 			printf(" ** loading of libified binary succeeded\n");
@@ -5497,7 +5506,7 @@ int wsh_loadlibs(void)
 */
 int wsh_getopt(int argc, char **argv)
 {
-	const char *short_opt = "hqvVxg";
+	const char *short_opt = "hqvVxgu";
 	int count = 0;
 	struct stat sb;
 	int c = 0, i = 0;
@@ -5509,6 +5518,7 @@ int wsh_getopt(int argc, char **argv)
 		{"global", no_argument, NULL, 'g'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"version", no_argument, NULL, 'V'},
+		{"version", no_argument, NULL, 'u'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -5543,6 +5553,10 @@ int wsh_getopt(int argc, char **argv)
 		case 'V':
 			wsh_print_version();
 			_Exit(EXIT_SUCCESS);
+			break;
+
+		case 'u':
+			wsh->opt_userland_load = 1;
 			break;
 
 		case 'x':
@@ -5622,6 +5636,7 @@ int wsh_usage(char *name)
 	printf("    -q, --quiet               Display less output\n");
 	printf("    -v, --verbose             Display more output\n");
 	printf("    -g, --global              Bind symbols globally\n");
+	printf("    -u, --userland-load       Force use userland loader\n");	
 	printf("    -V, --version             Display version and build, then exit\n");
 	printf("\n");
 	printf("Script:\n\n");

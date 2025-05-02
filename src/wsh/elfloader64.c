@@ -53,6 +53,8 @@
 #define ELF_ST_BIND ELF64_ST_BIND
 #define ELF_ST_TYPE ELF64_ST_TYPE
 
+#define MIN_MAP_SIZE 0xa00000
+
 #ifdef __amd64__
 
 
@@ -430,12 +432,16 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 	unsigned int j = 0;
 	char *raw = 0;
 	unsigned int nsyms = 0;
+	int scount = 0, scount2 = 0;
 //	char *text_base = 0;
+	symbols_t *s = 0;
 
 	Elf64_Shdr *shstrtab = 0;
 	Elf64_Dyn *dyn = 0;
 
 	hdr = (Elf64_Ehdr *) elf_start;
+
+	DL_COUNT(wsh->symbols, s, scount);
 
 	if (validate_elf(hdr)) {
                 printf(" !! ERROR: parsing failed : invalid ELF in %s() at %s:%d\n", __func__, __FILE__, __LINE__);
@@ -546,7 +552,7 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 	if ((hdr->e_shstrndx) && (hdr->e_shstrndx <= hdr->e_shnum)) {
 		if (shdr[hdr->e_shstrndx].sh_type == SHT_STRTAB) {
 			shstrtab = &shdr[hdr->e_shstrndx];
-			printf(" -- Found shstrtab\n");
+			printf(" -- found shstrtab\n");
 		}
 	}
 	// Perform relocations
@@ -561,19 +567,63 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 		}
 	}
 
+	DL_COUNT(wsh->symbols, s, scount2);
+	printf(" ** binary loaded (%d new symbols)\n", scount2 - scount);
 	return 0;
 
 }
 
 int userland_load_binary(char *fname)
 {
-	static char buf[10485760];
+	int fd = 0;
+	struct stat sb;
+	char *map = 0;
+	Elf32_Ehdr *ehdr32;
+	Elf64_Ehdr *ehdr64;
 
-	printf(" -- Attempting to load %s using userland loader\n", fname);
+	printf(" ** attempting to load %s using userland loader\n", fname);
 
-	FILE *elf = fopen(fname, "rb");
-	fread(buf, sizeof buf, 1, elf);
-	return elf_load(buf, sizeof buf, fname);
+	fd = open(fname, O_RDONLY);
+	if (fd <= 0) {
+		printf("!! ERROR: couldn't open %s : %s\n", fname, strerror(errno));
+		return -1;
+	}
+
+	if (fstat(fd, &sb) == -1) {
+		printf("!! ERROR: couldn't stat %s : %s\n", fname, strerror(errno));
+		return -1;
+	}
+
+	if ((unsigned int) sb.st_size < sizeof(Elf32_Ehdr)) {
+		printf("!! ERROR: file %s is too small (%u bytes) to be a valid ELF.\n", fname, (unsigned int) sb.st_size);
+		return -1;
+	}
+
+	map = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (map == MAP_FAILED) {
+		printf("!! ERROR: couldn't mmap %s : %s\n", fname, strerror(errno));
+		return -1;
+	}
+
+	switch (map[EI_CLASS]) {
+	case ELFCLASS64:
+		char *raw = calloc(1, sb.st_size+MIN_MAP_SIZE);
+		if(!raw){
+			printf("!! ERROR: couldn't calloc() %s : %s\n", fname, strerror(errno));
+			return -1;		
+		}
+		memcpy(raw, map, sb.st_size);
+	
+		return elf_load(raw, sb.st_size+MIN_MAP_SIZE, fname);
+	case ELFCLASS32:
+	default:
+		printf("!! ERROR: unknown ELF class\n");
+		return -1;
+	}
+
+	munmap(map, sb.st_size);
+	close(fd);
+	return 0;
 }
 
 #else

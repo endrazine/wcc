@@ -540,12 +540,16 @@ typedef struct wsh_t {
 	unsigned int opt_verbosetrace;	// Display verbose trace
 	unsigned int opt_appear;	// Display ourselves or hide ourselves ?
 
+	unsigned int opt_userland_load;	// Force use of userland loader
+
 	unsigned int firsterrno;
 	unsigned int firstsicode;
 	unsigned int firstsignal;
 	unsigned int totsignals;	// Per libcall
 	unsigned int globalsignals;	// Never reset
 	unsigned long int faultaddr;
+
+	unsigned int userland_loaded;
 
 	void *firstcontext;
 	unsigned int reason;

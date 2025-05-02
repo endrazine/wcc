@@ -62,6 +62,11 @@
 #define DF_1_NOW        0x00000001
 #define DF_1_PIE        0x08000000
 
+/**
+* Imported function prototype
+*/
+int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned int no_now_flag, unsigned int use_segments);
+
 
 const struct option long_options[] = {
 	{ "libify", no_argument, 0, 'l' },
