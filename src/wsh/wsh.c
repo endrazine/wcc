@@ -43,6 +43,7 @@
 * Imported function prototypes
 */
 int userland_load_binary(char *fname);
+int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned int no_now_flag, unsigned int use_segments);
 
 /**
 * Forward declarations
@@ -5267,7 +5268,7 @@ char *ar2lib(char *name)
 
 /**
 * Patch ELF ehdr->e_type to ET_DYN
-*/
+*
 int mk_lib(char *name)
 {
   int fd = 0;
@@ -5318,11 +5319,6 @@ int mk_lib(char *name)
     exit(EXIT_FAILURE);
   }
 
-  /**
-  * Work around : https://patchwork.ozlabs.org/project/glibc/patch/20190312130235.8E82C89CE49C@oldenburg2.str.redhat.com/
-  * We need to find and nullify entries DT_FLAGS, DT_FLAGS_1 and DT_BIND_NOW in dynamic section
-  * Use segments instead of sections so we may load ELFs without section headers.
-  */
   elf = (Elf_Ehdr *) map;
   phdr = (Elf_Phdr *) (map + elf->e_phoff);
   phnum = elf->e_phnum;
@@ -5353,6 +5349,8 @@ int mk_lib(char *name)
   close(fd);
   return 0;
 }
+
+*/
 
 /**
 * Attempt to patch a ET_EXEC binary as ET_DYN,
@@ -5423,7 +5421,7 @@ int attempt_to_patch(char *libname)
 	/**
 	* Patch ET_EXEC into ET_DYN
 	*/
-	mk_lib(outlib);
+	mk_lib(outlib, 1, 1, 1, 0);
 
 	if(wsh->libified++ != 0){
 		printf("\n\n Libifying more than once per process is likely to crash...\n\n");

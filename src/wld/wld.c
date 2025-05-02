@@ -27,9 +27,6 @@
 * SOFTWARE.
 *******************************************************************************
 *
-* Work around : https://patchwork.ozlabs.org/project/glibc/patch/20190312130235.8E82C89CE49C@oldenburg2.str.redhat.com/
-* We need to find and nullify entries DT_FLAGS, DT_FLAGS_1 and DT_BIND_NOW in dynamic section
-*
 * Note:
 *   Option -S performs libification using segments instead of sections.  
 *
@@ -65,14 +62,6 @@
 #define DF_1_NOW        0x00000001
 #define DF_1_PIE        0x08000000
 
-const struct option long_options[] = {
-	{ "libify", no_argument, 0, 'l' },
-	{ "no-init", no_argument, 0, 'n' },
-	{ "no-bind-now", no_argument, 0, 'N' },
-	{ "strip-symbol-versions", no_argument, 0, 's' },
-	{ "use-segments", no_argument, 0, 'S' },
-	{ 0, 0, 0, 0 }
-};
 
 /**
 * Process 64bits ELF binary using Segments
@@ -723,96 +712,3 @@ int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned 
 	return 0;
 }
 
-int print_version(void)
-{
-	printf("%s version:%s    (%s %s)\n", WNAME, WVERSION, WTIME, WDATE);
-	return 0;
-}
-
-int usage(char *name)
-{
-	print_version();
-	printf("\nUsage: %s <-l|--libify> [-n|--no-init] [-s|--strip-symbol-versions] [-N|--no-bind-now] [-S|--use-segments] file\n", name);
-	printf("\nOptions:\n");
-	printf("    --libify (-l)                         Transform executable into shared library.\n");
-	printf("    --no-init (-n)                        Remove constructors and desctructors from output library.\n");
-	printf("    --no-bind-now (-N)                    Remove BIND_NOW flag from output library.\n");
-	printf("    --strip-symbol-versions (-s)          Strip symbol versions from output library.\n");
-	printf("    --use-segments (-S)                   Process binary using segments rather than sections\n");
-
-	return 0;
-}
-
-int main(int argc, char **argv)
-{
-	char c = 0;
-	int option_index = 0;
-	char *target = 0;
-	int libify_flag = 0;
-	int noinit_flag = 0;
-	int strip_vernum_flag = 0;
-	int no_now_flag = 0;
-	int use_segments_flag = 0;
-
-	if ((argc < 2)) {
-		usage(argv[0]);
-		exit(EXIT_FAILURE);
-	}
-
-	while (1) {
-
-		c = getopt_long(argc, argv, "lnNsS", long_options, &option_index);
-		if ((c == 0xff)||(c == -1)) {
-			break;
-		}
-
-		switch (c) {
-
-		case 'l':
-			libify_flag = 1;
-			break;
-
-		case 'n':
-			noinit_flag = 1;
-			break;
-
-		case 'N':
-			no_now_flag = 1;
-			break;
-
-		case 's':
-			strip_vernum_flag = 1;
-			break;
-
-		case 'S':
-			use_segments_flag = 1;
-			break;
-
-		default:
-			fprintf(stderr, "!! ERROR: unknown option : '%c'\n", c);
-			return NULL;
-
-		}
-	}
-
-	if (optind == argc) {
-		printf("\n!! ERROR: Not enough parameters\n\n");
-		usage(argv[0]);
-	}
-
-	if (optind != argc - 1) {
-		printf("\n!! ERROR: Too many parameters\n\n");
-		usage(argv[0]);
-	}
-
-	if (!libify_flag) {
-		printf("\n!! ERROR: --libify option not set : not processing\n\n");
-		usage(argv[0]);
-	}
-	// assume given argument is an input file, find absolute path
-	target = realpath(argv[optind], 0);
-
-	mk_lib(target, noinit_flag, strip_vernum_flag, no_now_flag, use_segments_flag);
-
-	return 0;
-}
