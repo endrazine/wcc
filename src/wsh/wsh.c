@@ -1409,7 +1409,7 @@ int print_functions(lua_State * L)
 
 					/* handle breaks via getchar() */
 					pcnt++;
-					if((!returnall)&&(pcnt == LINES_MAX)){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
+//					if((!returnall)&&(pcnt == LINES_MAX)){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
 				}
 
 			}
@@ -5424,7 +5424,7 @@ int attempt_to_patch(char *libname)
 	mk_lib(outlib, 1, 1, 1, 0);
 
 	if(wsh->libified++ != 0){
-		printf("\n\n Libifying more than once per process is likely to crash...\n\n");
+		printf("\n\n Libifying more than one (ET_EXEC) ELF per process may lead to crashes...\n\n");
 	}
 
 	return dlopen(outlib, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
@@ -5462,7 +5462,7 @@ struct link_map *do_loadlib(char *libname)
 		}
 	}
 
-	if (wsh->opt_verbose) {
+	if ((wsh->opt_verbose)&&(handle)) {
 		printf("  * Base address: %p\n", (void *) handle->l_addr);
 	}
 

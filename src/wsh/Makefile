@@ -18,10 +18,10 @@ ifeq ($(unamem), x86_64)
 CFLAGS += -masm=intel
 endif
 
-ifeq ($(unamep), x86_64)
-WLINK	:= -Wl,-T -Wl,script.lds
+ifeq ($(unamem), x86_64)
+WLINK	= -Wl,-T -Wl,script.lds
 else
-WLINK	:=
+WLINK	=
 endif
 
 all::
@@ -45,7 +45,7 @@ test:
 	cd tests && make
 
 clean::
-	rm wsh elfloader64.o helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o learnwitch.log libwsh.so -f
+	rm wsh elfloader64.o helper.o wsh.o wshmain.o libwitch.so libwitch.a linenoise.o learnwitch.log libwsh.so wsh-* -f
 	cd openlibm && make clean
 	cd lua && make clean
 	cd tests && make clean
