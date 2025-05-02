@@ -2408,20 +2408,17 @@ unsigned int open_best(ctx_t *ctx)
 	// Open as object
 	formatok = bfd_check_format(ctx->abfd, bfd_object);
 	if(!formatok) { 
-                fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
-                err("bfd_check_format() failed\n");
+                fprintf (stderr, " !! WARNING: bfd_check_format() failed : %s\n", bfd_errmsg (bfd_get_error ()));
         }else{
         	printf("Fileformat ok: %x\n", formatok);
         }
         ok = bfd_check_format_matches(ctx->abfd, bfd_object, &matching);
 	
         if (!ok) {
-                fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
-                err("bfd_check_format_matches() failed\n");
+                fprintf (stderr, " !! WARNING: bfd_check_format_matches() failed : %s\n", bfd_errmsg (bfd_get_error ()));
 
                 if (bfd_get_error() != bfd_error_file_ambiguously_recognized || (matching == NULL && target == NULL)) {
-                        fprintf (stderr, " !! WARNING: %s\n", bfd_errmsg (bfd_get_error ()));
-                        err("ambiguous BFD executable file format\n");
+                        fprintf (stderr, " !! WARNING: ambiguous BFD executable file format : %s\n", bfd_errmsg (bfd_get_error ()));
                         return -1;
                 } else if (retries < 3) {
                         retries++;
