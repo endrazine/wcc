@@ -14,8 +14,8 @@ function str2md5(input)
 	MD5_Update(ctx, input, strlen(input))
 	MD5_Final(out, ctx)
 
-	free(ctx)
-	free(out)
+--	free(ctx)
+--	free(out)
 	return out
 end
 

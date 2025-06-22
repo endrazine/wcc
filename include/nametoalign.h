@@ -45,7 +45,7 @@ assoc_nametoalign_t nametoalign[] = {
 {".bss", 32},
 {".comment", 1},
 {".ctors", 8},
-{".data", 32},
+{".data", 8},
 {".data.rel.ro", 32},
 {".debug_abbrev", 1},
 {".debug_aranges", 16},
@@ -88,7 +88,7 @@ assoc_nametoalign_t nametoalign[] = {
 {".rel.plt", 4},
 {".rela.dyn", 8},
 {".rela.plt", 8},
-{".rodata", 32},
+{".rodata", 1},
 {".rsrc", 1},	// Microsoft Windows's resources
 {".shstrtab", 1},
 {".strtab", 1},

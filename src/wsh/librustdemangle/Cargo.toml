@@ -1,0 +1,11 @@
+[package]
+name = "rust_demangle_lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rustc-demangle = "0.1"
+
+[lib]
+name = "rust_demangle"
+crate-type = ["staticlib"]

@@ -30,7 +30,7 @@
 */
 
 #define WNAME   "Witchcraft Compiler Collection (WCC)"
-#define WVERSION "0.0.9"
+#define WVERSION "0.0.10"
 #define WDATE __DATE__
 #define WTIME __TIME__
 

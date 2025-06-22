@@ -38,6 +38,14 @@
 #include <libgen.h>	// For basename()
 #include <lauxlib.h>
 #include <sys/sendfile.h> // For sendfile()
+#include <string.h>
+#include <regex.h>
+
+/**
+* Rust demangling function prototypes
+*/
+char* rust_demangle(const char* mangled);
+void rust_demangle_free(char* ptr);
 
 /**
 * Imported function prototypes
@@ -2756,6 +2764,120 @@ int luabuff_append(char *cmd){
 	return 0;
 }
 
+/**
+* Extract just the function name from a fully qualified name
+*/
+char* extract_function_name(const char* full_name) {
+    if (!full_name) return NULL;
+    
+    char* result = strdup(full_name);
+    char* name = result;
+    
+    // Remove parameters - find first '(' and truncate there
+    char* params = strchr(name, '(');
+    if (params) {
+        *params = '\0';
+    }
+    
+    // Remove template parameters - find first '<' and truncate there
+    char* templates = strchr(name, '<');
+    if (templates) {
+        *templates = '\0';
+    }
+    
+    // For Rust/C++: extract last component after final '::'
+    char* last_colon = strstr(name, "::");
+    char* function_start = name;
+    
+    while (last_colon) {
+        function_start = last_colon + 2;
+        last_colon = strstr(function_start, "::");
+    }
+    
+    // If we found a different start point, move the string
+    if (function_start != name) {
+        memmove(name, function_start, strlen(function_start) + 1);
+    }
+    
+    return result;
+}
+
+/**
+* Detect if a given symbol is a Rust symbol
+*/
+int is_likely_rust_symbol(const char *symbol)
+{
+	if (!symbol)
+		return 0;
+
+	// Definitive Rust v0 mangling
+	if (strncmp(symbol, "_R", 2) == 0) {
+		return 1;
+	}
+	// Legacy Rust symbols (Itanium-style but with Rust characteristics)
+	if (strncmp(symbol, "_ZN", 3) == 0) {
+		// Look for Rust hash suffixes: ::h[16 hex digits]E
+		if (strstr(symbol, "17h") && strlen(symbol) > 20) {
+			// Check if it ends with 16 hex chars + E
+			char *h_pos = strstr(symbol, "17h");
+			if (h_pos && strlen(h_pos) >= 19) {
+				char *end = h_pos + 3 + 16;	// "17h" + 16 hex chars
+				if (*end == 'E' || *(end + 1) == 'E') {
+					return 1;
+				}
+			}
+		}
+		// Look for common Rust crate names
+		if (strstr(symbol, "3std") ||	// std::
+		    strstr(symbol, "4core") ||	// core::
+		    strstr(symbol, "5alloc") ||	// alloc::
+		    strstr(symbol, "4proc") ||	// proc_macro::
+		    strstr(symbol, "4test")) {	// test::
+			return 1;
+		}
+		// Look for Rust-specific patterns
+		if (strstr(symbol, "4main") ||	// main function
+		    strstr(symbol, "5panic") ||	// panic functions
+		    strstr(symbol, "6Option") ||	// Option<T>
+		    strstr(symbol, "6Result")) {	// Result<T>
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/**
+* Attempt to demangle Rust or C++ functions
+*/
+char* universal_demangle(const char* symbol) {
+    char* demangled = NULL;
+    
+    if (strncmp(symbol, "_R", 2) == 0 || 
+        (strncmp(symbol, "_ZN", 3) == 0 && is_likely_rust_symbol(symbol))) {
+        // Rust symbol - always need post-processing
+        char* full = rust_demangle(symbol);
+        if (full) {
+            demangled = extract_function_name(full);
+            free(full);
+        }
+    } else if (strncmp(symbol, "_Z", 2) == 0) {
+        // C++ symbol - try different flag combinations
+        
+        // Try without parameters first
+        demangled = cplus_demangle(symbol, DMGL_ANSI);
+        
+        if (demangled) {
+            // Still might have parameters, clean up
+            char* cleaned = extract_function_name(demangled);
+            free(demangled);
+            demangled = cleaned;
+        }
+    }
+    
+    return demangled ? demangled : strdup(symbol);
+}
+
 void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 {
 	unsigned int cnt = 0;
@@ -2766,6 +2888,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 	unsigned int j = 0;
 	unsigned skip_bl = 0;
 	char newname[1024];
+	char *luacmd = 0;
 
 	/**
 	* Walk symbol table
@@ -2817,7 +2940,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 		/**
 		* Demangle symbol if possible
 		*/
-		demangled = cplus_demangle(symname, DMGL_ANSI/*DMGL_PARAMS*/);
+		demangled = universal_demangle(symname);
 
 		// Skip if symbol has no name or no type
 		if (strlen(symname) && (htype) && (address != (unsigned long int) -1) && (address)) {
@@ -2858,18 +2981,12 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 				/**
 				* Create a wrapper function with the original name
 				*/
-				char *luacmd = calloc(1, 2048);
-				snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", symname, newname);
-				luabuff_append(luacmd);
-				free(luacmd);
-				// Add function/object to linked list
-				scan_symbol(symname, libname);
 
 				/**
 				* Handle demangled symbols
 				*/
-/*
-				if(demangled){
+
+				if (demangled) {
 					printf(" -- demangled: %s\n", demangled);
 					luacmd = calloc(1, 1024);
 					snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
@@ -2878,8 +2995,16 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 					// Add function/object to linked list
 					scan_symbol(demangled, libname);
 
+				} else {
+					luacmd = calloc(1, 2048);
+					snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", symname, newname);
+					luabuff_append(luacmd);
+					free(luacmd);
+					// Add function/object to linked list
+					scan_symbol(symname, libname);
+				
 				}
-*/
+
 
 			} else {
 				/**

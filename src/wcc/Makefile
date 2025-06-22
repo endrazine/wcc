@@ -22,11 +22,14 @@
 # capstone and libbfd are installed on the system.
 #
 
+CFLAGS := -W -Wall -Wno-discarded-qualifiers -Wno-int-conversion -Wno-unused-parameter -Wno-unused-function -Wno-unused-result -fpie -pie -fPIC -g3 -ggdb -I../../include  -I./include/sflib/ -I./include -I../../include/  -Wno-incompatible-pointer-types  -fstack-protector-all -Wl,-z,relro,-z,now -DPACKAGE -DPACKAGE_VERSION -rdynamic  -O0 -ggdb -g3 /lib/libbfd-2.43.so 
+#-D_FORTIFY_SOURCE=2 -O2
+
 WCC :=  ./wcc
 FILE := file
 
 all::
-	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd -lelf -lcapstone
+	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd-2.43 -lelf -lcapstone
 #	$(CC) $(CFLAGS) -m32 -Wl,-rpath /home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wcc/lib32/  wcc.c -o wcc32 -lelf ./lib32/libbfd-2.24-system.so ./lib32/libcapstone.so.3
 
 	cp wcc ../../bin/  || :
@@ -34,7 +37,7 @@ all::
 
 test::
 	$(WCC) /bin/ls -o ./ls.o -c
-	$(CC) ./ls.o -o ./ls.so -shared -g3 -ggdb -O0
+	$(CC) ./ls.o -o ./ls.so -shared -g3 -ggdb -O0 -lselinux -lc
 	$(FILE) ls.so
 clean:
 	rm -f wcc a.out wcc.o core wcc32 ls.o ls.so

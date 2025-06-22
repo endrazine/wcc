@@ -2,7 +2,9 @@
 *
 * Witchcraft Compiler Collection - wldd
 *
-* Author: Markus Gothe <nietzsche@lysator.liu.se>
+* Authors: 
+* Markus Gothe <nietzsche@lysator.liu.se>
+* Jonathan Brossard <endrazine@gmail.com>
 *
 *******************************************************************************
 * The MIT License (MIT)
@@ -49,6 +51,99 @@
 #include <libelf.h>
 #include <gelf.h>
 
+
+int opt_verbose = 0;
+
+#include <fcntl.h>
+#include <fcntl.h>            /* Definition of AT_* constants */
+#include <sys/syscall.h>      /* Definition of SYS_* constants */
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <link.h>
+
+// Function to search for library in standard paths
+char* find_library_path(const char* libname) {
+    // Check if the name already contains a path
+    if (strchr(libname, '/') != NULL) {
+        if (access(libname, F_OK) == 0) {
+            return realpath(libname, NULL);
+        }
+        return NULL;
+    }
+
+    // Get LD_LIBRARY_PATH environment variable
+    char* ld_path = getenv("LD_LIBRARY_PATH");
+    if (ld_path != NULL) {
+        char* ld_copy = strdup(ld_path);
+        char* path = strtok(ld_copy, ":");
+
+        while (path != NULL) {
+            char full_path[1024];
+            snprintf(full_path, sizeof(full_path), "%s/%s", path, libname);
+            
+            if (access(full_path, F_OK) == 0) {
+                free(ld_copy);
+                return realpath(full_path, NULL);
+            }
+            
+            path = strtok(NULL, ":");
+        }
+        free(ld_copy);
+    }
+
+    // Check standard library paths
+    const char* standard_paths[] = {
+        "/lib",
+        "/usr/lib",
+        "/usr/local/lib",
+        "/lib/x86_64-linux-gnu",  // Common on Debian/Ubuntu
+        "/usr/lib/x86_64-linux-gnu",
+        NULL
+    };
+
+    for (int i = 0; standard_paths[i] != NULL; i++) {
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", standard_paths[i], libname);
+        
+        if (access(full_path, F_OK) == 0) {
+            return realpath(full_path, NULL);
+        }
+    }
+
+    // Check paths from /etc/ld.so.conf
+    FILE* conf = fopen("/etc/ld.so.conf", "r");
+    if (conf != NULL) {
+        char line[1024];
+        while (fgets(line, sizeof(line), conf)) {
+            // Remove newline
+            line[strcspn(line, "\n")] = 0;
+            
+            // Skip comments and empty lines
+            if (line[0] == '#' || line[0] == '\0') continue;
+            
+            // Handle include directives
+            if (strncmp(line, "include ", 8) == 0) {
+                // For simplicity, we'll skip nested includes
+                continue;
+            }
+            
+            char full_path[1024];
+            snprintf(full_path, sizeof(full_path), "%s/%s", line, libname);
+            
+            if (access(full_path, F_OK) == 0) {
+                fclose(conf);
+                return realpath(full_path, NULL);
+            }
+        }
+        fclose(conf);
+    }
+
+    return NULL;
+}
+
 int main(int argc, char **argv)
 {
     int fd = 0;
@@ -62,9 +157,13 @@ int main(int argc, char **argv)
     size_t shstrndx = 0;
     int found_dynamic_section = 0, found_lib = 0;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s filename\n", argv[0]);
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s filename [-v]\n", argv[0]);
         exit(EXIT_FAILURE);
+    }
+    
+    if(argc > 2) {
+    	opt_verbose = 1;
     }
 
     if (elf_version(EV_CURRENT) == EV_NONE) {
@@ -145,13 +244,18 @@ int main(int argc, char **argv)
                     fprintf(stderr, "elf_strpt() failed: %s\n", elf_errmsg ( -1));
                     goto exit_fail;
                 }
-                
-                /* Parse out the library's name */
-                tmplib = calloc(strlen(lib),  sizeof(char));
-                sscanf(lib, "lib%[^.|^-]", tmplib);
-                printf("-l%s ", tmplib);
-                free(tmplib);
-                found_lib = 1;
+
+		if (!opt_verbose) {                
+		        /* Parse out the library's name */
+		        tmplib = calloc(strlen(lib),  sizeof(char));
+		        sscanf(lib, "lib%[^.|^-]", tmplib);
+		        printf("-l%s ", tmplib);
+		        free(tmplib);
+		        found_lib = 1;
+                } else {
+                	printf("%s ", find_library_path(lib));
+		        found_lib = 1;
+                }
             }
         }
         if(found_lib != 0) {

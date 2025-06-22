@@ -79,7 +79,7 @@
 #define FLAG_NOWRITE    4
 #define FLAG_TEXT       8
 
-#define EXTRA_CREATED_SECTIONS 4
+#define EXTRA_CREATED_SECTIONS 5
 
 
 #define RELOC_X86_64 1
@@ -343,6 +343,8 @@ unsigned int secindex_from_name_after_strip(ctx_t * ctx, const char *name);
 int analyze_text(ctx_t * ctx, char *data, unsigned int datalen, unsigned long int addr);
 int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend);
 
+int verify_critical_relocations(ctx_t *ctx);
+void debug_crash_analysis(ctx_t *ctx);
 
 /**
 * Globals
@@ -360,6 +362,12 @@ unsigned int globalsymindex = 0;
 char *globalreloc = 0;
 unsigned int globalreloclen = 0;
 unsigned int globalrelocoffset = 0;
+
+char *globaldatareloc = 0;
+unsigned int globaldatareloclen = 0;
+unsigned int globaldatarelocoffset = 0;
+
+unsigned int extrasectionnum = 0;
 
 unsigned long int mintext = -1;
 unsigned long int maxtext = 0;
@@ -468,6 +476,7 @@ void add_symaddr(ctx_t *ctx, const char *name, int addr, char symclass)
 	*/
 	if (globalsymtab == 0) {
 		globalsymtab = calloc(1, sizeof(Elf_Sym) * 2);
+		memset(globalsymtab, 0x00, sizeof(Elf_Sym) * 2);
 		globalsymtablen += sizeof(Elf_Sym);	// Skip 1 NULL entry
 	} else {
 		globalsymtab = realloc(globalsymtab, sizeof(Elf_Sym) + globalsymtablen);
@@ -567,19 +576,27 @@ int rd_symbols(ctx_t *ctx)
 	* Process symbol table
 	*/
 	storage_needed = bfd_get_symtab_upper_bound(ctx->abfd);
+	printf("storage_needed: %ld\n", storage_needed);	
+
 	if (storage_needed < 0) {
-		bfd_perror("warning: bfd_get_symtab_upper_bound");
+		bfd_perror(" !! WARNING: bfd_get_symtab_upper_bound");
 		ret = 0;
 		goto dynsym;
 	}
 	if (storage_needed == 0) {
-		fprintf(stderr, "warning: no symbols\n");
+		fprintf(stderr, " !! WARNING: no symbols\n");
 		goto dynsym;
 	}
+
+	if (storage_needed == 1) {
+		fprintf(stderr, " !! WARNING: no symbols\n");
+		goto dynsym;
+	}
+	
 	symbol_table = (asymbol **) malloc(storage_needed);
 	number_of_symbols = bfd_canonicalize_symtab(ctx->abfd, symbol_table);
 	if (number_of_symbols < 0) {
-		bfd_perror("warning: bfd_canonicalize_symtab");
+		bfd_perror(" !! WARNING: bfd_canonicalize_symtab");
 		ret = 0;
 		goto dynsym;
 	}
@@ -609,21 +626,32 @@ int rd_symbols(ctx_t *ctx)
 	}
 	symbol_table = NULL;
 
+	if(!ctx->abfd){
+		fprintf(stderr, " !! WARNING: no symbols\n");
+		goto out;	
+	}
+
 	storage_needed = bfd_get_dynamic_symtab_upper_bound(ctx->abfd);
+	printf("storage_needed: %ld\n", storage_needed);	
 	if (storage_needed < 0) {
-		bfd_perror("warning: bfd_get_dynamic_symtab_upper_bound");
+		bfd_perror(" !! WARNING: bfd_get_dynamic_symtab_upper_bound");
 		ret = 0;
-//		goto out;
 		exit(EXIT_FAILURE);
 	}
 	if (storage_needed == 0) {
-		fprintf(stderr, "warning: no symbols\n");
+		fprintf(stderr, " !! WARNING: no symbols\n");
 		goto out;
 	}
+	
+	if (storage_needed == 1) {
+		fprintf(stderr, " !! WARNING: no symbols\n");
+		goto dynsym;
+	}
+	
 	symbol_table = (asymbol **) malloc(storage_needed);
 	number_of_symbols = bfd_canonicalize_dynamic_symtab(ctx->abfd, symbol_table);
 	if (number_of_symbols < 0) {
-		bfd_perror("warning: bfd_canonicalize_symtab");
+		bfd_perror(" !! WARNING: bfd_canonicalize_symtab");
 		ret = 0;
 		goto dynsym;
 	}
@@ -1334,10 +1362,15 @@ static int write_strtab_and_reloc(ctx_t *ctx)
 	// truncate
 	ftruncate(ctx->fdout, tmpm);
 
-	// write relocations to binary
+	// write .text relocations to binary
 	tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
 	globalrelocoffset = tmpm;
 	write(ctx->fdout, globalreloc, globalreloclen);
+
+	// write .data relocations to binary
+	tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
+	globaldatarelocoffset = tmpm;
+	write(ctx->fdout, globaldatareloc, globaldatareloclen);
 
 	// write string table to binary
 	tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
@@ -1347,6 +1380,7 @@ static int write_strtab_and_reloc(ctx_t *ctx)
 	// write symbol table to binary
 	tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
 	globalsymtableoffset = tmpm;
+	memset(globalsymtab, 0x00, sizeof(Elf_Sym));	// Make sure first entry is NULL	
 	write(ctx->fdout, globalsymtab, globalsymtablen);
 
 	return 0;
@@ -1413,7 +1447,7 @@ static int fix_symtab_bindings(ctx_t *ctx)
 	      	printf("\n-- Displaying final symbols\n");
 	}
 
-	for (sindex = 0; sindex < (globalsymtablen / sizeof(Elf_Sym)); sindex++) {
+	for (sindex = maxnewsec + 1 + extrasectionnum; sindex < (globalsymtablen / sizeof(Elf_Sym)); sindex++) {
 
 		// get symbol name from index
 		s = globalsymtab + sindex * sizeof(Elf_Sym);
@@ -1613,26 +1647,28 @@ static int parse_reloc(ctx_t *ctx, msec_t *s)
 
 	has_addend = (shdr->sh_type == SHT_RELA) ? 1 : 0;	// SHT_RELA has addends, SHT_REL doesn't
 
+	printf(" ** relocations in section: %s\n",s->name);
+
 	if ((shdr->sh_type == SHT_RELA)
 	    && ((int) shdr->sh_entsize != entszfromname(".rela.dyn"))) {
-		printf("warning: strange relocation size: %lu != %u in %s\n", shdr->sh_entsize, entszfromname(".rela.dyn"), s->name);
+		printf(" !! WARNING: strange relocation size: %lu != %u in %s\n", shdr->sh_entsize, entszfromname(".rela.dyn"), s->name);
 		return -1;
 	}
 
 	if ((shdr->sh_type == SHT_REL)
 	    && ((int) shdr->sh_entsize != entszfromname(".rel.dyn"))) {
-		printf("warning: strange relocation size: %lu != %u in %s\n", shdr->sh_entsize, entszfromname(".rel.dyn"), s->name);
+		printf(" !! WARNING: strange relocation size: %lu != %u in %s\n", shdr->sh_entsize, entszfromname(".rel.dyn"), s->name);
 		return -1;
 	}
 
 	if ((shdr->sh_type == SHT_RELA)
 	    && ((int) shdr->sh_size % entszfromname(".rela.dyn"))) {
-		printf("warning: strange relocation section size: %lu not a multiple of %u in %s\n", shdr->sh_size, entszfromname(".rela.dyn"), s->name);
+		printf(" !! WARNING: strange relocation section size: %lu not a multiple of %u in %s\n", shdr->sh_size, entszfromname(".rela.dyn"), s->name);
 		return -1;
 	}
 
 	if ((shdr->sh_type == SHT_REL) && (shdr->sh_size % entszfromname(".rel.dyn"))) {
-		printf("warning: strange relocation section size: %lu not a multiple of %u in %s\n", shdr->sh_size, entszfromname(".rel.dyn"), s->name);
+		printf(" !! WARNING: strange relocation section size: %lu not a multiple of %u in %s\n", shdr->sh_size, entszfromname(".rel.dyn"), s->name);
 		return -1;
 	}
 
@@ -1692,8 +1728,8 @@ int fixup_strtab_and_symtab(ctx_t *ctx)
 		printf("\n -- Fixing strtab and symtab with delta of %u\n\n", deltastrtab);
 	}
 
-	for (sindex = maxnewsec + 1; sindex < (globalsymtablen / sizeof(Elf_Sym)); sindex++) {
-
+	for (sindex = maxnewsec + 1 + extrasectionnum; sindex < (globalsymtablen / sizeof(Elf_Sym)); sindex++) {
+//printf("patching index: %u\n", sindex);
 		// get symbol name from index
 		s = globalsymtab + sindex * sizeof(Elf_Sym);
 
@@ -1793,8 +1829,11 @@ static unsigned int parse_relocations(ctx_t *ctx)
 */
 unsigned int append_sym(Elf_Sym *s)
 {
+		printf(" -- global symtab length: %u\n", globalsymtablen);
+
 	if (globalsymtab == 0) {
 		globalsymtab = calloc(1, sizeof(Elf_Sym) * 2);
+		memset(globalsymtab, 0x00, sizeof(Elf_Sym) * 2);
 		globalsymtablen += sizeof(Elf_Sym);	// Skip 1 NULL entry
 	} else {
 		globalsymtab = realloc(globalsymtab, sizeof(Elf_Sym) + globalsymtablen);
@@ -1856,7 +1895,7 @@ static int create_section_symbols(ctx_t *ctx)
 		printf(" -- Max section index after stripping: %u\n", maxnewsec);
 	}
 
-	// Create symbol for section
+	// Create symbol for existing sections
 	for (i = 1; i <= maxnewsec; i++) {
 
 		char *newsname = 0;
@@ -1888,13 +1927,13 @@ static int create_section_symbols(ctx_t *ctx)
 		nameptr = append_strtab(newsname);
 
 		if (ctx->opt_debug) {
-			printf("%u %s\n", i, newsname);
+			printf(" [%02u] %s\n", i, newsname);
 		}
 
 		sym->st_name = nameptr;
 		sym->st_size = 0;
 		sym->st_value = 0;
-		sym->st_info = STT_SECTION;
+		sym->st_info = ELF64_ST_INFO(STB_LOCAL, STT_SECTION);
 		sym->st_other = 0;
 		sym->st_shndx = i;
 
@@ -1903,13 +1942,15 @@ static int create_section_symbols(ctx_t *ctx)
 
 	free(sym);
 
+	printf("\n");
+
 	deltastrtab = globalstrtablen;
 
-	if (ctx->opt_debug) {
+/*	if (ctx->opt_debug) {
 		printf(" -- Base sections symbol index: %u\n", 0);
 		printf(" -- Delta string table: %u\n", deltastrtab);
 	}
-
+*/
 	return 0;
 }
 
@@ -1921,11 +1962,20 @@ static unsigned int process_text(ctx_t *ctx)
 	t = section_from_name(ctx, ".text");
 	delta = orig_text - textvma;
 
-	// create section symbols
-//      create_section_symbols(ctx);
-
 	// parse text for relocations
 	analyze_text(ctx, (char *) (t->data + delta), maxtext - mintext - delta, orig_text);
+
+	return 0;
+}
+
+static unsigned int process_data(ctx_t *ctx)
+{
+	msec_t *t = 0;
+
+	t = section_from_name(ctx, ".data");
+
+	// parse .data and re-create missing relocations
+	analyze_data(ctx, t);
 
 	return 0;
 }
@@ -1977,6 +2027,11 @@ static unsigned int write_shdrs(ctx_t *ctx)
 		s->s_elf->sh_name = ctx->strndx_len;
 		ctx->strndx_len += strlen(s->name) + 1;
 
+		// adjust .text permissions
+		if(!strncmp(s->name, ".text", 6)){
+				s->s_elf->sh_flags = 6;
+		}
+
 		// adjust section links and info
 		s->s_elf->sh_link = link_from_name(ctx, s->name);	// Link to another section
 		s->s_elf->sh_info = info_from_name(ctx, s->name);	// Additional section information
@@ -1984,6 +2039,41 @@ static unsigned int write_shdrs(ctx_t *ctx)
 		// write section header to binary
 		write(ctx->fdout, s->s_elf, sizeof(Elf_Shdr));
 	}
+
+	/**
+	* Add a section header for a .note.GNU-stack section
+	*/
+/*
+	// append name to strndx
+	memcpy(ctx->strndx + ctx->strndx_len, ".note.GNU-stack", 16);
+
+	tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
+	
+	shdr = calloc(1, sizeof(Elf_Shdr));
+
+	shdr->sh_name = ctx->strndx_len;	// index in string table
+	shdr->sh_type = SHT_PROGBITS;	// Section type
+	shdr->sh_flags = 0;	// Section flags
+	shdr->sh_addr = 0;	// Section virtual addr at execution
+	shdr->sh_offset = tmpm;//globalrelocoffset;	// Section file offset
+	shdr->sh_size = 0;	//globalreloclen;	// Section size in bytes
+	shdr->sh_link = 0;	// Link to another section
+	shdr->sh_info = 0;
+	shdr->sh_addralign = 1;	// Section alignment
+	shdr->sh_entsize = 0;
+
+	ctx->strndx_len += 16;
+
+	// append string table section header to binary
+	write(ctx->fdout, shdr, sizeof(Elf_Shdr));
+	free(shdr);
+ctx->shnum++;
+maxsec++;
+	ctx->strndx_index = ctx->shnum + 1;
+	// append sections string table to binary
+	//write(ctx->fdout, ctx->strndx, ctx->strndx_len);
+
+*/
 
 	/**
 	* Add a section header for relocations
@@ -1999,7 +2089,7 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	shdr->sh_addr = 0;	// Section virtual addr at execution
 	shdr->sh_offset = globalrelocoffset;	// Section file offset
 	shdr->sh_size = globalreloclen;	// Section size in bytes
-	shdr->sh_link = ctx->shnum + 3;	// Link to another section
+	shdr->sh_link = ctx->shnum + 4;	// Link to another section
 	shdr->sh_info = 1;	// Additional section information  : .text
 	shdr->sh_addralign = 8;	// Section alignment
 	shdr->sh_entsize = entszfromname(".rela.plt");	// Entry size if section holds table
@@ -2013,6 +2103,43 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	ctx->strndx_index = ctx->shnum + 1;
 	// append sections string table to binary
 	//  write(ctx->fdout, ctx->strndx, ctx->strndx_len);
+
+
+	/**
+	* Add a section header for .data relocations
+	*/
+	
+	// append name to strndx
+	memcpy(ctx->strndx + ctx->strndx_len, ".data.rel", 10);
+
+	shdr = calloc(1, sizeof(Elf_Shdr));
+
+	shdr->sh_name = ctx->strndx_len;	// index in string table
+	shdr->sh_type = SHT_RELA;	// Section type
+	shdr->sh_flags = 2;	// Section flags
+	shdr->sh_addr = 0;	// Section virtual addr at execution
+	shdr->sh_offset = globaldatarelocoffset;	// Section file offset
+	shdr->sh_size = globaldatareloclen;	// Section size in bytes
+	shdr->sh_link = ctx->shnum + 4;	// Link to another section
+	shdr->sh_info = 3;	// Additional section information  : .data
+	shdr->sh_addralign = 8;	// Section alignment
+	shdr->sh_entsize = entszfromname(".rela.plt");	// Entry size if section holds table
+
+	ctx->strndx_len += 10;
+
+	// append string table section header to binary
+	write(ctx->fdout, shdr, sizeof(Elf_Shdr));
+	free(shdr);
+
+	ctx->shnum++;
+	maxsec++;
+
+	ctx->strndx_index = ctx->shnum + 1;
+	// append sections string table to binary
+	//write(ctx->fdout, ctx->strndx, ctx->strndx_len);
+
+
+
 
 	/**
 	* Add a section header for string table
@@ -2040,8 +2167,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	free(shdr);
 
 	ctx->strndx_index = ctx->shnum + 1;
-	// append sections strint table to binary
-//      write(ctx->fdout, ctx->strndx, ctx->strndx_len);
 
 
 	/**
@@ -2070,8 +2195,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	free(shdr);
 
 	ctx->strndx_index = ctx->shnum + 1;
-	// append sections strint table to binary
-//      write(ctx->fdout, ctx->strndx, ctx->strndx_len);
 
 	/**
 	* Append an additional section header for the Section header string table
@@ -2309,7 +2432,7 @@ int print_bfd_sections(ctx_t *ctx)
 
 	if (ctx->opt_verbose) {
 		printf("\n -- Input binary sections\n\n");
-		printf("             name                      address range     pages  perms    offset\n");
+		printf("             name                      address range     size   perms    offset\n");
 		printf(" --------------------------------------------------------------------------------\n");
 	}
 
@@ -2409,8 +2532,8 @@ unsigned int open_best(ctx_t *ctx)
 	formatok = bfd_check_format(ctx->abfd, bfd_object);
 	if(!formatok) { 
                 fprintf (stderr, " !! WARNING: bfd_check_format() failed : %s\n", bfd_errmsg (bfd_get_error ()));
-        }else{
-        	printf("Fileformat ok: %x\n", formatok);
+//        }else{
+//        	printf("Fileformat ok: %x\n", formatok);
         }
         ok = bfd_check_format_matches(ctx->abfd, bfd_object, &matching);
 	
@@ -2434,16 +2557,16 @@ unsigned int open_best(ctx_t *ctx)
                         goto retry;
                 }
 
-        }else{
-        	printf(" -- matching formats:\n");
-                list_matching_formats(matching);
-                printf(" -- BFD parsing: ok\n");        
-                printf(" -- arch size: %u\n", bfd_get_arch_size(ctx->abfd));
+//        }else{
+//        	printf(" -- matching formats:\n");
+//                list_matching_formats(matching);
+//                printf(" -- BFD parsing: ok\n");        
+//                printf(" -- arch size: %u\n", bfd_get_arch_size(ctx->abfd));
         }
 	
 	ctx->shnum = bfd_count_sections(ctx->abfd);
 	
-	printf("ctx->shnum = %x\n", ctx->shnum);
+//	printf("ctx->shnum = %x\n", ctx->shnum);
 	
 	ctx->corefile = 0;
 
@@ -2749,7 +2872,9 @@ int save_dynstr(ctx_t *ctx, GElf_Shdr shdr, char *binary)
 int save_dynsym(ctx_t *ctx, GElf_Shdr shdr, char *binary)
 {
 	if (globalsymtab == 0) {
-		globalsymtab = calloc(1, sizeof(Elf_Sym) + shdr.sh_size);
+		globalsymtab = calloc(1, 2*sizeof(Elf_Sym) + shdr.sh_size);
+		memset(globalsymtab, 0x00, sizeof(Elf_Sym));
+		globalsymtablen += sizeof(Elf_Sym);	// Skip 1 NULL entry
 	} else {
 		globalsymtab = realloc(globalsymtab, shdr.sh_size + globalsymtablen);
 	}
@@ -2782,7 +2907,7 @@ int fixup_symtab_section_index(ctx_t *ctx)
 	Elf_Sym *s = 0;
 	unsigned int sindex = 0;
 
-	for (sindex = maxnewsec + 1; sindex < globalsymtablen / sizeof(Elf_Sym); sindex++) {
+	for (sindex = maxnewsec + 1 + extrasectionnum; sindex < globalsymtablen / sizeof(Elf_Sym); sindex++) {
 
 		// get symbol name from index
 		s = globalsymtab + sindex * sizeof(Elf_Sym);
@@ -2805,7 +2930,7 @@ int append_reloc(Elf_Rela *r)
 		s = globalreloc + i * sizeof(Elf_Rela);
 		//
 		if (s->r_offset == r->r_offset) {
-			printf("warning: already have a relocation at %lu\n", r->r_offset);
+			printf(" !! WARNING: already have a .text relocation at %lu\n", r->r_offset);
 			return -1;	// already in relocation section
 		}
 	}
@@ -2819,6 +2944,35 @@ int append_reloc(Elf_Rela *r)
 
 	memcpy(globalreloc + globalreloclen, r, sizeof(Elf_Rela));
 	globalreloclen += sizeof(Elf_Rela);
+
+	return 0;
+
+}
+
+int append_data_reloc(Elf_Rela *r)
+{
+	unsigned int i = 0;
+	Elf_Rela *s = 0;
+
+	// search this address in reloc table
+	for (i = 0; i < globaldatareloclen / sizeof(Elf_Rela); i++) {
+		s = globaldatareloc + i * sizeof(Elf_Rela);
+		//
+		if (s->r_offset == r->r_offset) {
+			printf(" !! WARNING: already have a .data relocation at %lu\n", r->r_offset);
+			return -1;	// already in relocation section
+		}
+	}
+
+	// save relocation
+	if (!globaldatareloc) {
+		globaldatareloc = calloc(1, sizeof(Elf_Rela));
+	} else {
+		globaldatareloc = realloc(globaldatareloc, sizeof(Elf_Rela) + globaldatareloclen);
+	}
+
+	memcpy(globaldatareloc + globaldatareloclen, r, sizeof(Elf_Rela));
+	globaldatareloclen += sizeof(Elf_Rela);
 
 	return 0;
 
@@ -2896,17 +3050,17 @@ int save_reloc(ctx_t *ctx, Elf_Rela *r, unsigned int sindex, int has_addend)
 
 	// search symbol corresponding to this index
 	if (!globalsymtab) {
-		printf("warning: no symbol table for relocation index %u\n", sindex);
+		printf(" !! WARNING: no symbol table for relocation index %u\n", sindex);
 		return 0;
 	}
 
 	if (sindex > globalsymtablen / sizeof(Elf_Sym)) {	// verify index is within bound of symtab...
-		printf("warning: symbol index %u is out of bounds of symbol table\n", sindex);
+		printf(" !! WARNING: symbol index %u is out of bounds of symbol table\n", sindex);
 		return 0;
 	}
 
 	if (!globalstrtab) {
-		printf("warning: no string table for relocation index %u\n", sindex);
+		printf(" !! WARNING: no string table for relocation index %u\n", sindex);
 		return 0;
 	}
 	// get symbol name from index
@@ -2948,7 +3102,7 @@ int save_reloc(ctx_t *ctx, Elf_Rela *r, unsigned int sindex, int has_addend)
 			// Skip
 			if (ctx->opt_debug) {
 				printf
-				    ("warning: skipping unknown relocation for symbol: %s in section: %s\t%s\tat:%lu\toff:%lu\n",
+				    (" !! WARNING: skipping unknown relocation for symbol: %s in section: %s\t%s\tat:%lu\toff:%lu\n",
 				     sname, sec->name, reloc_htype(rtype), rout->r_offset, rout->r_offset - textvma);
 			}
 			s->st_shndx = 0;
@@ -2982,6 +3136,79 @@ int save_reloc(ctx_t *ctx, Elf_Rela *r, unsigned int sindex, int has_addend)
 	}
 
 	append_reloc(rout);
+	return 0;
+}
+
+int save_data_reloc(ctx_t *ctx, Elf_Rela *r, unsigned int sindex, int has_addend)
+{
+	Elf_Sym *s = 0;
+	char *sname = 0;
+	unsigned int i = 0;
+
+	int rtype = 0, outtype = 0;
+	char *htype = 0;
+	msec_t *sec = 0;
+
+	Elf_Rela *rout = 0;
+
+	rout = calloc(1, sizeof(Elf_Rela));	// Work on a copy of the relocation instead of the original one
+	memcpy(rout, r, sizeof(Elf_Rela));
+
+	if (!has_addend) {
+		rout->r_addend = 0;
+	};
+
+	// search symbol corresponding to this index
+	if (!globalsymtab) {
+		printf(" !! WARNING: no symbol table for relocation index %u\n", sindex);
+		return 0;
+	}
+
+	if (sindex > globalsymtablen / sizeof(Elf_Sym)) {	// verify index is within bound of symtab...
+		printf(" !! WARNING: symbol index %u is out of bounds of symbol table\n", sindex);
+		return 0;
+	}
+
+	if (!globalstrtab) {
+		printf(" !! WARNING: no string table for relocation index %u\n", sindex);
+		return 0;
+	}
+	// get symbol name from index
+	s = globalsymtab + sindex * sizeof(Elf_Sym);
+	sname = globalstrtab + s->st_name;
+
+	// check if name is "old_" : if so, skip
+	if (str_eq(sname, "old_")) {
+		return -1;
+	}
+
+	if (ctx->opt_debug) {
+		printf("\n * adding .data relocation for: %s\n", sname);
+	}
+
+	/**
+        * Convert relocation depending on type and source section
+        */
+
+	outtype = 0;
+//	rtype = ELF_R_TYPE(rout->r_info);
+//	sec = section_from_index(ctx, s->st_shndx);	// section related to this object
+
+#ifdef __x86_64__
+		outtype = R_X86_64_64;
+#else
+		outtype = R_386_32;
+#endif
+		rout->r_offset = r->r_offset;
+		rout->r_info = ELF_R_INFO(sindex, outtype);
+		rout->r_addend = r->r_addend;
+
+	if (ctx->opt_debug) {
+		htype = reloc_htype(outtype);
+		printf("-->>     %016lx\t%lu\t%s\t%u\taddend:%lu\t\n\n", rout->r_offset, rout->r_info, htype, sindex, rout->r_addend);
+	}
+
+	append_data_reloc(rout);
 	return 0;
 }
 
@@ -3253,7 +3480,7 @@ static int create_text_data_reloc(ctx_t *ctx, cs_insn *ins, msec_t *m, unsigned 
 		if (rip_relative) {	// compute new addend and set reloc type
 			cs_x86_op *op = &(x86->operands[argnum]);
 
-			r->r_addend = ((op->mem.disp) + ins->address) - m->s_bfd->vma;	// (rip + (immediate|displacement)) - m->s_bfd->vma;    // dst - (section vma)
+			r->r_addend = ((op->mem.disp) + ins->address) - m->s_bfd->vma + ins->size -4; // TODO	// (rip + (immediate|displacement)) - m->s_bfd->vma;    // dst - (section vma)
 //                      printf("* new rip based addend : %llx\n", r->r_addend);
 
 			newtype = R_X86_64_PC32;
@@ -3292,7 +3519,7 @@ static int create_text_data_reloc(ctx_t *ctx, cs_insn *ins, msec_t *m, unsigned 
 		free(r);
 	} else {		// Unhandled relocation
 		if (ctx->opt_debug) {
-			printf("warning: unknown relocation section: %s at ", m->name);
+			printf(" !! WARNING: unknown relocation section: %s at ", m->name);
 			printf("0x%" PRIx64 ":\t%s\t%s\n", ins->address, ins->mnemonic, ins->op_str);
 		}
 	}
@@ -3402,6 +3629,455 @@ static void parse_text_data_reloc(ctx_t *ctx, csh ud, cs_mode mode, cs_insn *ins
 			break;
 		}
 	}
+}
+
+// Simplified analyze_data function focusing on the crash
+int analyze_data(ctx_t *ctx, msec_t *s)
+{
+    unsigned int i = 0;
+    msec_t *sec = 0, *tmp = 0;
+    unsigned int secindex = 0;
+    int total_relocations = 0;
+    
+    printf(" -- Analyzing .data section (Simplified)\n\n");
+    hexdump(s->data, s->len);
+    printf("\n");
+    
+    if (ctx->archsz == 64) {
+        for (i = 0; i < s->len; i += 8) {
+            unsigned long int val = *(unsigned long int*)(s->data+i);
+            printf(" data[%04u] %016lx", i/8, val);
+            
+            if (val == 0) {
+                printf(" (null)\n");
+                continue;
+            }
+            
+            // Check if this value points to any section
+            // Be less restrictive - check all values above 0x1000
+            if (val < 0x1000) {
+                printf(" (small value - not a pointer)\n");
+                continue;
+            }
+            
+            int found_match = 0;
+            DL_FOREACH_SAFE(ctx->mshdrs, sec, tmp) {
+                if (!sec->s_bfd || !sec->s_bfd->vma || !sec->s_elf || !sec->s_elf->sh_size) {
+                    continue;
+                }
+                
+                // Check if value is within section bounds
+                if (val >= sec->s_bfd->vma && val < (sec->s_bfd->vma + sec->s_elf->sh_size)) {
+                    printf("  --> %s (%016lx-%016lx)", sec->name, 
+                           sec->s_bfd->vma, sec->s_bfd->vma + sec->s_elf->sh_size);
+                    
+                    // Skip self-references in .data
+                    if (str_eq(sec->name, ".data")) {
+                        printf(" (self-reference - skipping)");
+                        goto next_entry;
+                    }
+                    
+                    // Create relocation
+                    Elf_Rela *r = calloc(1, sizeof(Elf_Rela));
+                    r->r_offset = i;
+                    r->r_info = 0;
+                    r->r_addend = val - sec->s_bfd->vma;
+
+                    // Determine section index
+                    if (str_eq(sec->name, ".text")) {
+                        secindex = 1;
+                    } else if (str_eq(sec->name, ".rodata")) {
+                        secindex = 2;
+                    } else if (str_eq(sec->name, ".data")) {
+                        secindex = 3;
+                    } else if (str_eq(sec->name, ".bss")) {
+                        secindex = 4;
+                    } else {
+                        // For other sections, try to get their index
+                        secindex = secindex_from_name_after_strip(ctx, sec->name);
+                        if (secindex == 0) {
+                            printf(" // Unknown section %s", sec->name);
+                            free(r);
+                            goto next_entry;
+                        }
+                    }
+
+                    printf(" (secindex=%d)", secindex);
+                    save_data_reloc(ctx, r, secindex, 1); 
+                    *(unsigned long int*)(s->data+i) = 0;
+                    free(r);
+                    found_match = 1;
+                    total_relocations++;
+                    break;
+                }
+            }
+            
+            next_entry:
+            if (!found_match) {
+                printf(" (no section match)");
+                
+                // Special check for the crash location
+                // Entry ~116 (offset 0x3a8) should not be null
+                if (i/8 >= 110 && i/8 <= 120) {
+                    printf(" *** POTENTIAL CRASH CAUSE: data[%04u] ***", i/8);
+                }
+            }
+            printf("\n");
+        }
+    }
+    
+    printf("\n=== Summary ===\n");
+    printf("Total relocations created: %d\n", total_relocations);
+    
+    // Find entries that might still be problematic
+    printf("\nChecking for values that might need relocation...\n");
+    for (i = 0; i < s->len; i += 8) {
+        unsigned long int val = *(unsigned long int*)(s->data+i);
+        if (val > 0x1000 && val < 0x100000) {  // Reasonable pointer range
+            printf("data[%04u] still contains: 0x%lx - check if this should be relocated\n", 
+                   i/8, val);
+        }
+    }
+    
+    return 0;
+}
+
+// Current analyze_data function (from your code)
+int analyze_data_old2(ctx_t *ctx, msec_t *s)
+{
+    unsigned int i = 0;
+    msec_t *sec = 0, *tmp = 0;
+    unsigned int secindex = 0;
+    
+    printf(" -- Analyzing .data section\n\n");
+    printf("DEBUG: s->len = %zu\n", s->len);  
+    printf("DEBUG: expected entries = %zu\n", s->len / 8);  
+    
+    hexdump(s->data, s->len);
+    printf("\n");
+    
+    // First, let's list all sections available to understand the issue
+    printf("\n=== Available sections for matching ===\n");
+    DL_FOREACH(ctx->mshdrs, sec) {
+        printf("Section: %s, VMA: 0x%lx, Size: 0x%lx (end: 0x%lx)\n", 
+               sec->name, 
+               sec->s_bfd ? sec->s_bfd->vma : 0, 
+               sec->s_elf ? sec->s_elf->sh_size : 0,
+               sec->s_bfd ? (sec->s_bfd->vma + sec->s_elf->sh_size) : 0);
+    }
+    printf("========================================\n\n");
+    
+    if (ctx->archsz == 64) {
+        for (i = 0; i < s->len; i += 8) {
+            unsigned long int val = *(unsigned long int*)(s->data+i);
+            printf(" data[%04u] %08lx", i/8, val);  // Fixed: use %08lx instead of %08x
+            
+            // Enhanced debugging: check why DL_FOREACH doesn't match
+            printf(" [CHECKING: ");
+            int found_any = 0;
+            DL_FOREACH_SAFE(ctx->mshdrs, sec, tmp) {
+                printf("%s(vma=0x%lx,sz=0x%lx) ", 
+                       sec->name, 
+                       sec->s_bfd ? sec->s_bfd->vma : 0,
+                       sec->s_elf ? sec->s_elf->sh_size : 0);
+                
+                // Let's check each condition separately
+                if (val) {
+                    if (sec->s_bfd && sec->s_bfd->vma) {
+                        if (val >= sec->s_bfd->vma) {
+                            if (sec->s_elf && sec->s_elf->sh_size) {
+                                if (val <= sec->s_bfd->vma + sec->s_elf->sh_size) {
+                                    printf("MATCH!");
+                                    found_any = 1;
+                                    break;
+                                } else {
+                                    printf("(val too big)");
+                                }
+                            } else {
+                                printf("(no size)");
+                            }
+                        } else {
+                            printf("(val too small)");
+                        }
+                    } else {
+                        printf("(no vma)");
+                    }
+                } else {
+                    printf("(val is 0)");
+                }
+            }
+            printf("] ");
+            
+            if (!found_any) {
+                printf("NO MATCHES FOUND");
+            }
+            
+            // Run the actual matching logic
+            DL_FOREACH_SAFE(ctx->mshdrs, sec, tmp) {
+                if ((val) && (sec->s_bfd->vma) && 
+                    (val >= sec->s_bfd->vma) && (sec->s_elf->sh_size) && 
+                    (val <= sec->s_bfd->vma + sec->s_elf->sh_size)) {
+                    
+                    printf("  --> %s (%08lx-%08lx)", sec->name, 
+                           sec->s_bfd->vma, sec->s_bfd->vma + sec->s_elf->sh_size);
+                    
+                    // Create relocation
+                    Elf_Rela *r = calloc(1, sizeof(Elf_Rela));
+                    r->r_offset = i;
+                    r->r_info = 0;
+                    r->r_addend = val - sec->s_bfd->vma;
+
+                    if (!strncmp(sec->name, ".text", 5)) {
+                        secindex = 1;
+                    } else if (!strncmp(sec->name, ".rodata", 7)) {
+                        secindex = 2;
+                    } else if (!strncmp(sec->name, ".data", 5)) {
+                        secindex = 3;
+                    } else if (!strncmp(sec->name, ".bss", 4)) {
+                        secindex = 4;
+                    } else {
+                        secindex = 0;
+                        printf(" // Unknown section %s", sec->name);
+                    }
+
+                    printf(" (secindex=%d)", secindex);
+                    save_data_reloc(ctx, r, secindex, 1); 
+                    *(unsigned long int*)(s->data+i) = 0;
+                    free(r);
+                    break;  // Stop at first match
+                }
+            }
+            
+            printf("\n");
+        }
+    }
+    
+    // Missing relocations check (moved outside main loop)
+    printf("\n=== Addresses not relocated (might be missing) ===\n");
+    for (unsigned int j = 0; j < s->len; j += 8) {
+        unsigned long int val = *(unsigned long int*)(s->data + j);
+        if (val >= 0x4000 && val < 0x25000 && val != 0) {
+            printf("data[%04u] %08lx - possible missing relocation\n", j/8, val);
+        }
+    }
+    printf("=== End debug ===\n");
+    
+    return 0;
+}
+
+/*
+// Enhanced analyze_data that handles more edge cases
+int analyze_data_fixed(ctx_t *ctx, msec_t *s)
+{
+    printf(" -- Analyzing .data section (FIXED VERSION)\n\n");
+    hexdump(s->data, s->len);
+    printf("\n");
+    
+    // First pass: backup original data for debugging
+    unsigned char *original_data = malloc(s->len);
+    memcpy(original_data, s->data, s->len);
+    
+    if (ctx->archsz == 64) {
+        for (unsigned int i = 0; i < s->len; i += 8) {
+            unsigned long int val = *(unsigned long int*)(s->data + i);
+            printf(" data[%04u] %016lx", i/8, val);
+            
+            if (val == 0) {
+                printf(" (null)\n");
+                continue;
+            }
+            
+            // Be less strict about "special values"
+            // Only skip obviously invalid values
+            if (val < 0x1000 && val != 0) {
+                // But check if it might be an index or count
+                if (val < 256) {
+                    printf(" (likely count/index: %lu - not relocating)\n", val);
+                    continue;
+                }
+            }
+            
+            // Check for packed values (like 0x0000010100000001)
+            if ((val & 0xFFFFFFFF) == 0x00000001 && (val >> 32) == 0x00000101) {
+                printf(" (packed value - analyzing parts)\n");
+                // This might be two related values packed together
+                // For now, skip, but we might need to handle this specially
+                continue;
+            }
+            
+            // Don't skip large values - they might be valid addresses
+            // The kernel virtual address space on x86_64 is vast
+            
+            int found_match = 0;
+            msec_t *best_match = NULL;
+            unsigned long best_addend = 0;
+            
+            // Try to find the best matching section
+            msec_t *sec = 0;
+            DL_FOREACH(ctx->mshdrs, sec) {
+                if (!sec->s_bfd || !sec->s_bfd->vma || !sec->s_elf || !sec->s_elf->sh_size) {
+                    continue;
+                }
+                
+                // Check if value falls within section bounds
+                if (val >= sec->s_bfd->vma && val < (sec->s_bfd->vma + sec->s_elf->sh_size)) {
+                    // Skip self-references in .data
+                    if (str_eq(sec->name, ".data")) {
+                        printf(" (self-reference to %s - skipping)", sec->name);
+                        goto next_entry;
+                    }
+                    
+                    best_match = sec;
+                    best_addend = val - sec->s_bfd->vma;
+                    found_match = 1;
+                    break;  // Take the first match
+                }
+            }
+            
+            if (found_match && best_match) {
+                printf("  --> %s (%016lx-%016lx)", best_match->name, 
+                       best_match->s_bfd->vma, best_match->s_bfd->vma + best_match->s_elf->sh_size);
+                
+                // Create relocation
+                Elf_Rela *r = calloc(1, sizeof(Elf_Rela));
+                r->r_offset = i;
+                r->r_info = 0;  // Will be set in save_data_reloc
+                r->r_addend = best_addend;
+
+                // Determine section index
+                unsigned int secindex = 0;
+                if (str_eq(best_match->name, ".text")) {
+                    secindex = 1;
+                } else if (str_eq(best_match->name, ".rodata")) {
+                    secindex = 2;
+                } else if (str_eq(best_match->name, ".data")) {
+                    secindex = 3;
+                } else if (str_eq(best_match->name, ".bss")) {
+                    secindex = 4;
+                } else {
+                    secindex = secindex_from_name_after_strip(ctx, best_match->name);
+                    if (secindex == 0) {
+                        printf(" // Unknown section %s", best_match->name);
+                        free(r);
+                        goto next_entry;
+                    }
+                }
+
+                printf(" (secindex=%d, addend=0x%lx)", secindex, best_addend);
+                save_data_reloc(ctx, r, secindex, 1); 
+                
+                // Zero out the original value
+                *(unsigned long int*)(s->data + i) = 0;
+                free(r);
+            } else {
+                printf(" (no section match - value might be encoded differently)");
+                
+                // Check if this might be a negative offset or encoded value
+                if (val > 0x7fffffffffff) {
+                    long signed_val = (long)val;
+                    printf("\n    Checking as signed: %ld (0x%lx)", signed_val, signed_val);
+                    
+                    // Check if adding to any section base gives a valid address
+                    msec_t *sec = 0;
+                    DL_FOREACH(ctx->mshdrs, sec) {
+                        if (!sec->s_bfd || !sec->s_bfd->vma) continue;
+                        
+                        long result = sec->s_bfd->vma + signed_val;
+                        if (result > 0 && result < 0x7fffffffffff) {
+                            msec_t *target = section_from_addr(ctx, result);
+                            if (target) {
+                                printf("\n    %s + %ld = 0x%lx (in %s)", 
+                                       sec->name, signed_val, result, target->name);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            next_entry:
+            printf("\n");
+        }
+    }
+    
+    // Call our debugging functions
+    find_missing_relocation(ctx);
+    verify_critical_relocations(ctx);
+    
+    free(original_data);
+    return 0;
+}
+*/
+
+int analyze_data_old(ctx_t *ctx, msec_t *s)
+{
+	unsigned int i = 0;
+	msec_t *sec = 0, *tmp = 0;
+	unsigned int secindex = 0;
+
+	printf(" -- Analyzing .data section\n\n");
+	hexdump(s->data, s->len);
+	printf("\n");
+
+	if (ctx->archsz == 64) {	// 64 bits
+
+		for (i = 0; i < s->len; i += 8) {
+			unsigned long int val = *(unsigned long int*)(s->data+i);
+			printf(" data[%04u] %08x", i/8, val);
+
+
+			DL_FOREACH_SAFE(ctx->mshdrs, sec, tmp) {
+			
+//				if ((val)&&(sec->s_bfd->vma)&&(val >= sec->s_bfd->vma)&&(sec->s_elf->sh_size)&&(val <= sec->s_bfd->vma + sec->s_elf->sh_size)&&(strncmp(sec->name, ".text", 6))&&(strncmp(sec->name, ".data", 6))) {
+//					printf("  --> %s\ (%08x-%08x)", sec->name, sec->s_bfd->vma, sec->s_bfd->vma + sec->s_elf->sh_size);
+
+if ((val) && (sec->s_bfd->vma) && 
+    (val >= sec->s_bfd->vma) && (sec->s_elf->sh_size) && 
+    (val <= sec->s_bfd->vma + sec->s_elf->sh_size)) {
+    
+        printf("  [DEBUG] val=0x%lx matches section %s (vma=0x%lx, end=0x%lx)\n", 
+               val, sec->name, sec->s_bfd->vma, sec->s_bfd->vma + sec->s_elf->sh_size);
+            
+    printf("  --> %s (%08lx-%08lx)", sec->name, 
+           sec->s_bfd->vma, sec->s_bfd->vma + sec->s_elf->sh_size);
+    
+    
+					// Create relocation
+					Elf_Rela *r = 0;
+					r = calloc(1, sizeof(Elf_Rela));
+					r->r_offset = i;
+					r->r_info = 0;	// Computed later
+					r->r_addend = val - sec->s_bfd->vma;
+
+					if (!strncmp(sec->name, ".text", 6)) {
+						secindex = 1;		/* section 1 is .text */
+					} else if (!strncmp(sec->name, ".rodata", 8)) {
+						secindex = 2;		/* section 2 is .rodata */
+					} else if (!strncmp(sec->name, ".data", 6)) {
+						secindex = 3;		/* section 3 is .data */					
+					} else if (!strncmp(sec->name, ".bss", 5)) {
+						secindex = 4;		/* section 4 is .bss */					
+					} else {
+						secindex = 0;		/* unknown ? */
+						printf(" // Unknown relocation section !!");
+					}
+
+					// Save relocation
+					save_data_reloc(ctx, r, secindex, 1); 
+
+					// Nullify in .data section
+					*(unsigned long int*)(s->data+i) = 0;//0xdeadbeef;					
+				}
+			}			
+			
+			printf("\n");
+		}
+
+	
+	} else {			// 32 bits
+
+	}
+
+	return 0;
 }
 
 int analyze_text(ctx_t *ctx, char *data, unsigned int datalen, unsigned long int addr)
@@ -3680,7 +4356,23 @@ unsigned int libify(ctx_t *ctx)
 	fixup_symtab_section_index(ctx);
 
 	process_text(ctx);
+	
+	process_data(ctx);
 
+	/**
+	* Add debugging and verification
+	*/
+//	if (ctx->opt_debug) {
+		verify_critical_relocations(ctx);
+		debug_crash_analysis(ctx);
+
+
+//    analyze_crash_location(ctx);
+    analyze_problematic_values(ctx);
+    scan_all_data_sections(ctx);
+
+//	}
+	
 	/**
 	*
 	* PROCESSING
@@ -4026,4 +4718,217 @@ int main(int argc, char **argv)
 	libify(ctx);
 
 	return 0;
+}
+
+
+int verify_critical_relocations(ctx_t *ctx)
+{
+    printf("\n=== Verifying Critical Relocations ===\n");
+    
+    // Check for critical sections that must have proper relocations
+    msec_t *data_section = section_from_name(ctx, ".data");
+    if (!data_section) {
+        printf("ERROR: .data section not found\n");
+        return -1;
+    }
+    
+    // Look for patterns that commonly cause crashes
+    printf("Checking .data section for critical pointers...\n");
+    
+    for (unsigned int i = 0; i < data_section->len; i += 8) {
+        unsigned long *ptr = (unsigned long *)(data_section->data + i);
+        unsigned long val = *ptr;
+        
+        // Check for values that might need relocation but were missed
+        if (val > 0x1000 && val < 0x7fffffffffff) {
+            // See if this value corresponds to any section
+            msec_t *target = section_from_addr(ctx, val);
+            if (target && !str_eq(target->name, ".data")) {
+                // This looks like it should be relocated but might not be
+                printf("WARNING: data[%04u] contains 0x%lx (-> %s) - might need relocation\n",
+                       i/8, val, target->name);
+                
+                // Check if there's already a relocation for this offset
+                int has_relocation = 0;
+                for (unsigned int j = 0; j < globaldatareloclen / sizeof(Elf_Rela); j++) {
+                    Elf_Rela *r = (Elf_Rela *)(globaldatareloc + j * sizeof(Elf_Rela));
+                    if (r->r_offset == i) {
+                        has_relocation = 1;
+                        break;
+                    }
+                }
+                
+                if (!has_relocation) {
+                    printf("  --> NO RELOCATION FOUND! This might cause crash.\n");
+                }
+            }
+        }
+    }
+    
+    // Verify that critical runtime structures are properly set up
+    printf("\nChecking for critical runtime structures...\n");
+    
+    // Check GOT entries
+    msec_t *got_section = section_from_name(ctx, ".got");
+    if (got_section) {
+        printf("Found .got section at VMA 0x%lx, size %lu\n", 
+               got_section->s_bfd->vma, got_section->s_elf->sh_size);
+    } else {
+        printf("WARNING: No .got section found\n");
+    }
+    
+    // Check PLT entries
+    msec_t *plt_section = section_from_name(ctx, ".plt");
+    if (plt_section) {
+        printf("Found .plt section at VMA 0x%lx, size %lu\n", 
+               plt_section->s_bfd->vma, plt_section->s_elf->sh_size);
+    } else {
+        printf("WARNING: No .plt section found\n");
+    }
+    
+    return 0;
+}
+
+// Also add this debugging function to find exactly which data entry is causing the crash
+void debug_crash_analysis(ctx_t *ctx)
+{
+    printf("\n=== Crash Analysis ===\n");
+    
+    // The crash happens when loading from 0x5555555803a8
+    // We need to find which .data entry this corresponds to
+    
+    msec_t *data_section = section_from_name(ctx, ".data");
+    if (!data_section) {
+        printf("ERROR: .data section not found\n");
+        return;
+    }
+
+
+    // In a typical PIE binary loaded at 0x555555554000:
+    // - .text starts at file offset 0x1000, loads at 0x555555555000
+    // - .data is at VMA 0x23000, loads at 0x555555577000
+    
+    // But let's calculate the actual offset
+    unsigned long crash_loaded_addr = 0x5555555803a8;
+    unsigned long likely_base = 0x555555554000;  // Common PIE base
+    unsigned long data_vma = data_section->s_bfd->vma;  // Should be around 0x23000
+    unsigned long text_base = 0x1000;  // Typical .text VMA in object file
+    
+    // Calculate where .data would be loaded
+    unsigned long data_loaded_at = likely_base + (data_vma - text_base);
+    
+    if (crash_loaded_addr >= data_loaded_at && 
+        crash_loaded_addr < data_loaded_at + data_section->len) {
+        
+        unsigned long offset = crash_loaded_addr - data_loaded_at;
+        unsigned int entry_index = offset / 8;
+        
+        printf("Crash address 0x%lx maps to data[%04u]\n", crash_loaded_addr, entry_index);
+        
+        // Show what's at that location
+        if (entry_index * 8 < data_section->len) {
+            unsigned long *value_ptr = (unsigned long *)(data_section->data + entry_index * 8);
+            unsigned long current_value = *value_ptr;
+            
+            printf("Current value at data[%04u]: 0x%lx\n", entry_index, current_value);
+            
+            if (current_value == 0) {
+                printf("*** This is NULL! This explains the crash! ***\n");
+                printf("This entry should have been relocated but wasn't.\n");
+            }
+        }
+    } else {
+        printf("Crash address 0x%lx is outside calculated .data range\n", crash_loaded_addr);
+        printf("Data section VMA: 0x%lx, calculated load address: 0x%lx\n", 
+               data_vma, data_loaded_at);
+    }
+}
+    
+// Function to analyze problematic values in more detail
+void analyze_problematic_values(ctx_t *ctx)
+{
+    printf("\n=== Analyzing Problematic Values ===\n");
+    
+    // Value 1: ff01003fffffffff at data[0004]
+    unsigned long val1 = 0xff01003ffffffff;
+    printf("\n1. Value: 0x%lx (at data[0004])\n", val1);
+    
+    // This could be a negative offset when interpreted as signed
+    long signed_val1 = (long)val1;
+    printf("   As signed: %ld\n", signed_val1);
+    
+    // Check if it could be a relative address from .data
+    msec_t *data_sec = section_from_name(ctx, ".data");
+    if (data_sec && data_sec->s_bfd) {
+        long relative_addr = data_sec->s_bfd->vma + signed_val1;
+        printf("   .data base (0x%lx) + signed_val = 0x%lx\n", 
+               data_sec->s_bfd->vma, relative_addr);
+        
+        if (relative_addr > 0 && relative_addr < 0x100000) {
+            // Check if this points to any section
+            msec_t *target = section_from_addr(ctx, relative_addr);
+            if (target) {
+                printf("   *** This would point to section: %s ***\n", target->name);
+                printf("   *** This looks like a relative offset that needs relocation! ***\n");
+            }
+        }
+    }
+    
+    // Check if it might be two 32-bit values
+    unsigned int high32_1 = (val1 >> 32) & 0xFFFFFFFF;
+    unsigned int low32_1 = val1 & 0xFFFFFFFF;
+    printf("   High 32-bits: 0x%x (%u)\n", high32_1, high32_1);
+    printf("   Low 32-bits: 0x%x (%u)\n", low32_1, low32_1);
+    
+    // Value 2: 0000010100000001 at data[0017]
+    unsigned long val2 = 0x010100000001;
+    printf("\n2. Value: 0x%lx (at data[0017])\n", val2);
+    
+    unsigned int high32_2 = (val2 >> 32) & 0xFFFFFFFF;
+    unsigned int low32_2 = val2 & 0xFFFFFFFF;
+    printf("   High 32-bits: 0x%x (%u)\n", high32_2, high32_2);
+    printf("   Low 32-bits: 0x%x (%u)\n", low32_2, low32_2);
+    
+    // This pattern suggests it might be structured data
+    printf("   This might be:\n");
+    printf("   - Count/size in high part: %u\n", high32_2);
+    printf("   - Flags/index in low part: %u\n", low32_2);
+    printf("   - Or two separate 32-bit values that were incorrectly combined\n");
+    
+    // Let's also check the values we skipped as "small values"
+    printf("\n=== Values classified as 'small' that might need attention ===\n");
+    printf("Note: Some of these might be legitimate pointers in a low address space\n");
+    printf("or offsets that need special handling.\n");
+}
+
+// Let's also create a function to scan all data sections, not just .data
+void scan_all_data_sections(ctx_t *ctx)
+{
+    printf("\n=== Scanning All Data-Like Sections ===\n");
+    
+    msec_t *sec = 0;
+    DL_FOREACH(ctx->mshdrs, sec) {
+        // Check sections that might contain pointers
+        if (str_eq(sec->name, ".data") || 
+            str_eq(sec->name, ".data.rel.ro") ||
+            str_eq(sec->name, ".got") ||
+            str_eq(sec->name, ".bss") ||
+            str_eq(sec->name, ".rodata")) {
+            
+            printf("\nAnalyzing section: %s\n", sec->name);
+            printf("VMA: 0x%lx, Size: %lu bytes\n", 
+                   sec->s_bfd ? sec->s_bfd->vma : 0, 
+                   sec->s_elf ? sec->s_elf->sh_size : 0);
+            
+            if (sec->data && sec->len > 0) {
+                // Look for null pointers that should have been relocated
+                for (unsigned int i = 0; i < sec->len; i += 8) {
+                    unsigned long *ptr = (unsigned long *)(sec->data + i);
+                    if (*ptr == 0 && i < sec->len - 8) {
+                        printf("  Null pointer at offset 0x%x (entry %u)\n", i, i/8);
+                    }
+                }
+            }
+        }
+    }
 }

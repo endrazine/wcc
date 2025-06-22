@@ -7,7 +7,7 @@
 # This file is licensed under MIT License.
 #
 
-OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a
+OBJLIB := ./lua/src/liblua.a ./openlibm/libopenlibm.a ./librustdemangle/target/release/librust_demangle.a
 
 CFLAGS := -rdynamic -W -Wall -Wextra -O0 -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include -rdynamic -I../../include/ -I./luajit-2.0/src/ -Wl,-E -Wl,-z,now
 #OBJLIB := ./luajit-2.0/src/libluajit.a ./openlibm/libopenlibm.a 
@@ -25,6 +25,7 @@ WLINK	=
 endif
 
 all::
+	cd librustdemangle && cargo build --release
 	cd openlibm && make CFLAGS="-fpie -fPIC"
 	cd lua && make linux CFLAGS="-fpie -fPIC"
 	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline
@@ -49,7 +50,7 @@ clean::
 	cd openlibm && make clean
 	cd lua && make clean
 	cd tests && make clean
-
+	cd librustdemangle && rm -rf target && rm -f Cargo.lock
 deepclean:
 	cd openlibm && make clean
 	cd lua && make clean
