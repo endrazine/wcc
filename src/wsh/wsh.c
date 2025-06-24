@@ -2986,16 +2986,15 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 				* Handle demangled symbols
 				*/
 
-				if (demangled) {
-//					printf(" -- demangled: %s\n", demangled);
-					luacmd = calloc(1, 1024);
-					snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
-					luabuff_append(luacmd);
-					free(luacmd);
-					// Add function/object to linked list
-					scan_symbol(demangled, libname);
+//				printf(" -- demangled: %s\n", demangled);
+				luacmd = calloc(1, 1024);
+				snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
+				luabuff_append(luacmd);
+				free(luacmd);
+				// Add function/object to linked list
+				scan_symbol(demangled, libname);
 
-				} else {
+/*				} else {
 					luacmd = calloc(1, 2048);
 					snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", symname, newname);
 					luabuff_append(luacmd);
@@ -3004,7 +3003,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 					scan_symbol(symname, libname);
 				
 				}
-
+*/
 
 			} else {
 				/**
