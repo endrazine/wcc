@@ -2987,7 +2987,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 				*/
 
 				if (demangled) {
-					printf(" -- demangled: %s\n", demangled);
+//					printf(" -- demangled: %s\n", demangled);
 					luacmd = calloc(1, 1024);
 					snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
 					luabuff_append(luacmd);
