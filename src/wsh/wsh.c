@@ -3186,6 +3186,10 @@ void parse_dyn(struct link_map *map)
 
 #ifndef __GLIBC__
 static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
+
+    Elf_Word *hash = NULL;
+    if (dyn->d_tag == DT_HASH) hash = (Elf_Word *)(info->dlpi_addr + dyn->d_un.d_ptr);
+
     unsigned int nsym = 0;
     if (hash) nsym = hash[1];  // nchain = number of symbols
 
@@ -3204,7 +3208,7 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
     Elf_Sym *dynsym = NULL;
     unsigned int dynstrsz = 0;
     Elf_Word *hash = NULL;
-    unsigned int nsym = 0;
+//    unsigned int nsym = 0;
 
     // Parse dynamic tags
     for (; dyn->d_tag != DT_NULL; dyn++) {
