@@ -217,8 +217,8 @@ char *blnames[] = {
 	"frame_dummy",
 	"register_tm_clones",
 //"__libc_start_main",
-	"__gmon_start__"
-//	"main"
+	"__gmon_start__",
+	"main"
 };
 
 /**
@@ -305,6 +305,7 @@ typedef struct ctx_t {
 	unsigned long int opt_entrypoint;
 	unsigned char opt_poison;
 	unsigned int opt_original;
+	unsigned int opt_keep_main;
 	unsigned int opt_debug;
 	unsigned int opt_asmdebug;
 	unsigned int opt_flags;	// used in setting eabi
@@ -342,7 +343,9 @@ msec_t *section_from_index(ctx_t * ctx, unsigned int index);
 unsigned int secindex_from_name_after_strip(ctx_t * ctx, const char *name);
 int analyze_text(ctx_t * ctx, char *data, unsigned int datalen, unsigned long int addr);
 int save_reloc(ctx_t * ctx, Elf_Rela * r, unsigned int sindex, int has_addend);
-
+int analyze_data(ctx_t *ctx, msec_t *s);
+void analyze_problematic_values(ctx_t *ctx);
+void scan_all_data_sections(ctx_t *ctx);
 int verify_critical_relocations(ctx_t *ctx);
 void debug_crash_analysis(ctx_t *ctx);
 
@@ -444,7 +447,10 @@ void add_symaddr(ctx_t *ctx, const char *name, int addr, char symclass)
 	// check if name is in blacklist
 	for (i = 0; i < sizeof(blnames) / sizeof(char *); i++) {
 		if (str_eq(name, blnames[i])) {
-			return;
+			// Keep "main" symbol if user asked so
+			if ((!str_eq(name,"main"))||(!ctx->opt_keep_main)){
+				return;
+			}
 		}
 	}
 	sa = (struct symaddr *) malloc(sizeof(struct symaddr));
@@ -1428,7 +1434,6 @@ char *symclass(char sclass)
 */
 static int fix_symtab_bindings(ctx_t *ctx)
 {
-
 	char *sname = 0;
 	Elf_Sym *s = 0;
 	unsigned int i = 0, sindex = 0;
@@ -1467,8 +1472,6 @@ static int fix_symtab_bindings(ctx_t *ctx)
       				printf(" * name: %s at index %u info: %x class: %s\n", sname, sindex, s->st_info, symclass(sclass));
 			}
       		}
-
-
 	}
 
 	return 0;
@@ -1729,7 +1732,7 @@ int fixup_strtab_and_symtab(ctx_t *ctx)
 	}
 
 	for (sindex = maxnewsec + 1 + extrasectionnum; sindex < (globalsymtablen / sizeof(Elf_Sym)); sindex++) {
-//printf("patching index: %u\n", sindex);
+
 		// get symbol name from index
 		s = globalsymtab + sindex * sizeof(Elf_Sym);
 
@@ -1740,6 +1743,13 @@ int fixup_strtab_and_symtab(ctx_t *ctx)
 		*/
 		for (i = 0; i < sizeof(blnames) / sizeof(char *); i++) {
 			sname = (char *) (globalstrtab + s->st_name);
+
+			// Don't rename "main" if opt_keep_main is set			
+			if ((ctx->opt_keep_main)&&(str_eq(sname, "main"))) {
+				printf(" * keeping symbol : %s\n", blnames[i]);
+				continue;
+			}
+			
 			if ((s->st_name < globalstrtablen) && (str_eq(sname, blnames[i]))) {
 				if (ctx->opt_debug) {
 					printf(" * name blacklisted: %s at index %u\n", sname, sindex);
@@ -1756,6 +1766,23 @@ int fixup_strtab_and_symtab(ctx_t *ctx)
 				s->st_shndx = 0;
 			}
 		}
+
+		/**
+		* Adjust symbol addresses 
+		* For addresses within the .TEXT segment: substract base load address of .TEXT segment
+		* For addresses within the .DATA segment: substract base load address of .DATA segment
+		*/
+		if ((s->st_value)&&(s->st_value >= mintext)&&(s->st_value <= maxtext)) {
+			printf(" * adjusting .TEXT symbol: %s\n", (char *) (globalstrtab + s->st_name));
+			s->st_value -= textvma;
+//		} else if ((s->st_value)&&(s->st_value >= mindata)&&(s->st_value <= maxdata)) {
+		} else if(s->st_value){
+			printf(" * adjusting .DATA symbol: %s\n", (char *) (globalstrtab + s->st_name));
+			s->st_value -= datavma;
+		} else if(!s->st_value){
+			printf(" * no adjustment symbol: %s\n", (char *) (globalstrtab + s->st_name));		
+		}
+
 	}
 	return 0;
 }
@@ -2043,7 +2070,7 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	/**
 	* Add a section header for a .note.GNU-stack section
 	*/
-/*
+
 	// append name to strndx
 	memcpy(ctx->strndx + ctx->strndx_len, ".note.GNU-stack", 16);
 
@@ -2073,7 +2100,6 @@ maxsec++;
 	// append sections string table to binary
 	//write(ctx->fdout, ctx->strndx, ctx->strndx_len);
 
-*/
 
 	/**
 	* Add a section header for relocations
@@ -2566,7 +2592,7 @@ unsigned int open_best(ctx_t *ctx)
 	
 	ctx->shnum = bfd_count_sections(ctx->abfd);
 	
-//	printf("ctx->shnum = %x\n", ctx->shnum);
+	printf("ctx->shnum = %x\n", ctx->shnum);
 	
 	ctx->corefile = 0;
 
@@ -4508,6 +4534,7 @@ int usage(char *name)
 	printf("    -E, --exec\n");
 	printf("    -C, --core\n");
 	printf("    -O, --original\n");
+	printf("    -k, --keep-main\n");
 	printf("    -D, --disasm\n");
 	printf("    -d, --debug\n");
 	printf("    -h, --help\n");
@@ -4545,7 +4572,7 @@ int desired_arch(ctx_t *ctx, char *name)
 
 int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 {
-	const char *short_opt = "ho:i:scSEsxCvVXp:Odm:e:f:D";
+	const char *short_opt = "ho:i:scSEsxCvVXp:Odm:e:f:Dk";
 	int count = 0;
 	struct stat sb;
 	int c = 0;
@@ -4567,6 +4594,7 @@ int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 		{ "interpreter", required_argument, NULL, 'i' },
 		{ "poison", required_argument, NULL, 'p' },
 		{ "original", no_argument, NULL, 'O' },
+		{ "keep-main", no_argument, NULL, 'k' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "version", no_argument, NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
@@ -4626,6 +4654,10 @@ int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 		case 'i':
 			ctx->opt_interp = strdup(optarg);
 			count++;
+			break;
+
+		case 'k':
+			ctx->opt_keep_main = 1;
 			break;
 
 		case 'm':

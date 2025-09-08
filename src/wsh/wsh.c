@@ -5575,7 +5575,7 @@ struct link_map *do_loadlib(char *libname)
 
 	handle = dlopen(libname, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
 	if (!handle) {
-		fprintf(stderr, "ERROR: dlopen() %s \n", dlerror());
+		fprintf(stderr, "WARNING: dlopen() %s \n", dlerror());
 
 		// attempt to patch binary as ET_DYN if was ET_EXEC
 		if (wsh->opt_userland_load) {
