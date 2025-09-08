@@ -436,7 +436,7 @@ int scan_symbol(char *symbol, char *libname)
 		sbind = 1; // Assume global
 		hbind = symbol_tobind(sbind);
 
-		retv = add_symbol(symbol, libname, htype, hbind, ret - dli.dli_fbase, 0, ret); // size=0
+		retv = add_symbol(symbol, libname, htype, hbind, (unsigned long)ret - (unsigned long)dli.dli_fbase, 0, ret); // size=0
 #endif
 	}
 
