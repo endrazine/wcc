@@ -2955,7 +2955,7 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 	while ((sym)&&(!msync((long unsigned int)sym &~0xfff,4096,0))) {
 #else
 	for (unsigned int cnt = 0; cnt < nsym; cnt++) {
-		sym = sym + cnt;  // Or sym++
+//		sym = sym + cnt;
 #endif
 
 		func = 0;
