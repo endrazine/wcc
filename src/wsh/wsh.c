@@ -3185,47 +3185,42 @@ void parse_dyn(struct link_map *map)
 }
 
 #ifndef __GLIBC__
-static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
-
-    Elf_Word *hash = NULL;
-    if (dyn->d_tag == DT_HASH) hash = (Elf_Word *)(info->dlpi_addr + dyn->d_un.d_ptr);
-
-    unsigned int nsym = 0;
-    if (hash) nsym = hash[1];  // nchain = number of symbols
-
-    if (strlen(info->dlpi_name) < 2) return 0;  // Skip unnamed or short-named modules
-
-    Elf_Dyn *dyn = NULL;
-    for (int j = 0; j < info->dlpi_phnum; j++) {
-        if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
-            dyn = (Elf_Dyn *)(info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
-            break;
-        }
-    }
-    if (!dyn) return 0;
-
-    char *dynstr = NULL;
-    Elf_Sym *dynsym = NULL;
-    unsigned int dynstrsz = 0;
-    Elf_Word *hash = NULL;
-//    unsigned int nsym = 0;
-
-    // Parse dynamic tags
-    for (; dyn->d_tag != DT_NULL; dyn++) {
-        if (dyn->d_tag == DT_STRTAB) dynstr = (char *)(info->dlpi_addr + dyn->d_un.d_val);
-        if (dyn->d_tag == DT_SYMTAB) dynsym = (Elf_Sym *)(info->dlpi_addr + dyn->d_un.d_val);
-        if (dyn->d_tag == DT_STRSZ) dynstrsz = dyn->d_un.d_val;
-        if (dyn->d_tag == DT_HASH) hash = (Elf_Word *)(info->dlpi_addr + dyn->d_un.d_val);
-        // Note: For DT_GNU_HASH, parsing is more complex; assume DT_HASH for now (common in musl)
-    }
-
-    if (hash) nsym = hash[1];  // nchain from sysv hash == number of symbols
-
-    if (dynstr && dynsym && dynstrsz && nsym) {
-        scan_syms(dynstr, dynsym, dynstrsz, (char *)info->dlpi_name, nsym);
-    }
-
-    return 0;
+static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
+{
+	if (strlen(info->dlpi_name) < 2)
+		return 0;	// Skip unnamed or short-named modules
+	Elf_Dyn *dyn = NULL;
+	for (int j = 0; j < info->dlpi_phnum; j++) {
+		if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
+			dyn = (Elf_Dyn *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
+			break;
+		}
+	}
+	if (!dyn)
+		return 0;
+	char *dynstr = NULL;
+	Elf_Sym *dynsym = NULL;
+	unsigned int dynstrsz = 0;
+	Elf_Word *hash = NULL;
+	unsigned int nsym = 0;
+// Parse dynamic tags
+	for (; dyn->d_tag != DT_NULL; dyn++) {
+		if (dyn->d_tag == DT_STRTAB)
+			dynstr = (char *) (info->dlpi_addr + dyn->d_un.d_ptr);
+		if (dyn->d_tag == DT_SYMTAB)
+			dynsym = (Elf_Sym *) (info->dlpi_addr + dyn->d_un.d_ptr);
+		if (dyn->d_tag == DT_STRSZ)
+			dynstrsz = dyn->d_un.d_val;
+		if (dyn->d_tag == DT_HASH)
+			hash = (Elf_Word *) (info->dlpi_addr + dyn->d_un.d_ptr);
+// Note: For DT_GNU_HASH, parsing is more complex; assume DT_HASH for now (common in musl)
+	}
+	if (hash)
+		nsym = hash[1];	// nchain = number of symbols
+	if (dynstr && dynsym && dynstrsz && nsym) {
+		scan_syms(dynstr, dynsym, dynstrsz, (char *) info->dlpi_name, nsym);
+	}
+	return 0;
 }
 #endif
 
