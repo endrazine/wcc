@@ -3176,17 +3176,39 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
         if (info->dlpi_addr != 0) {
             // This is likely the main program on musl
             libname = wsh->selflib ? wsh->selflib : "/proc/self/exe";
+            if (wsh->opt_verbose) {
+                printf("  * Adjusted empty libname to: %s\n", libname);
+            }
         } else {
+            if (wsh->opt_verbose) {
+                printf("  * Skipping: empty name and zero addr\n");
+            }
             return 0; // Skip only if it's truly empty and addr is 0
         }
     }
     
-    // Debug output
+    // FIX: Skip processing our own binary to avoid "Resource busy" error
+    if (wsh->selflib && libname && !strcmp(libname, wsh->selflib)) {
+        if (wsh->opt_verbose) {
+            printf("  * Skipping self-processing: %s\n", libname);
+        }
+        return 0; // Continue iteration but skip ourselves
+    }
+    
+    // Also skip if it looks like wsh
+    if (libname && (strstr(libname, "/wsh") || !strcmp(libname, "wsh"))) {
+        if (wsh->opt_verbose) {
+            printf("  * Skipping wsh binary: %s\n", libname);
+        }
+        return 0;
+    }
+
     if (wsh->opt_verbose) {
         printf("  * sym_callback: processing %s (base: %p, phnum: %d)\n", 
                libname, (void*)info->dlpi_addr, info->dlpi_phnum);
     }
     
+    // Find PT_DYNAMIC segment
     Elf_Dyn *dyn = NULL;
     for (int j = 0; j < info->dlpi_phnum; j++) {
         if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
@@ -3199,14 +3221,15 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
         if (wsh->opt_verbose) {
             printf("    * No PT_DYNAMIC segment found in %s\n", libname);
         }
-        return 0;
+        return 0; // Continue iteration
     }
     
+    // Parse dynamic section to find symbol table info
     char *dynstr = NULL;
     Elf_Sym *dynsym = NULL;
     unsigned int dynstrsz = 0;
     Elf_Word *hash = NULL;
-    Elf_Xword *gnu_hash = NULL;
+    Elf_Word *gnu_hash = NULL;
     unsigned int nsym = 0;
     
     // Parse dynamic tags
@@ -3226,30 +3249,107 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
                 hash = (Elf_Word *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
                 break;
             case DT_GNU_HASH:
-                gnu_hash = (Elf_Xword *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
+                gnu_hash = (Elf_Word *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
                 break;
         }
     }
     
-    // Get symbol count
+    // Calculate number of symbols
     if (hash) {
+        // Traditional SysV hash table
         nsym = hash[1]; // nchain = number of symbols
-    } else if (gnu_hash) {
-        // GNU hash is more complex, but we can estimate
-        // For now, try to calculate from symbol table size
-        if (dynsym && dynstr) {
-            // Estimate based on string table size (rough heuristic)
-            nsym = dynstrsz / 20; // Average symbol name length estimate
+        if (wsh->opt_verbose) {
+            printf("    * Using SysV hash: nsym=%u\n", nsym);
+        }
+    } else if (gnu_hash && dynsym && dynstr) {
+        // GNU hash table - more complex calculation
+        /*
+         * GNU hash table format:
+         * uint32_t nbuckets
+         * uint32_t symoffset  (index of first symbol in hash table)
+         * uint32_t bloom_size
+         * uint32_t bloom_shift
+         * uint64_t bloom[bloom_size]
+         * uint32_t buckets[nbuckets]
+         * uint32_t chain[]
+         */
+        
+        uint32_t nbuckets = gnu_hash[0];
+        uint32_t symoffset = gnu_hash[1];
+        uint32_t bloom_size = gnu_hash[2];
+        
+        // Bounds checking
+        if (nbuckets > 0 && nbuckets < 100000 && symoffset < 100000 && bloom_size < 10000) {
+            // Find the highest symbol index by scanning buckets
+            uint32_t *buckets = &gnu_hash[4 + bloom_size * 2]; // Skip bloom filter
+            uint32_t *chains = &buckets[nbuckets];
+            
+            uint32_t max_sym_idx = symoffset;
+            
+            for (uint32_t i = 0; i < nbuckets; i++) {
+                if (buckets[i] != 0 && buckets[i] >= symoffset) {
+                    uint32_t chain_idx = buckets[i];
+                    
+                    // Follow the chain to find the last symbol
+                    while (chain_idx >= symoffset && chain_idx < 100000) { // Sanity check
+                        if (chain_idx > max_sym_idx) {
+                            max_sym_idx = chain_idx;
+                        }
+                        
+                        // Check if this is the last symbol in the chain
+                        uint32_t chain_val = chains[chain_idx - symoffset];
+                        if (chain_val & 1) {
+                            break; // Last symbol in chain
+                        }
+                        chain_idx++;
+                    }
+                }
+            }
+            
+            nsym = max_sym_idx + 1;
+            
+            if (wsh->opt_verbose) {
+                printf("    * GNU hash: nbuckets=%u, symoffset=%u, bloom_size=%u, max_sym_idx=%u, nsym=%u\n",
+                       nbuckets, symoffset, bloom_size, max_sym_idx, nsym);
+            }
+        } else {
+            // Invalid GNU hash, try fallback
+            nsym = 0;
+            if (wsh->opt_verbose) {
+                printf("    * Invalid GNU hash parameters, using fallback\n");
+            }
         }
     }
     
+    // Fallback calculation if we couldn't get nsym from hash tables
+    if (nsym == 0 && dynsym && dynstr) {
+        // Try to calculate from available info
+        // Look for the next section after dynsym to estimate size
+        char *dynsym_end = dynstr;  // String table usually follows symbol table
+        
+        if (dynsym_end > (char*)dynsym) {
+            size_t dynsym_size = dynsym_end - (char*)dynsym;
+            nsym = dynsym_size / sizeof(Elf_Sym);
+        } else {
+            // Last resort: use string table size as rough estimate
+            nsym = dynstrsz / 20; // Very rough estimate (avg symbol name length)
+        }
+        
+        if (wsh->opt_verbose) {
+            printf("    * Fallback calculation: dynsym=%p, dynstr=%p, estimated nsym=%u\n",
+                   dynsym, dynstr, nsym);
+        }
+    }
+    
+    // Debug output
     if (wsh->opt_verbose) {
         printf("    * dynstr: %p, dynsym: %p, dynstrsz: %u, nsym: %u\n", 
                dynstr, dynsym, dynstrsz, nsym);
         printf("    * hash: %p, gnu_hash: %p\n", hash, gnu_hash);
     }
     
-    if (dynstr && dynsym && dynstrsz && nsym > 0) {
+    // Validate we have what we need and the values are reasonable
+    if (dynstr && dynsym && dynstrsz > 0 && nsym > 0 && nsym < 1000000) {
         if (wsh->opt_verbose) {
             printf("  * Parsing symbols from %s (base: %p, symbols: %u)\n", 
                    libname, (void*)info->dlpi_addr, nsym);
@@ -3257,10 +3357,12 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
         scan_syms(dynstr, dynsym, dynstrsz, (char *) libname, nsym);
     } else {
         if (wsh->opt_verbose) {
-            printf("  * Skipping %s - missing symbol info (dynstr:%p dynsym:%p dynstrsz:%u nsym:%u)\n",
+            printf("  * Skipping %s - invalid symbol info (dynstr:%p dynsym:%p dynstrsz:%u nsym:%u)\n",
                    libname, dynstr, dynsym, dynstrsz, nsym);
         }
     }
+    
+    // Always return 0 to continue iteration
     return 0;
 }
 #endif
@@ -3299,6 +3401,10 @@ int parse_link_map_dyn(struct link_map *map)
 }
 #else
 int parse_link_map_dyn(struct link_map *map) {
+    if (wsh->opt_verbose) {
+        printf("  * parse_link_map_dyn (musl): processing loaded modules\n");
+    }
+    
     // Portable: Use dl_iterate_phdr to parse symbols from all loaded modules
     dl_iterate_phdr(sym_callback, NULL);
     return 0;
@@ -3381,15 +3487,29 @@ void parse_link_vdso(void)
 */
 void rescan(void)
 {
-	reload_elfs();
+    if (wsh->opt_verbose) {
+        printf("  * rescan() called\n");
+    }
+    
+    reload_elfs();
 
-	empty_symbols();
-	wsh->opt_rescan = 1;
-	parse_link_map_dyn(wsh->mainhandle);
-	parse_link_vdso();
-	wsh->opt_rescan = 0;
-	exec_luabuff();
+    empty_symbols();
+    wsh->opt_rescan = 1;
+    
+    if (wsh->opt_verbose) {
+        printf("  * About to call parse_link_map_dyn\n");
+    }
+    
+    parse_link_map_dyn(wsh->mainhandle);
+    parse_link_vdso();
+    wsh->opt_rescan = 0;
+    exec_luabuff();
+    
+    if (wsh->opt_verbose) {
+        printf("  * rescan() complete\n");
+    }
 }
+
 
 /**
 * Display content of /proc/self/maps
