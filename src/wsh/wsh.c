@@ -1251,7 +1251,8 @@ int load_indirect_functions(lua_State * L)
 	exec_luabuff();
 	free(luacmd);
 
-        for(size_t i = 0; i < num_entries; i++) {
+	size_t i = 0;
+        for(i = 0; i < num_entries; i++) {
 #ifdef __GLIBC__
 		if (dladdr1((void*)((uintptr_t)entries[i].fn), &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
 			retv = add_symbol(entries[i].name, info.dli_fname, "Function", "Global", (void*)((uintptr_t)entries[i].fn)-info.dli_fbase, 8, (void*)((uintptr_t)entries[i].fn));
