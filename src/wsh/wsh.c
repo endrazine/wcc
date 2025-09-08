@@ -1224,7 +1224,7 @@ extern size_t __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *
 int load_indirect_functions(lua_State * L)
 {
     struct libc_ifunc_impl entries[MAX_NUM_IMPL];
-
+	size_t i = 0;
 	int retv = 0;
 
     for(const char** function_name = indirect_function_names; *function_name; function_name++) {
@@ -1251,7 +1251,6 @@ int load_indirect_functions(lua_State * L)
 	exec_luabuff();
 	free(luacmd);
 
-	size_t i = 0;
         for(i = 0; i < num_entries; i++) {
 #ifdef __GLIBC__
 		if (dladdr1((void*)((uintptr_t)entries[i].fn), &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
