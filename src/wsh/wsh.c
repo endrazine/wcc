@@ -40,6 +40,7 @@
 #include <sys/sendfile.h> // For sendfile()
 #include <string.h>
 #include <regex.h>
+#include <link.h>
 
 /**
 * Rust demangling function prototypes
@@ -2949,7 +2950,14 @@ void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
 	/**
 	* Walk symbol table
 	*/
+
+#ifdef __GLIBC__
 	while ((sym)&&(!msync((long unsigned int)sym &~0xfff,4096,0))) {
+#else
+	for (unsigned int cnt = 0; cnt < nsym; cnt++) {
+		sym = sym + cnt;  // Or sym++
+#endif
+
 		func = 0;
 		if (sym->st_name >= sz) {
 			break;
@@ -3176,7 +3184,43 @@ void parse_dyn(struct link_map *map)
 	scan_syms(dynstr, dynsym, dynstrsz, map->l_name);
 }
 
+static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
+    if (strlen(info->dlpi_name) < 2) return 0;  // Skip unnamed or short-named modules
 
+    Elf_Dyn *dyn = NULL;
+    for (int j = 0; j < info->dlpi_phnum; j++) {
+        if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
+            dyn = (Elf_Dyn *)(info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
+            break;
+        }
+    }
+    if (!dyn) return 0;
+
+    char *dynstr = NULL;
+    Elf_Sym *dynsym = NULL;
+    unsigned int dynstrsz = 0;
+    Elf_Word *hash = NULL;
+    unsigned int nsym = 0;
+
+    // Parse dynamic tags
+    for (; dyn->d_tag != DT_NULL; dyn++) {
+        if (dyn->d_tag == DT_STRTAB) dynstr = (char *)(info->dlpi_addr + dyn->d_un.d_val);
+        if (dyn->d_tag == DT_SYMTAB) dynsym = (Elf_Sym *)(info->dlpi_addr + dyn->d_un.d_val);
+        if (dyn->d_tag == DT_STRSZ) dynstrsz = dyn->d_un.d_val;
+        if (dyn->d_tag == DT_HASH) hash = (Elf_Word *)(info->dlpi_addr + dyn->d_un.d_val);
+        // Note: For DT_GNU_HASH, parsing is more complex; assume DT_HASH for now (common in musl)
+    }
+
+    if (hash) nsym = hash[1];  // nchain from sysv hash == number of symbols
+
+    if (dynstr && dynsym && dynstrsz && nsym) {
+        scan_syms(dynstr, dynsym, dynstrsz, (char *)info->dlpi_name);
+    }
+
+    return 0;
+}
+
+#ifdef __GLIBC__
 int parse_link_map_dyn(struct link_map *map)
 {
 	if (!map) {
@@ -3192,7 +3236,6 @@ int parse_link_map_dyn(struct link_map *map)
 	}
 
 	// skip first entries in an attempt to not display the libs we load for ourselves...
-
 	if(!wsh->opt_appear){
 		if (map->l_next) {	// Leave libdl.so apparent in verbose mode
 			map = map->l_next;
@@ -3209,6 +3252,13 @@ int parse_link_map_dyn(struct link_map *map)
 
 	return 0;
 }
+#else
+int parse_link_map_dyn(struct link_map *map) {
+    // Portable: Use dl_iterate_phdr to parse symbols from all loaded modules
+    dl_iterate_phdr(sym_callback, NULL);
+    return 0;
+}
+#endif
 
 /**
 * Execute internal lua buffer
@@ -3244,7 +3294,6 @@ int exec_luabuff(void)
 				fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
 			}
 skipthisone:
-		    
 			buff += n;            
 			memset(line, 0x00, 4096);
 		}
@@ -3254,7 +3303,6 @@ skipthisone:
 		wsh->luabuffsz = 0;
 
 		return 0;
-
 	}
 
 	/**
@@ -3267,8 +3315,6 @@ skipthisone:
 	/**
 	* Release internal lua buffer
 	*/
-//	printf(" -- Executing internal buffer:\n%s\n",wsh->luabuff);
-
 	free(wsh->luabuff);
 	wsh->luabuff = 0;
 	wsh->luabuffsz = 0;
