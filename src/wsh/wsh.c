@@ -1232,6 +1232,7 @@ extern size_t __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *
 /**
 * Load Indirect functions
 */
+#ifdef __GLIBC__
 int load_indirect_functions(lua_State * L)
 {
     struct libc_ifunc_impl entries[MAX_NUM_IMPL];
@@ -1289,6 +1290,18 @@ int load_indirect_functions(lua_State * L)
 
 	return 0;
 }
+#else
+int load_indirect_functions(lua_State * L) {
+  if (wsh->opt_verbose) {
+    printf("WARNING: Indirect functions not supported on this libc\n");
+  }
+  return 0;
+}
+
+int print_indirect_functions(lua_State * L) {
+  return 0;
+}
+#endif
 
 /**
 * Display Indirect functions
