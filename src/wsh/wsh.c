@@ -3181,9 +3181,10 @@ void parse_dyn(struct link_map *map)
 		}
 		dyn += 1;
 	}
-	scan_syms(dynstr, dynsym, dynstrsz, map->l_name);
+	scan_syms(dynstr, dynsym, dynstrsz, map->l_name, 0);
 }
 
+#ifndef __GLIBC__
 static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
     unsigned int nsym = 0;
     if (hash) nsym = hash[1];  // nchain = number of symbols
@@ -3222,6 +3223,7 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
 
     return 0;
 }
+#endif
 
 #ifdef __GLIBC__
 int parse_link_map_dyn(struct link_map *map)
