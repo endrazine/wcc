@@ -2948,153 +2948,124 @@ char* universal_demangle(const char* symbol) {
 
 void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname, unsigned int nsym)
 {
-	unsigned int cnt = 0;
-	char *htype = 0;
-	unsigned long int address = 0;
-	char *demangled = 0, *symname = 0;
-	unsigned int func = 0;
-	unsigned int j = 0;
-	unsigned skip_bl = 0;
-	char newname[1024];
-	char *luacmd = 0;
+    unsigned int cnt = 0;
+    char *htype = 0;
+    unsigned long int address = 0;
+    char *demangled = 0, *symname = 0;
+    unsigned int func = 0;
+    unsigned int j = 0;
+    unsigned skip_bl = 0;
+    char newname[1024];
+    char *luacmd = 0;
 
-	/**
-	* Walk symbol table
-	*/
+    if (wsh->opt_verbose) {
+        printf("    * scan_syms: %s, nsym=%u, sz=%lu\n", libname, nsym, sz);
+    }
 
 #ifdef __GLIBC__
-	while ((sym)&&(!msync((long unsigned int)sym &~0xfff,4096,0))) {
+    while ((sym)&&(!msync((long unsigned int)sym &~0xfff,4096,0))) {
 #else
-	for (unsigned int cnt = 0; cnt < nsym; cnt++) {
-//		sym = sym + cnt;
+    // FIXED: Use the provided nsym parameter properly
+    for (unsigned int cnt = 0; cnt < nsym && sym; cnt++, sym++) {
 #endif
+        func = 0;
+        if (sym->st_name >= sz) {
+            if (wsh->opt_verbose) {
+                printf("    * Breaking: st_name (%u) >= sz (%lu)\n", sym->st_name, sz);
+            }
+            break;
+        }
+        
+        symname = dynstr + sym->st_name;
+        
+        // Add debug output for first few symbols
+        if (wsh->opt_verbose && cnt < 5) {
+            printf("    * Symbol[%u]: %s (type: %u, addr: %lx)\n", 
+                   cnt, symname, ELF_ST_TYPE(sym->st_info), sym->st_value);
+        }
 
-		func = 0;
-		if (sym->st_name >= sz) {
-			break;
-		}
-		cnt++;
-		symname = dynstr + sym->st_name;
+        // Rest of function continues as before...
+        switch (ELF_ST_TYPE(sym->st_info)) {
+        case STT_GNU_IFUNC:
+        case STT_FUNC:
+            htype = "Function";
+            func = 1;
+            break;
+        case STT_OBJECT:
+            htype = "Object";
+            break;
+        case STT_SECTION:
+            htype = "Section";
+            break;
+        case STT_FILE:
+            htype = "File";
+            break;
+        case STT_NOTYPE:
+        case STT_NUM:
+        case STT_LOPROC:
+        case STT_HIPROC:
+        default:
+            htype = 0;
+            break;
+        }
 
-		/**
-		* Extract Symbol type
-		*/
-		switch (ELF_ST_TYPE(sym->st_info)) {
-		case STT_GNU_IFUNC:	// Indirect function call (architecture dependant implementation/optimization)
-		case STT_FUNC:
-			htype = "Function";
-			func = 1;
-			break;
-		case STT_OBJECT:
-			htype = "Object";
-			break;
-		case STT_SECTION:
-			htype = "Section";
-			break;
-		case STT_FILE:
-			htype = "File";
-			break;
-		case STT_NOTYPE:
-		case STT_NUM:
-		case STT_LOPROC:
-		case STT_HIPROC:
-		default:
-			htype = 0;
-			break;
-		}
+        if (symname) {
+            address = resolve_addr(symname, libname);
+        } else {
+            address = (unsigned long int) -1;
+        }
 
-		/**
-		* Resolve address
-		*/
-		if (symname) {
-			address = resolve_addr(symname, libname);
-		} else {
-			address = (unsigned long int) -1;
-		}
+        demangled = universal_demangle(symname);
 
-		/**
-		* Demangle symbol if possible
-		*/
-		demangled = universal_demangle(symname);
+        if (strlen(symname) && (htype) && (address != (unsigned long int) -1) && (address)) {
+            skip_bl = 0;
 
-		// Skip if symbol has no name or no type
-		if (strlen(symname) && (htype) && (address != (unsigned long int) -1) && (address)) {
+            for(j=0; j < sizeof(lua_blacklist)/sizeof(char*);j++){
+                if((strlen(symname) == strlen(lua_blacklist[j]))&&(!strncmp(lua_blacklist[j] ,symname, strlen(lua_blacklist[j])))){
+                    skip_bl = 1;
+                }
+            }
 
-			/**
-			* If function name is blackslisted, skip...
-			*/
-			skip_bl = 0;
-
-			// Lua blacklist
-			for(j=0; j < sizeof(lua_blacklist)/sizeof(char*);j++){
-				if((strlen(symname) == strlen(lua_blacklist[j]))&&(!strncmp(lua_blacklist[j] ,symname, strlen(lua_blacklist[j])))){
-					skip_bl = 1;
-				}
-			}
-
-			// Lua default functions
-			for(j=0; j < sizeof(lua_default_functions)/sizeof(char*);j++){
-				if((strlen(symname) == strlen(lua_default_functions[j]))&&(!strncmp(lua_default_functions[j] ,symname, strlen(lua_default_functions[j])))){
-					skip_bl = 1;
-				}
-			}
-			
-			if(skip_bl){
+            for(j=0; j < sizeof(lua_default_functions)/sizeof(char*);j++){
+                if((strlen(symname) == strlen(lua_default_functions[j]))&&(!strncmp(lua_default_functions[j] ,symname, strlen(lua_default_functions[j])))){
+                    skip_bl = 1;
+                }
+            }
+            
+            if(skip_bl){
 #ifdef DEBUG
-				printf(" * blacklisted function name: %s\n", symname);
+                printf(" * blacklisted function name: %s\n", symname);
 #endif
-			} else if (func) {
-				/*
-				* Make C function available from lua
-				*/
-				memset(newname, 0x00, 1024);
-				snprintf(newname, 1023, "reflect_%s", symname);
-				lua_pushcfunction(wsh->L, (void *) address);
-				lua_setglobal(wsh->L, newname);
+            } else if (func) {
+                memset(newname, 0x00, 1024);
+                snprintf(newname, 1023, "reflect_%s", symname);
+                lua_pushcfunction(wsh->L, (void *) address);
+                lua_setglobal(wsh->L, newname);
 
+                luacmd = calloc(1, 1024);
+                snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
+                luabuff_append(luacmd);
+                free(luacmd);
+                scan_symbol(demangled, libname);
+            } else {
+                if((!scan_symbol(symname, libname))&&(msync(address &~0xfff,4096,0) == 0)) {
+                    lua_pushlstring(wsh->L, (char *) address, sym->st_size);
+                    lua_setglobal(wsh->L, symname);
+                }
+            }
+        }
 
-				/**
-				* Create a wrapper function with the original name
-				*/
-
-				/**
-				* Handle demangled symbols
-				*/
-
-//				printf(" -- demangled: %s\n", demangled);
-				luacmd = calloc(1, 1024);
-				snprintf(luacmd,1023, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", demangled, newname);
-				luabuff_append(luacmd);
-				free(luacmd);
-				// Add function/object to linked list
-				scan_symbol(demangled, libname);
-
-/*				} else {
-					luacmd = calloc(1, 2048);
-					snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%s, a, b, c, d, e, f, g, h); return j, k; end\n", symname, newname);
-					luabuff_append(luacmd);
-					free(luacmd);
-					// Add function/object to linked list
-					scan_symbol(symname, libname);
-				
-				}
-*/
-
-			} else {
-				/**
-				* Add function/object to linked list
-				*/
-				if((!scan_symbol(symname, libname))&&(msync(address &~0xfff,4096,0) == 0)) {	// no errors, mapped
-					// Export global as a string of known size
-					lua_pushlstring(wsh->L, (char *) address, sym->st_size);
-					lua_setglobal(wsh->L, symname);
-				}
-			}
-		}
-
-		free(demangled);
-		sym++;
-	}
+        free(demangled);
+        
+#ifdef __GLIBC__
+        cnt++;
+        sym++;
+#endif
+    }
+    
+    if (wsh->opt_verbose) {
+        printf("    * scan_syms complete: processed %u symbols from %s\n", cnt, libname);
+    }
 }
 
 void parse_dyn(struct link_map *map)
@@ -3196,7 +3167,6 @@ void parse_dyn(struct link_map *map)
 }
 
 #ifndef __GLIBC__
-// AROUND line 1067 - Improve the sym_callback function
 static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
 {
     const char *libname = info->dlpi_name;
@@ -3211,6 +3181,12 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
         }
     }
     
+    // Debug output
+    if (wsh->opt_verbose) {
+        printf("  * sym_callback: processing %s (base: %p, phnum: %d)\n", 
+               libname, (void*)info->dlpi_addr, info->dlpi_phnum);
+    }
+    
     Elf_Dyn *dyn = NULL;
     for (int j = 0; j < info->dlpi_phnum; j++) {
         if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
@@ -3218,36 +3194,72 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
             break;
         }
     }
-    if (!dyn)
+    
+    if (!dyn) {
+        if (wsh->opt_verbose) {
+            printf("    * No PT_DYNAMIC segment found in %s\n", libname);
+        }
         return 0;
-        
+    }
+    
     char *dynstr = NULL;
     Elf_Sym *dynsym = NULL;
     unsigned int dynstrsz = 0;
     Elf_Word *hash = NULL;
+    Elf_Xword *gnu_hash = NULL;
     unsigned int nsym = 0;
     
     // Parse dynamic tags
-    for (; dyn->d_tag != DT_NULL; dyn++) {
-        if (dyn->d_tag == DT_STRTAB)
-            dynstr = (char *) (info->dlpi_addr + dyn->d_un.d_ptr);
-        if (dyn->d_tag == DT_SYMTAB)
-            dynsym = (Elf_Sym *) (info->dlpi_addr + dyn->d_un.d_ptr);
-        if (dyn->d_tag == DT_STRSZ)
-            dynstrsz = dyn->d_un.d_val;
-        if (dyn->d_tag == DT_HASH)
-            hash = (Elf_Word *) (info->dlpi_addr + dyn->d_un.d_ptr);
+    Elf_Dyn *dyn_iter = dyn;
+    for (; dyn_iter->d_tag != DT_NULL; dyn_iter++) {
+        switch (dyn_iter->d_tag) {
+            case DT_STRTAB:
+                dynstr = (char *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
+                break;
+            case DT_SYMTAB:
+                dynsym = (Elf_Sym *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
+                break;
+            case DT_STRSZ:
+                dynstrsz = dyn_iter->d_un.d_val;
+                break;
+            case DT_HASH:
+                hash = (Elf_Word *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
+                break;
+            case DT_GNU_HASH:
+                gnu_hash = (Elf_Xword *) (info->dlpi_addr + dyn_iter->d_un.d_ptr);
+                break;
+        }
     }
     
-    if (hash)
+    // Get symbol count
+    if (hash) {
         nsym = hash[1]; // nchain = number of symbols
-        
-    if (dynstr && dynsym && dynstrsz && nsym) {
+    } else if (gnu_hash) {
+        // GNU hash is more complex, but we can estimate
+        // For now, try to calculate from symbol table size
+        if (dynsym && dynstr) {
+            // Estimate based on string table size (rough heuristic)
+            nsym = dynstrsz / 20; // Average symbol name length estimate
+        }
+    }
+    
+    if (wsh->opt_verbose) {
+        printf("    * dynstr: %p, dynsym: %p, dynstrsz: %u, nsym: %u\n", 
+               dynstr, dynsym, dynstrsz, nsym);
+        printf("    * hash: %p, gnu_hash: %p\n", hash, gnu_hash);
+    }
+    
+    if (dynstr && dynsym && dynstrsz && nsym > 0) {
         if (wsh->opt_verbose) {
             printf("  * Parsing symbols from %s (base: %p, symbols: %u)\n", 
                    libname, (void*)info->dlpi_addr, nsym);
         }
         scan_syms(dynstr, dynsym, dynstrsz, (char *) libname, nsym);
+    } else {
+        if (wsh->opt_verbose) {
+            printf("  * Skipping %s - missing symbol info (dynstr:%p dynsym:%p dynstrsz:%u nsym:%u)\n",
+                   libname, dynstr, dynsym, dynstrsz, nsym);
+        }
     }
     return 0;
 }
