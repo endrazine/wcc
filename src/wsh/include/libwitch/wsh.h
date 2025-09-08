@@ -59,11 +59,11 @@
 #ifdef __GLIBC__
 #include <execinfo.h>
 #else
-int backtrace(void *buffer[.size], int size){
+int backtrace(void *buffer, int size){
 	return 0;
 }
 
-char **backtrace_symbols(void *const buffer[.size], int size){
+char **backtrace_symbols(void *buffer, int size){
 	return "";
 }
 #endif
