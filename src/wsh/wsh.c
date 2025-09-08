@@ -728,6 +728,12 @@ int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 	Elf_Phdr *p = 0;
 	int j = 0;
 
+	if (wsh->opt_verbose) {
+		printf("DEBUG: phdr_callback - name='%s', addr=%p, phnum=%d\n", 
+			info->dlpi_name ? info->dlpi_name : "(null)", 
+			(void*)info->dlpi_addr, info->dlpi_phnum);
+	}
+
 	for (j = 0; j < info->dlpi_phnum; j++) {
 		p = (Elf_Phdr *) &info->dlpi_phdr[j];
 
@@ -735,15 +741,17 @@ int phdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 		ptype = decode_type(p->p_type);
 		fname = info->dlpi_name;
 		if((!fname)||(strlen(fname) < 2)){
-#ifdef DEBUG
-			if(info->dlpi_addr + p->p_vaddr >= 0x7fd000000000){
-				fname = "[vdso]";
-			}else{
-				fname = realpath(__progname_full,0);	// leak
-			}
-#else
-			return 0;
-#endif
+			// On musl, the main program has dlpi_name="" or "/proc/self/exe"
+			// Don't skip it - use a reasonable name instead
+			if(info->dlpi_addr != 0) {  // This is likely the main program
+				fname = wsh->selflib ? wsh->selflib : "[main]";
+		    	} else {
+				if(info->dlpi_addr + p->p_vaddr >= 0x7fd000000000){
+					fname = "[vdso]";
+				} else {
+					fname = "[unknown]";
+				}
+		    	}
 		}
 
 		// Save segment
@@ -885,11 +893,14 @@ int scan_sections(char *fname, unsigned long int baseaddr)
 */
 int shdr_callback(struct dl_phdr_info *info, size_t size, void *data)
 {
-	if(strlen(info->dlpi_name) < 2){
-		return 0;
+	const char *libname = info->dlpi_name;
+	if((!libname) || (strlen(libname) < 2)){
+		// On musl, main program might have empty or short name
+		// Use selflib or a default name instead of skipping
+		libname = wsh->selflib ? wsh->selflib : "/proc/self/exe";
 	}
+	scan_sections(libname, info->dlpi_addr);
 
-	scan_sections(info->dlpi_name, info->dlpi_addr);
 	return 0;
 }
 
@@ -3185,42 +3196,60 @@ void parse_dyn(struct link_map *map)
 }
 
 #ifndef __GLIBC__
+// AROUND line 1067 - Improve the sym_callback function
 static int sym_callback(struct dl_phdr_info *info, size_t size, void *data)
 {
-	if (strlen(info->dlpi_name) < 2)
-		return 0;	// Skip unnamed or short-named modules
-	Elf_Dyn *dyn = NULL;
-	for (int j = 0; j < info->dlpi_phnum; j++) {
-		if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
-			dyn = (Elf_Dyn *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
-			break;
-		}
-	}
-	if (!dyn)
-		return 0;
-	char *dynstr = NULL;
-	Elf_Sym *dynsym = NULL;
-	unsigned int dynstrsz = 0;
-	Elf_Word *hash = NULL;
-	unsigned int nsym = 0;
-// Parse dynamic tags
-	for (; dyn->d_tag != DT_NULL; dyn++) {
-		if (dyn->d_tag == DT_STRTAB)
-			dynstr = (char *) (info->dlpi_addr + dyn->d_un.d_ptr);
-		if (dyn->d_tag == DT_SYMTAB)
-			dynsym = (Elf_Sym *) (info->dlpi_addr + dyn->d_un.d_ptr);
-		if (dyn->d_tag == DT_STRSZ)
-			dynstrsz = dyn->d_un.d_val;
-		if (dyn->d_tag == DT_HASH)
-			hash = (Elf_Word *) (info->dlpi_addr + dyn->d_un.d_ptr);
-// Note: For DT_GNU_HASH, parsing is more complex; assume DT_HASH for now (common in musl)
-	}
-	if (hash)
-		nsym = hash[1];	// nchain = number of symbols
-	if (dynstr && dynsym && dynstrsz && nsym) {
-		scan_syms(dynstr, dynsym, dynstrsz, (char *) info->dlpi_name, nsym);
-	}
-	return 0;
+    const char *libname = info->dlpi_name;
+    
+    // Handle musl's behavior where main program has empty/short name
+    if ((!libname) || (strlen(libname) < 2)) {
+        if (info->dlpi_addr != 0) {
+            // This is likely the main program on musl
+            libname = wsh->selflib ? wsh->selflib : "/proc/self/exe";
+        } else {
+            return 0; // Skip only if it's truly empty and addr is 0
+        }
+    }
+    
+    Elf_Dyn *dyn = NULL;
+    for (int j = 0; j < info->dlpi_phnum; j++) {
+        if (info->dlpi_phdr[j].p_type == PT_DYNAMIC) {
+            dyn = (Elf_Dyn *) (info->dlpi_addr + info->dlpi_phdr[j].p_vaddr);
+            break;
+        }
+    }
+    if (!dyn)
+        return 0;
+        
+    char *dynstr = NULL;
+    Elf_Sym *dynsym = NULL;
+    unsigned int dynstrsz = 0;
+    Elf_Word *hash = NULL;
+    unsigned int nsym = 0;
+    
+    // Parse dynamic tags
+    for (; dyn->d_tag != DT_NULL; dyn++) {
+        if (dyn->d_tag == DT_STRTAB)
+            dynstr = (char *) (info->dlpi_addr + dyn->d_un.d_ptr);
+        if (dyn->d_tag == DT_SYMTAB)
+            dynsym = (Elf_Sym *) (info->dlpi_addr + dyn->d_un.d_ptr);
+        if (dyn->d_tag == DT_STRSZ)
+            dynstrsz = dyn->d_un.d_val;
+        if (dyn->d_tag == DT_HASH)
+            hash = (Elf_Word *) (info->dlpi_addr + dyn->d_un.d_ptr);
+    }
+    
+    if (hash)
+        nsym = hash[1]; // nchain = number of symbols
+        
+    if (dynstr && dynsym && dynstrsz && nsym) {
+        if (wsh->opt_verbose) {
+            printf("  * Parsing symbols from %s (base: %p, symbols: %u)\n", 
+                   libname, (void*)info->dlpi_addr, nsym);
+        }
+        scan_syms(dynstr, dynsym, dynstrsz, (char *) libname, nsym);
+    }
+    return 0;
 }
 #endif
 
