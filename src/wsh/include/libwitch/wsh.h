@@ -51,11 +51,14 @@
 #include <sys/mman.h>
 #include <ucontext.h>
 #include <ctype.h>
-#include <execinfo.h>
 #include <pthread.h>
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 #include <sys/ptrace.h>
+
+#ifdef __GLIBC__
+#include <execinfo.h>
+#endif
 
 #define USE_LUA 1
 // Use either lua or luajit
