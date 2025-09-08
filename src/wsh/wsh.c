@@ -2935,7 +2935,7 @@ char* universal_demangle(const char* symbol) {
     return demangled ? demangled : strdup(symbol);
 }
 
-void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname)
+void scan_syms(char *dynstr, Elf_Sym * sym, unsigned long int sz, char *libname, unsigned int nsym)
 {
 	unsigned int cnt = 0;
 	char *htype = 0;
@@ -3185,6 +3185,9 @@ void parse_dyn(struct link_map *map)
 }
 
 static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
+    unsigned int nsym = 0;
+    if (hash) nsym = hash[1];  // nchain = number of symbols
+
     if (strlen(info->dlpi_name) < 2) return 0;  // Skip unnamed or short-named modules
 
     Elf_Dyn *dyn = NULL;
@@ -3214,7 +3217,7 @@ static int sym_callback(struct dl_phdr_info *info, size_t size, void *data) {
     if (hash) nsym = hash[1];  // nchain from sysv hash == number of symbols
 
     if (dynstr && dynsym && dynstrsz && nsym) {
-        scan_syms(dynstr, dynsym, dynstrsz, (char *)info->dlpi_name);
+        scan_syms(dynstr, dynsym, dynstrsz, (char *)info->dlpi_name, nsym);
     }
 
     return 0;
