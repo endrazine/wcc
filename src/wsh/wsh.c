@@ -418,6 +418,7 @@ int scan_symbol(char *symbol, char *libname)
 
 	ret = (unsigned long int) dlsym(handle, symbol);
 
+#ifdef __GLIBC__
 	if ((dladdr1((void*)ret, &dli, (void **) &s, RTLD_DL_SYMENT))&&(s)) {
 
 		stype = ELF_ST_TYPE(s->st_info);
@@ -428,6 +429,15 @@ int scan_symbol(char *symbol, char *libname)
 
 		retv = add_symbol(symbol, libname, htype, hbind, s->st_value, s->st_size, ret);
 		if(retv){return retv;}
+#else
+	if (dladdr((void*)ret, &dli)) {
+		stype = 2; // Assume STT_FUNC
+		htype = symbol_totype(stype);
+		sbind = 1; // Assume global
+		hbind = symbol_tobind(sbind);
+
+		retv = add_symbol(symbol, libname, htype, hbind, ret - dli.dli_fbase, 0, ret); // size=0
+#endif
 	}
 
 	dlclose(handle);
@@ -1224,11 +1234,13 @@ int load_indirect_functions(lua_State * L)
 
 	Dl_info info;
 	Elf64_Sym *mydlsym = calloc(1, sizeof(Elf64_Sym));
+#ifdef __GLIBC__
 	if (dladdr1(addr, &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
-//		printf("INFO:dli_fname:%s\n", info.dli_fname);
-//		printf("INFO:dli_fbase:%p\n", info.dli_fbase);
-
 		retv = add_symbol(*function_name, info.dli_fname, "Function", "Global", dlsym(NULL, *function_name)-info.dli_fbase, 8, dlsym(NULL, *function_name));
+#else
+	if (dladdr(addr, &info)) {
+		retv = add_symbol(entries[i].name, info.dli_fname, "Function", "Global", (void*)((uintptr_t)entries[i].fn)-info.dli_fbase, 0, (void*)((uintptr_t)entries[i].fn));
+#endif
 	}else{
 		retv = add_symbol(*function_name, "indirect:libc.so", "Function", "Global", dlsym(NULL, *function_name), 8, dlsym(NULL, *function_name));
 	}
@@ -1240,15 +1252,20 @@ int load_indirect_functions(lua_State * L)
 	free(luacmd);
 
         for(size_t i = 0; i < num_entries; i++) {
-
+#ifdef __GLIBC__
 		if (dladdr1((void*)((uintptr_t)entries[i].fn), &info, (void **) &mydlsym, RTLD_DL_SYMENT)) {
-//			printf("INFO:dli_fname:%s\n", info.dli_fname);
-//			printf("INFO:dli_fbase:%p\n", info.dli_fbase);
-
 			retv = add_symbol(entries[i].name, info.dli_fname, "Function", "Global", (void*)((uintptr_t)entries[i].fn)-info.dli_fbase, 8, (void*)((uintptr_t)entries[i].fn));
 		}else{
 			retv = add_symbol(entries[i].name, "indirect:libc.so", "Function", "Global", (void*)((uintptr_t)entries[i].fn), 8, (void*)((uintptr_t)entries[i].fn));
 		}
+#else
+		if (dladdr((void*)((uintptr_t)entries[i].fn), &info)) {
+			retv = add_symbol(entries[i].name, info.dli_fname, "Function", "Global", (void*)((uintptr_t)entries[i].fn)-info.dli_fbase, 0, (void*)((uintptr_t)entries[i].fn));
+		}else{
+			retv = add_symbol(entries[i].name, "indirect:libc.so", "Function", "Global", (void*)((uintptr_t)entries[i].fn), 0, (void*)((uintptr_t)entries[i].fn));
+		}
+#endif
+
 		char *luacmd = calloc(1, 2048);
 		snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%p, a, b, c, d, e, f, g, h); return j, k; end\n", entries[i].name, (void*)((uintptr_t)entries[i].fn));
 		luabuff_append(luacmd);
@@ -1768,6 +1785,7 @@ int info(lua_State * L)
 			return 0;
 		}
 
+#ifdef __GLIBC__
 		if (dladdr1(ret, &dli, (void **) &s, RTLD_DL_SYMENT)&&(s)) {
 			stype = ELF_ST_TYPE(s->st_info);
 			htype = symbol_totype(stype);
@@ -1782,7 +1800,19 @@ int info(lua_State * L)
 			}
 
 			printf(" * %s %s %s at %p	%s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, s->st_size /*, s->st_value */ );
-
+#else
+		if (dladdr(ret, &dli)) {
+			stype = 2; // Assume function
+			htype = symbol_totype(stype);
+			sbind = 1;
+			hbind = symbol_tobind(sbind);
+			char *secname = "";
+			sections_t *sec = section_from_addr(dli.dli_saddr);
+			if(sec){
+				secname = sec->name;
+			}
+			printf(" * %s %s %s at %p %s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, 0 /* s->st_size */ );
+#endif
 		} else {
 			printf(" * symbol %s does not exist.\n", (char *)symbol);
 		}
@@ -4970,8 +5000,9 @@ void declare_internals(void)
 int set_alloc_opt(void)
 {
 	setenv("LIBC_FATAL_STDERR_", "yes", 1);
+#ifdef __GLIBC__
 	mallopt(M_CHECK_ACTION, 3);
-
+#endif
 	return 0;
 }
 
