@@ -58,14 +58,6 @@
 
 #ifdef __GLIBC__
 #include <execinfo.h>
-#else
-int backtrace(void *buffer, int size){
-	return 0;
-}
-
-char **backtrace_symbols(void *buffer, int size){
-	return "";
-}
 #endif
 
 #define USE_LUA 1

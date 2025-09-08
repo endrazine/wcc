@@ -164,6 +164,17 @@ learn_t *protorecords = NULL;
 */
 extern wsh_t *wsh;
 
+#ifndef __GLIBC__
+int backtrace(void *buffer, int size){
+	return 0;
+}
+
+char **backtrace_symbols(void *buffer, int size){
+	return "";
+}
+#endif
+
+
 /**
 * Bruteforce valid memory mapping ranges
 */
