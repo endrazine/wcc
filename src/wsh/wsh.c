@@ -166,12 +166,62 @@ learn_t *protorecords = NULL;
 extern wsh_t *wsh;
 
 #ifndef __GLIBC__
-int backtrace(void *buffer, int size){
-	return 0;
+#include <libunwind.h>
+
+int backtrace(void **buffer, int size) {
+    unw_context_t context;
+    unw_cursor_t cursor;
+    int n = 0;
+
+    if (unw_getcontext(&context) < 0)
+        return 0;
+
+    if (unw_init_local(&cursor, &context) < 0)
+        return 0;
+
+    while (n < size && unw_step(&cursor) > 0) {
+        unw_word_t pc;
+        if (unw_get_reg(&cursor, UNW_REG_IP, &pc) < 0)
+            break;
+        buffer[n++] = (void *)(uintptr_t)pc;
+    }
+
+    return n;
 }
 
-char **backtrace_symbols(void *buffer, int size){
-	return "";
+char **backtrace_symbols(void *const *buffer, int size) {
+    char **result = calloc(size, sizeof(char*));
+    if (!result) return NULL;
+
+    for (int i = 0; i < size; i++) {
+        unw_context_t context;
+        unw_cursor_t cursor;
+        unw_word_t offset;
+        char proc_name[256];
+
+        result[i] = malloc(512);
+        if (!result[i]) {
+            snprintf(result[i] = malloc(32), 32, "%p", buffer[i]);
+            continue;
+        }
+
+        // Try to resolve symbol name
+        if (unw_getcontext(&context) == 0 && 
+            unw_init_local(&cursor, &context) == 0) {
+            
+            unw_set_reg(&cursor, UNW_REG_IP, (unw_word_t)(uintptr_t)buffer[i]);
+            
+            if (unw_get_proc_name(&cursor, proc_name, sizeof(proc_name), &offset) == 0) {
+                snprintf(result[i], 512, "%s+0x%lx [%p]", proc_name, offset, buffer[i]);
+            } else {
+                snprintf(result[i], 512, "%p", buffer[i]);
+            }
+        } else {
+            snprintf(result[i], 512, "%p", buffer[i]);
+        }
+    }
+
+    return result;
 }
 #endif
 
