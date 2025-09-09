@@ -168,30 +168,80 @@ extern wsh_t *wsh;
 #ifndef __GLIBC__
 #include <dlfcn.h>
 
+// DEBUG: Add this to see what's defined
+void debug_arch_defines() {
+    printf("Architecture defines:\n");
+#ifdef __x86_64__
+    printf("  __x86_64__ is defined\n");
+#endif
+#ifdef __x86_64
+    printf("  __x86_64 is defined\n");
+#endif
+#ifdef __amd64__
+    printf("  __amd64__ is defined\n");
+#endif
+#ifdef __amd64
+    printf("  __amd64 is defined\n");
+#endif
+#ifdef _M_X64
+    printf("  _M_X64 is defined\n");
+#endif
+#ifdef __LP64__
+    printf("  __LP64__ is defined\n");
+#endif
+    printf("  sizeof(void*) = %zu\n", sizeof(void*));
+}
+
 int backtrace(void **buffer, int size) {
-    void **frame_pointer;
+    void **frame_pointer = NULL;
     int count = 0;
 
-#ifdef __x86_64__
+    debug_arch_defines(); // Call this to see what's defined
+
+    // More comprehensive architecture detection
+#if defined(__x86_64__) || defined(__x86_64) || defined(__amd64__) || defined(__amd64)
     __asm__("movq %%rbp, %0" : "=r"(frame_pointer));
-#elif defined(__i386__)
+    printf("Using x86_64 frame pointer walking\n");
+#elif defined(__i386__) || defined(__i386) || defined(i386)
     __asm__("movl %%ebp, %0" : "=r"(frame_pointer));
+    printf("Using i386 frame pointer walking\n");
+#elif defined(__aarch64__)
+    __asm__("mov %0, x29" : "=r"(frame_pointer));
+    printf("Using aarch64 frame pointer walking\n");
 #else
+    printf("No supported architecture detected for backtrace\n");
     return 0;
 #endif
 
+    printf("Initial frame pointer: %p\n", frame_pointer);
+
     while (frame_pointer && count < size) {
-        if (frame_pointer < (void**)0x1000) break;
+        // Validate frame pointer
+        if (frame_pointer < (void**)0x1000) {
+            printf("Frame pointer too low: %p\n", frame_pointer);
+            break;
+        }
         
+        // Get return address
         void *return_addr = frame_pointer[1];
-        if (!return_addr || return_addr < (void*)0x1000) break;
+        if (!return_addr || return_addr < (void*)0x1000) {
+            printf("Invalid return address: %p\n", return_addr);
+            break;
+        }
         
+        printf("Frame %d: %p -> %p\n", count, frame_pointer, return_addr);
         buffer[count++] = return_addr;
         
+        // Move to previous frame
         void **prev_frame = (void**)frame_pointer[0];
-        if (prev_frame <= frame_pointer) break;
+        if (prev_frame <= frame_pointer) {
+            printf("Invalid prev frame: %p <= %p\n", prev_frame, frame_pointer);
+            break;
+        }
         frame_pointer = prev_frame;
     }
+    
+    printf("Backtrace collected %d frames\n", count);
     return count;
 }
 
@@ -199,17 +249,32 @@ char **backtrace_symbols(void *const *buffer, int size) {
     char **result = calloc(size, sizeof(char*));
     if (!result) return NULL;
     
+    printf("Converting %d addresses to symbols\n", size);
+    
     for (int i = 0; i < size; i++) {
         Dl_info info;
         result[i] = malloc(256);
         if (!result[i]) continue;
         
-        if (dladdr(buffer[i], &info) && info.dli_sname) {
-            snprintf(result[i], 256, "%s(%s+0x%lx) [%p]",
-                info.dli_fname ?: "?", info.dli_sname,
-                (char*)buffer[i] - (char*)info.dli_saddr, buffer[i]);
+        printf("Resolving %p... ", buffer[i]);
+        if (dladdr(buffer[i], &info)) {
+            if (info.dli_sname) {
+                snprintf(result[i], 256, "%s(%s+0x%lx) [%p]",
+                    info.dli_fname ? info.dli_fname : "?",
+                    info.dli_sname,
+                    (char*)buffer[i] - (char*)info.dli_saddr,
+                    buffer[i]);
+                printf("-> %s\n", info.dli_sname);
+            } else {
+                snprintf(result[i], 256, "%s(+0x%lx) [%p]",
+                    info.dli_fname ? info.dli_fname : "?",
+                    (char*)buffer[i] - (char*)info.dli_fbase,
+                    buffer[i]);
+                printf("-> %s (no symbol)\n", info.dli_fname ? info.dli_fname : "?");
+            }
         } else {
             snprintf(result[i], 256, "[%p]", buffer[i]);
+            printf("-> no info\n");
         }
     }
     return result;
