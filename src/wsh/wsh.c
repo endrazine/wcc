@@ -170,59 +170,55 @@ extern wsh_t *wsh;
 
 int backtrace(void **buffer, int size) {
     int count = 0;
-    
-    // Try different methods to get stack frames
     void *current_frame = __builtin_frame_address(0);
     
-    if (!current_frame || current_frame == (void*)0x3) {
-        // Fallback: get stack pointer and try to walk from there
-        void *stack_ptr;
-        __asm__("movq %%rsp, %0" : "=r"(stack_ptr));
-        printf("Frame pointer failed (got %p), trying from stack pointer %p\n", current_frame, stack_ptr);
-        
-        // Look for return addresses on the stack
-        unsigned long *sp = (unsigned long*)stack_ptr;
-        for (int i = 0; i < 100 && count < size; i++) {
-            void *potential_addr = (void*)sp[i];
-            
-            // Check if this looks like a code address
-            Dl_info info;
-            if (dladdr(potential_addr, &info) && info.dli_fbase) {
-                buffer[count++] = potential_addr;
-                if (count >= size) break;
-            }
-        }
-        return count;
+    if (!current_frame || current_frame < (void*)0x1000) {
+        printf("Invalid initial frame pointer: %p\n", current_frame);
+        return 0;
     }
     
-    // Traditional frame pointer walking
     void **fp = (void**)current_frame;
     printf("Using frame pointer walking from %p\n", fp);
     
     while (fp && count < size) {
-        if (fp < (void**)0x1000 || fp >= (void**)0x800000000000UL) {
+        // Enhanced validation
+        if (fp < (void**)0x1000 || 
+            fp >= (void**)0x800000000000UL ||
+            ((uintptr_t)fp & 0x7) != 0) {  // Check alignment
             printf("Invalid frame pointer: %p\n", fp);
             break;
         }
         
         void *return_addr = fp[1];
-        if (!return_addr || return_addr < (void*)0x1000) {
+        
+        // Better return address validation
+        if (!return_addr || 
+            return_addr < (void*)0x1000 || 
+            return_addr >= (void*)0x800000000000UL) {
             printf("Invalid return address: %p\n", return_addr);
             break;
         }
         
-        // Validate this is actually a code address
+        // Validate this is actually in a mapped executable region
         Dl_info info;
-        if (dladdr(return_addr, &info)) {
-            buffer[count++] = return_addr;
-            printf("Frame %d: %p\n", count-1, return_addr);
+        if (!dladdr(return_addr, &info) || !info.dli_fbase) {
+            printf("Return address %p not in any mapped library\n", return_addr);
+            break;
         }
         
+        buffer[count++] = return_addr;
+        printf("Frame %d: %p (%s)\n", count-1, return_addr, 
+               info.dli_fname ? info.dli_fname : "unknown");
+        
         void **next_fp = (void**)fp[0];
-        if (next_fp <= fp) break;
+        if (!next_fp || next_fp <= fp || next_fp >= (void**)0x800000000000UL) {
+            printf("End of stack or invalid next frame: %p\n", next_fp);
+            break;
+        }
         fp = next_fp;
     }
     
+    printf("Collected %d valid frames\n", count);
     return count;
 }
 
@@ -232,24 +228,24 @@ char **backtrace_symbols(void *const *buffer, int size) {
     
     for (int i = 0; i < size; i++) {
         Dl_info info;
-        result[i] = malloc(256);
+        result[i] = malloc(512);  // Increased buffer size
         if (!result[i]) continue;
         
         if (dladdr(buffer[i], &info)) {
             if (info.dli_sname) {
-                snprintf(result[i], 256, "%s(%s+0x%lx) [%p]",
+                snprintf(result[i], 512, "%s(%s+0x%lx) [%p]",
                     info.dli_fname ? info.dli_fname : "?",
                     info.dli_sname,
                     (char*)buffer[i] - (char*)info.dli_saddr,
                     buffer[i]);
             } else {
-                snprintf(result[i], 256, "%s(+0x%lx) [%p]",
+                snprintf(result[i], 512, "%s(+0x%lx) [%p]",
                     info.dli_fname ? info.dli_fname : "?",
                     (char*)buffer[i] - (char*)info.dli_fbase,
                     buffer[i]);
             }
         } else {
-            snprintf(result[i], 256, "[%p]", buffer[i]);
+            snprintf(result[i], 512, "[%p]", buffer[i]);
         }
     }
     return result;
