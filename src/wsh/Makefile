@@ -40,9 +40,9 @@ all::
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
-	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(LIB) $(WLINK) -liberty $(OBJLIB) -ldl
-	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-static-`uname -m` $(LIB) $(WLINK) -liberty $(OBJLIB) -static
-	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-`uname -m` $(WLINK) $(LIB) -liberty $(OBJLIB) -ldl -Wl,-rpath=/tmp/wsh/`uname -m`/,-rpath=/tmp/wsh/,-rpath=.
+	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(LIBS) $(WLINK) -liberty $(OBJLIB) -ldl
+	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-static-`uname -m` $(LIBS) $(WLINK) -liberty $(OBJLIB) -static
+	$(CC) $(CFLAGS) ../wld/wld.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-`uname -m` $(WLINK) $(LIBS) -liberty $(OBJLIB) -ldl -Wl,-rpath=/tmp/wsh/`uname -m`/,-rpath=/tmp/wsh/,-rpath=.
 	cp wsh libwsh.so
 	../wld/wld -l libwsh.so
 	cp wsh ../../bin/
