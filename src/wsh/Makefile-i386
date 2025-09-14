@@ -9,8 +9,9 @@
 
 CC	:= gcc -m32
 
-CFLAGS := -masm=intel -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now -m32 #--sanitize=address
+#CFLAGS := -masm=intel -W -Wall -Wextra -O0 -mpreferred-stack-boundary=12 -mstackrealign -ggdb -g3 -Wno-unused-but-set-variable -Wno-unused-parameter -I./include/sflib/ -I./include -I../../include/ -rdynamic -Wl,-E -Wl,-z,now -m32 #--sanitize=address
 
+CFLAGS := -rdynamic -O0 -ggdb -g3 -Wno-incompatible-pointer-types -Wno-int-conversion -Wno-unused-but-set-variable -Wno-unused-parameter -I./include -rdynamic -I../../include/ -I./luajit-2.0/src/ -Wl,-E -Wl,-z,now
 
 all::
 	cd openlibm && make CFLAGS="-pie -fpie -fPIC -m32" ARCH=i386
@@ -21,8 +22,8 @@ all::
 	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -pie -fpie -fPIC
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
-	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c	
-	$(CC) $(CFLAGS) elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-i386 ./lua/src/liblua.a  -lgsl -lgslcblas /usr/lib32/libc.so -lm -ldl /usr/lib/i386-linux-gnu/libiberty.a 
+	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
+	$(CC) $(CFLAGS) elfloader64.o ../wld/wld.o wsh.o helper.o linenoise.o wshmain.o -o wsh-i386 ./lua/src/liblua.a  -lgsl -lgslcblas /lib/i386-linux-gnu/libc.so -lm -ldl /usr/lib/i386-linux-gnu/libiberty.a 
 	cp wsh-i386 ../../bin/
 
 dep::
@@ -52,3 +53,4 @@ install::
 uninstall::
 	rm -rf $(DESTDIR)/usr/share/wcc/
 	rm -f $(DESTDIR)/usr/bin/wsh-i386
+
