@@ -2455,7 +2455,7 @@ static int libcall(lua_State * L)
 {
 	unsigned long int *arg[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	unsigned int i = 0;
-	void *(*f) () = 0;
+	void *(*f) (void *arg1, void *arg2, void *arg3, void *arg4, void *arg5, void *arg6, void *arg7, void *arg8) = 0;
 	void *ret = 0;
 	int callerrno = 0;
 	int argnum = 0;
