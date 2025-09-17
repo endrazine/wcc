@@ -29,7 +29,7 @@ WCC :=  ./wcc
 FILE := file
 
 all::
-	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd-2.45 -lelf -lcapstone
+	$(CC) $(CFLAGS) wcc.c -o wcc -lbfd -lelf -lcapstone
 #	$(CC) $(CFLAGS) -m32 -Wl,-rpath /home/jonathan/solution-exp/unlinking/awareness/self/wcc/src/wcc/lib32/  wcc.c -o wcc32 -lelf ./lib32/libbfd-2.24-system.so ./lib32/libcapstone.so.3
 
 	cp wcc ../../bin/  || :
