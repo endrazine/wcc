@@ -308,6 +308,7 @@ typedef struct ctx_t {
 	unsigned long int opt_entrypoint;
 	unsigned char opt_poison;
 	unsigned int opt_no_data_relro;
+	unsigned int opt_no_extra_symbols;
 	unsigned int opt_original;
 	unsigned int opt_keep_main;
 	unsigned int opt_debug;
@@ -687,6 +688,343 @@ int rd_symbols(ctx_t *ctx)
 
 	return ret;
 }
+
+int rd_pe_symbols(ctx_t *ctx)
+{
+	long storage_needed = 0;
+	asymbol **symbol_table = NULL;
+	long number_of_symbols = 0;
+	long i = 0;
+	int ret = 0;
+
+	const char *sym_name = 0;
+	int symclass = 0;
+	int sym_value = 0;
+
+	if (ctx->opt_verbose) {
+		printf("\n\n -- Reading PE symbols and exports\n\n");
+		printf(" Symbol\t\t\t\taddress\t\tclass\n");
+		printf(" -----------------------------------------------------\n");
+	}
+
+	/**
+	* Process PE exports using BFD dynamic symbol table
+	*/
+	storage_needed = bfd_get_dynamic_symtab_upper_bound(ctx->abfd);
+	if (ctx->opt_debug) {
+		printf("PE dynamic symbols storage needed: %ld\n", storage_needed);
+	}
+
+	if (storage_needed < 0) {
+		bfd_perror(" !! WARNING: bfd_get_dynamic_symtab_upper_bound failed for PE");
+		ret = 0;
+		goto try_regular_symtab;
+	}
+
+	if (storage_needed == 0) {
+		if (ctx->opt_verbose) {
+			fprintf(stderr, " !! WARNING: no PE dynamic symbols found\n");
+		}
+		goto try_regular_symtab;
+	}
+
+	symbol_table = (asymbol **) malloc(storage_needed);
+	if (!symbol_table) {
+		perror("malloc failed for PE symbol table");
+		ret = 0;
+		goto try_regular_symtab;
+	}
+
+	number_of_symbols = bfd_canonicalize_dynamic_symtab(ctx->abfd, symbol_table);
+	if (number_of_symbols < 0) {
+		bfd_perror(" !! WARNING: bfd_canonicalize_dynamic_symtab failed for PE");
+		ret = 0;
+		goto cleanup_and_try_regular;
+	}
+
+	if (ctx->opt_verbose) {
+		printf(" * Found %ld PE exported symbols\n", number_of_symbols);
+	}
+
+	for (i = 0; i < number_of_symbols; i++) {
+		asymbol *asym = symbol_table[i];
+		sym_name = bfd_asymbol_name(asym);
+		symclass = bfd_decode_symclass(asym);
+		sym_value = bfd_asymbol_value(asym);
+
+		if (*sym_name == '\0') {
+			continue;
+		}
+		// For PE exports, we're mainly interested in defined symbols
+		if (bfd_is_undefined_symclass(symclass)) {
+			continue;
+		}
+		// Check if this is an export (PE exports show up as BSF_EXPORT or BSF_GLOBAL)
+		if (asym->flags & (BSF_EXPORT | BSF_GLOBAL)) {
+			if (!ctx->opt_strip) {
+				// Fix PE symbol classification
+				char corrected_symclass = symclass;
+
+				// PE exports in code sections should be 'T'
+				if (asym->section) {
+					if (asym->section->flags & SEC_CODE) {
+						corrected_symclass = 'T';	// Global code symbol
+					} else if (asym->section->flags & SEC_DATA) {
+						corrected_symclass = 'D';	// Global data symbol
+					} else if (asym->section->flags & SEC_ALLOC) {
+						corrected_symclass = 'B';	// Global BSS symbol
+					}
+				} else {
+					// No section info, assume it's code for exports
+					corrected_symclass = 'T';
+				}
+
+				if (ctx->opt_debug) {
+					printf(" * PE symbol: %s, original class: %c, corrected: %c, flags: 0x%x\n", sym_name, symclass, corrected_symclass, asym->flags);
+				}
+
+				add_symaddr(ctx, sym_name, sym_value, corrected_symclass);
+			}
+		}
+	}
+
+	ret = 1;
+	goto cleanup;
+
+      cleanup_and_try_regular:
+	if (symbol_table) {
+		free(symbol_table);
+		symbol_table = NULL;
+	}
+
+      try_regular_symtab:
+	/**
+	* Try regular symbol table as fallback
+	*/
+	if (ctx->opt_debug) {
+		printf(" * Trying regular symbol table as fallback\n");
+	}
+
+	storage_needed = bfd_get_symtab_upper_bound(ctx->abfd);
+	if (storage_needed > 0) {
+		symbol_table = (asymbol **) malloc(storage_needed);
+		if (symbol_table) {
+			number_of_symbols = bfd_canonicalize_symtab(ctx->abfd, symbol_table);
+			if (number_of_symbols > 0) {
+				if (ctx->opt_verbose) {
+					printf(" * Found %ld regular symbols in PE file\n", number_of_symbols);
+				}
+
+				for (i = 0; i < number_of_symbols; i++) {
+					asymbol *asym = symbol_table[i];
+					sym_name = bfd_asymbol_name(asym);
+					symclass = bfd_decode_symclass(asym);
+					sym_value = bfd_asymbol_value(asym);
+
+					if (*sym_name == '\0') {
+						continue;
+					}
+
+					if (bfd_is_undefined_symclass(symclass)) {
+						continue;
+					}
+
+					if (!ctx->opt_strip) {
+						// Fix PE symbol classification
+						char corrected_symclass = symclass;
+
+						// Determine correct symbol class based on section
+						if (asym->section) {
+							if (asym->section->flags & SEC_CODE) {
+								corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'T' : 't';
+							} else if (asym->section->flags & SEC_DATA) {
+								corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'D' : 'd';
+							} else if ((asym->section->flags & SEC_ALLOC) && !(asym->section->flags & SEC_LOAD)) {
+								corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'B' : 'b';
+							}
+						}
+
+						add_symaddr(ctx, sym_name, sym_value, corrected_symclass);
+					}
+				}
+				ret = 1;
+			}
+		}
+	}
+
+      cleanup:
+	if (symbol_table) {
+		free(symbol_table);
+	}
+
+	if (ctx->opt_verbose) {
+		printf("\n");
+	}
+
+	return ret;
+}
+
+int rd_macho_symbols(ctx_t *ctx)
+{
+	long storage_needed = 0;
+	asymbol **symbol_table = NULL;
+	long number_of_symbols = 0;
+	long i = 0;
+	int ret = 0;
+
+	const char *sym_name = 0;
+	int symclass = 0;
+	int sym_value = 0;
+	const char *target = bfd_get_target(ctx->abfd);
+	int is_macho = (strstr(target, "mach-o") != NULL);
+	int is_pe = (strstr(target, "pe-") != NULL || strstr(target, "pei-") != NULL);
+
+	if (ctx->opt_verbose) {
+		printf("\n\n -- Reading symbols (%s)\n\n", target);
+		printf(" Symbol\t\t\t\taddress\t\tclass\n");
+		printf(" -----------------------------------------------------\n");
+	}
+
+    /**
+    * Process symbol table
+    */
+	storage_needed = bfd_get_symtab_upper_bound(ctx->abfd);
+	if (ctx->opt_debug) {
+		printf("storage_needed: %ld\n", storage_needed);
+	}
+
+	if (storage_needed < 0) {
+		bfd_perror(" !! WARNING: bfd_get_symtab_upper_bound");
+		ret = 0;
+		goto dynsym;
+	}
+	if (storage_needed == 0 || storage_needed == 1) {
+		fprintf(stderr, " !! WARNING: no symbols\n");
+		goto dynsym;
+	}
+
+	symbol_table = (asymbol **) malloc(storage_needed);
+	number_of_symbols = bfd_canonicalize_symtab(ctx->abfd, symbol_table);
+	if (number_of_symbols < 0) {
+		bfd_perror(" !! WARNING: bfd_canonicalize_symtab");
+		ret = 0;
+		goto dynsym;
+	}
+
+	for (i = 0; i < number_of_symbols; i++) {
+		asymbol *asym = symbol_table[i];
+		sym_name = bfd_asymbol_name(asym);
+		symclass = bfd_decode_symclass(asym);
+		sym_value = bfd_asymbol_value(asym);
+
+		if (*sym_name == '\0') {
+			continue;
+		}
+		if (bfd_is_undefined_symclass(symclass)) {
+			continue;
+		}
+
+		if (!ctx->opt_strip) {
+			char corrected_symclass = symclass;
+
+			// Fix symbol classification based on binary format
+			if (is_macho) {
+				// Mach-O specific symbol classification
+				if (asym->section) {
+					if (asym->section->flags & SEC_CODE) {
+						// Code section - check if it's global vs local
+						if (asym->flags & BSF_GLOBAL) {
+							corrected_symclass = 'T';	// Global text
+						} else if (asym->flags & BSF_LOCAL) {
+							corrected_symclass = 't';	// Local text  
+						} else {
+							// Default based on original classification
+							corrected_symclass = (symclass == 'W') ? 'T' : symclass;
+						}
+					} else if (asym->section->flags & SEC_DATA) {
+						corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'D' : 'd';
+					} else if ((asym->section->flags & SEC_ALLOC) && !(asym->section->flags & SEC_LOAD)) {
+						corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'B' : 'b';
+					}
+				} else {
+					// No section info - use flags to determine
+					if (asym->flags & BSF_GLOBAL) {
+						corrected_symclass = 'T';	// Assume global code
+					}
+				}
+			} else if (is_pe) {
+				// PE specific symbol classification (existing logic)
+				if (asym->section) {
+					if (asym->section->flags & SEC_CODE) {
+						corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'T' : 't';
+					} else if (asym->section->flags & SEC_DATA) {
+						corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'D' : 'd';
+					} else if ((asym->section->flags & SEC_ALLOC) && !(asym->section->flags & SEC_LOAD)) {
+						corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'B' : 'b';
+					}
+				} else {
+					corrected_symclass = (asym->flags & BSF_GLOBAL) ? 'T' : 't';
+				}
+			}
+			// ELF files: use original symclass (BFD handles them correctly)
+
+			if (ctx->opt_debug && corrected_symclass != symclass) {
+				printf(" * Symbol: %-20s section: %-10s orig: %c corrected: %c flags: 0x%04x\n",
+				       sym_name, asym->section ? asym->section->name : "(none)", symclass, corrected_symclass, asym->flags);
+			}
+
+			add_symaddr(ctx, sym_name, sym_value, corrected_symclass);
+		}
+	}
+
+	ret = 1;
+
+      dynsym:
+	if (symbol_table) {
+		free(symbol_table);
+	}
+	symbol_table = NULL;
+
+	// Try dynamic symbols too (mainly for ELF)
+	if (!is_pe && !is_macho) {
+		storage_needed = bfd_get_dynamic_symtab_upper_bound(ctx->abfd);
+		if (storage_needed > 0) {
+			symbol_table = (asymbol **) malloc(storage_needed);
+			number_of_symbols = bfd_canonicalize_dynamic_symtab(ctx->abfd, symbol_table);
+			if (number_of_symbols > 0) {
+				for (i = 0; i < number_of_symbols; i++) {
+					asymbol *asym = symbol_table[i];
+					sym_name = bfd_asymbol_name(asym);
+					symclass = bfd_decode_symclass(asym);
+					sym_value = bfd_asymbol_value(asym);
+
+					if (*sym_name == '\0') {
+						continue;
+					}
+					if (bfd_is_undefined_symclass(symclass)) {
+						continue;
+					}
+
+					if (!ctx->opt_strip) {
+						add_symaddr(ctx, sym_name, sym_value, symclass);
+					}
+				}
+			}
+		}
+	}
+
+      out:
+	if (symbol_table) {
+		free(symbol_table);
+	}
+
+	if (ctx->opt_verbose) {
+		printf("\n");
+	}
+
+	return ret;
+}
+
 
 /**
 * Return section entry size from name
@@ -2608,6 +2946,18 @@ static int extend_text(ctx_t *ctx)
 {
 	unsigned int i = 0;
 	asection *s = 0;
+	char const *target = NULL;
+	int is_pe64 = 0, is_pe32 = 0, is_macho = 0;
+
+	target = bfd_get_target(ctx->abfd);
+
+	is_pe64 = (strcmp(target, "pe-x86-64") == 0 || strcmp(target, "pei-x86-64") == 0);
+	is_pe32 = (strcmp(target, "pe-i386") == 0 || strcmp(target, "pei-i386") == 0 || strcmp(target, "pe-arm-wince-little") == 0 || strcmp(target, "pei-arm-wince-little") == 0);
+	is_macho = (strstr(target, "mach-o") != NULL);
+
+	if(is_macho){
+		return 0;
+	}
 
 	if (ctx->opt_debug) {
 		printf(" -- Extending .text\n\n");
@@ -3819,11 +4169,6 @@ static void parse_text_data_reloc(ctx_t *ctx, csh ud, cs_mode mode, cs_insn *ins
 
 	x86 = &(ins->detail->x86);
 
-//      if(ctx->opt_debug){
-//              printf("\t\tRELOC Address: %lu\n", ins->address);
-//              printf("\t\tRELOC operands.type: MEM, opcount:%u\n", x86->op_count);
-//      }
-
 	for (i = 0; i < x86->op_count; i++) {
 		cs_x86_op *op = &(x86->operands[i]);
 		m = 0;
@@ -3891,6 +4236,11 @@ int analyze_data(ctx_t *ctx, msec_t *s)
 	msec_t *sec = 0, *tmp = 0;
 	unsigned int secindex = 0;
 	int total_relocations = 0;
+
+	if (!s) {
+		printf(" -- No .data section found, skipping analysis\n");
+		return -1;
+	}
 
 	printf(" -- Analyzing .data section (Simplified)\n\n");
 	hexdump(s->data, s->len);
@@ -4074,7 +4424,9 @@ int rd_symtab(ctx_t *ctx)
 	}
 
 	if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
-		printf("error: in elf_getshdrstrndx\n");
+		if (ctx->opt_verbose) {
+			printf("Warning: no .shstrtab section found\n");
+		}
 		return -1;
 	}
 
@@ -4194,7 +4546,7 @@ int strip_binary_reloc(ctx_t *ctx)
 unsigned int libify(ctx_t *ctx)
 {
 	char const *target = NULL;
-	int is_pe64 = 0, is_pe32 = 0;
+	int is_pe64 = 0, is_pe32 = 0, is_macho = 0;
 
 	/**
 	*
@@ -4246,9 +4598,20 @@ unsigned int libify(ctx_t *ctx)
 
 	is_pe64 = (strcmp(target, "pe-x86-64") == 0 || strcmp(target, "pei-x86-64") == 0);
 	is_pe32 = (strcmp(target, "pe-i386") == 0 || strcmp(target, "pei-i386") == 0 || strcmp(target, "pe-arm-wince-little") == 0 || strcmp(target, "pei-arm-wince-little") == 0);
+	is_macho = (strstr(target, "mach-o") != NULL);
 
 	if ((is_pe64) || (is_pe32)) {
 		printf("target: %s\n", target);
+		rd_pe_symbols(ctx);
+	} else if (is_macho) {
+		printf("target: %s (Mach-O)\n", target);
+
+		// Add fake section symbols to account for 
+		// potentially missing sections (.symtab->link pad)
+		add_symaddr(ctx, "pad1", 1, 0x54);
+		add_symaddr(ctx, "pad2", 2, 0x54);
+
+		rd_macho_symbols(ctx);
 	} else {
 		rd_symbols(ctx);
 	}
@@ -4258,7 +4621,9 @@ unsigned int libify(ctx_t *ctx)
 	/**
 	* Add extra symbols
 	*/
-	add_extra_symbols(ctx);
+	if (!ctx->opt_no_extra_symbols) {
+		add_extra_symbols(ctx);
+	}
 
 	/**
 	* Parse relocations
@@ -4416,6 +4781,8 @@ int usage(char *name)
 	printf("    -O, --original\n");
 	printf("    -k, --keep-main\n");
 	printf("    -D, --disasm\n");
+	printf("    -n, --no-data-rel-ro\n");
+	printf("    -N, --no-extra-symbols\n");
 	printf("    -d, --debug\n");
 	printf("    -h, --help\n");
 	printf("    -v, --verbose\n");
@@ -4460,7 +4827,7 @@ int desired_arch(ctx_t *ctx, char *name)
 */
 int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 {
-	const char *short_opt = "ho:i:scSEsxCvVXp:Odm:e:f:Dkn";
+	const char *short_opt = "ho:i:scSEsxCvVXp:Odm:e:f:DknN";
 	int count = 0;
 	struct stat sb;
 	int c = 0;
@@ -4484,6 +4851,7 @@ int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 		{ "original", no_argument, NULL, 'O' },
 		{ "keep-main", no_argument, NULL, 'k' },
 		{ "no-data-rel-ro", no_argument, NULL, 'n' },
+		{ "no-extra-symbols", no_argument, NULL, 'N' },
 		{ "verbose", no_argument, NULL, 'v' },
 		{ "version", no_argument, NULL, 'V' },
 		{ NULL, 0, NULL, 0 }
@@ -4556,6 +4924,10 @@ int ctx_getopt(ctx_t *ctx, int argc, char **argv)
 
 		case 'n':
 			ctx->opt_no_data_relro = 1;
+			break;
+
+		case 'N':
+			ctx->opt_no_extra_symbols = 1;
 			break;
 
 		case 'o':
