@@ -35,12 +35,60 @@
 #include <libwitch/sigs.h>
 #include <uthash.h>
 #include <utlist.h>
-#include <libgen.h>	// For basename()
+#include <libgen.h>
 #include <lauxlib.h>
-#include <sys/sendfile.h> // For sendfile()
+#include <sys/sendfile.h>
 #include <string.h>
 #include <regex.h>
 #include <link.h>
+
+#define CARRAY_META "carray_meta"
+#define CSTRUCT_META "cstruct_meta"
+#define STRUCT_DEF_META "struct_def_meta"
+
+/**
+* Structures for lua2c() and struct2c()
+* implementing binary reification
+*/
+
+typedef enum {
+	CARRAY_CHARPTR,
+	CARRAY_INT,
+	CARRAY_LONG,
+	CARRAY_VOIDPTR
+} carray_type_t;
+
+typedef struct {
+	void *data;
+	size_t length;
+	carray_type_t type;
+} carray_t;
+
+
+// Structure field descriptor
+typedef struct {
+	char name[64];
+	char type[32];
+	size_t offset;
+	size_t size;
+} struct_field_t;
+
+// Structure definition
+typedef struct {
+	char name[128];
+	size_t total_size;
+	size_t alignment;
+	size_t field_count;
+	struct_field_t *fields;
+} struct_def_t;
+
+// Structure instance (similar to carray_t)
+typedef struct {
+	void *data;
+	struct_def_t *definition;
+	int is_owned;		// Whether we own the memory
+} cstruct_t;
+
 
 /**
 * Rust demangling function prototypes
@@ -60,6 +108,24 @@ int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned 
 int wsh_usage(char *name);
 int wsh_print_version(void);
 int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
+static int carray_ptr(lua_State *L);
+static void create_carray_metatable(lua_State *L);
+static int carray_debug(lua_State *L);
+void init_lua2c(lua_State *L);
+static int print_array(lua_State *L);
+static int cstruct_gc(lua_State * L);
+static int cstruct_index(lua_State * L);
+static int cstruct_newindex(lua_State * L);
+static int cstruct_ptr(lua_State * L);
+static int struct_def_gc(lua_State * L);
+static int print_struct(lua_State * L);
+static int load_struct_def(lua_State * L);
+static int struct2c(lua_State * L);
+static int ptr2struct(lua_State * L);
+static int memory2c(lua_State * L);
+static void create_cstruct_metatable(lua_State * L);
+static void create_struct_def_metatable(lua_State * L);
+void init_struct2c(lua_State * L);
 
 // address sanitizer macro : disable a function by prepending ATTRIBUTE_NO_SANITIZE_ADDRESS to its definition
 #if defined(__clang__) || defined (__GNUC__)
@@ -136,6 +202,13 @@ int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned l
 #define EXTRA_VDSO  "linux-gate.so.1"
 #endif
 
+learn_t *protorecords = NULL;
+
+/**
+* Main wsh context
+*/
+extern wsh_t *wsh;
+
 #ifdef __aarch64__
 #define ESR_MAGIC 0x45535201
 
@@ -157,13 +230,6 @@ uint64_t get_esr_from_reserved(void *reserved, size_t reserved_size) {
 }
 
 #endif
-
-learn_t *protorecords = NULL;
-
-/**
-* Main wsh context
-*/
-extern wsh_t *wsh;
 
 #ifndef __GLIBC__
 #include <dlfcn.h>
@@ -4846,14 +4912,6 @@ void xfree(lua_State * L)
 	munmap(trueptr, sz);
 }
 
-
-/**
-* Resize a xallocated memory zone
-*/
-//void xrealloc(lua_State * L)
-//{
-//}
-
 void traceunaligned(lua_State * L)
 {
 	wsh->trace_singlebranch = 0;
@@ -5138,8 +5196,6 @@ static struct section *sec_from_addr(unsigned long int addr)
 int priv_memcpy(lua_State * L)
 {
 	void *arg1 = 0, *arg2 = 0, *arg3 = 0;
-//	char *ptr = 0;
-//	char *addr = 0;
 	int ret = 0;
 
 	read_arg1(arg1);
@@ -5160,8 +5216,6 @@ int priv_memcpy(lua_State * L)
 int priv_strcpy(lua_State * L)
 {
 	void *arg1 = 0, *arg2 = 0;
-//	char *ptr = 0;
-//	char *addr = 0;
 	int ret = 0;
 
 	read_arg1(arg1);
@@ -5270,7 +5324,6 @@ void declare_num(int val, char *name)
 */
 void declare_internals(void)
 {
-//	tuple_t *t;
 	unsigned int i;
 
 	/**
@@ -5368,6 +5421,8 @@ int enable_core(lua_State * L)
 
 int wsh_init(void)
 {
+	int status = 0;
+
 	set_sighandlers();
 
 	// create context
@@ -5398,6 +5453,25 @@ int wsh_init(void)
 
 	// Set process name
 	prctl(PR_SET_NAME,"wsh",NULL,NULL,NULL);
+
+	// Initialize lua2c()
+	init_lua2c(wsh->L);
+
+	// Initialize struct2c()
+	init_struct2c(wsh->L);
+
+	// Load json.lua by default
+	status = luaL_dostring(wsh->L, "json = dofile('/usr/share/wcc/scripts/json.lua')");
+	if (status != LUA_OK) {
+		fprintf(stderr, "Warning: Could not load JSON library: %s\n", lua_tostring(wsh->L, -1));
+		lua_pop(wsh->L, 1);  // Remove error message
+		fprintf(stderr, "JSON-defined structures will not be readily available.\n");
+		fprintf(stderr, "To enable: ensure /usr/share/wcc/scripts/json.lua exists and is readable\n");
+	} else {
+		if (wsh->opt_verbose) {
+			printf("JSON library loaded - struct2c() available!\n");
+		}
+	}
 
 	return 0;
 }
@@ -5735,92 +5809,6 @@ char *ar2lib(char *name)
 	}
 	return strdup(cmd);
 }
-
-/**
-* Patch ELF ehdr->e_type to ET_DYN
-*
-int mk_lib(char *name)
-{
-  int fd = 0;
-  struct stat sb;
-  char *map = 0;
-  Elf32_Ehdr *ehdr32;
-  Elf64_Ehdr *ehdr64;
-
-  Elf_Ehdr *elf = 0;
-  Elf_Phdr *phdr = 0;
-  Elf_Dyn *dyn;
-  unsigned int phnum = 0;
-  unsigned int i = 0, j = 0;
-
-  fd = open(name, O_RDWR);
-  if (fd <= 0) {
-    printf(" !! couldn't open %s : %s\n", name, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  if (fstat(fd, &sb) == -1) {
-    printf(" !! couldn't stat %s : %s\n", name, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  if ((unsigned int) sb.st_size < sizeof(Elf32_Ehdr)) {
-    printf(" !! file %s is too small (%u bytes) to be a valid ELF.\n", name, (unsigned int) sb.st_size);
-    exit(EXIT_FAILURE);
-  }
-
-  map = mmap(NULL, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  if (map == MAP_FAILED) {
-    printf(" !! couldn't mmap %s : %s\n", name, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  switch (map[EI_CLASS]) {
-  case ELFCLASS32:
-    ehdr32 = (Elf32_Ehdr *) map;
-    ehdr32->e_type = ET_DYN;
-    break;
-  case ELFCLASS64:
-    ehdr64 = (Elf64_Ehdr *) map;
-    ehdr64->e_type = ET_DYN;
-    break;
-  default:
-    printf(" !! unknown ELF class\n");
-    exit(EXIT_FAILURE);
-  }
-
-  elf = (Elf_Ehdr *) map;
-  phdr = (Elf_Phdr *) (map + elf->e_phoff);
-  phnum = elf->e_phnum;
-
-  for ( i = 0; i < phnum ; i++) {
-    // Find dynamic segment
-    if(phdr[i].p_type == PT_DYNAMIC){
-      dyn = map + phdr[i].p_offset;
-      // Patch dynamic segment
-      for ( j = 0; j < (phdr[i].p_filesz/sizeof(Elf_Dyn)) ; j++) {
-        switch (dyn->d_tag) {
-        case DT_FLAGS:
-        case DT_POSFLAG_1:
-        case DT_BIND_NOW:
-            dyn->d_tag = DT_NULL;
-            dyn->d_un.d_val = -1;
-            break;
-        default:
-          break;
-        }
-        dyn += 1;
-      }
-      break;
-    }
-  }  
-
-  munmap(map, sb.st_size);
-  close(fd);
-  return 0;
-}
-
-*/
 
 /**
 * Attempt to patch a ET_EXEC binary as ET_DYN,
@@ -6274,84 +6262,6 @@ static void initialize_wsh() {
 	setenv("MALLOC_CHECK_", "3", 1);
 }
 
-
-/**
-* Methods for manipulating arrays of strings from lua
-*
-
-
-// metatable method for handling "array[index]"
-static int array_index (lua_State* L) { 
-   int** parray = luaL_checkudata(L, 1, "array");
-   int index = luaL_checkinteger(L, 2);
-   lua_pushnumber(L, (*parray)[index-1]);
-   return 1; 
-}
-
-// metatable method for handle "array[index] = value"
-static int array_newindex (lua_State* L) { 
-   int** parray = luaL_checkudata(L, 1, "array");
-   int index = luaL_checkinteger(L, 2);
-   int value = luaL_checkinteger(L, 3);
-   (*parray)[index-1] = value;
-   return 0; 
-}
-
-void luaL_openlib(lua_State *L, const char *libname, const luaL_Reg *l, int nup) {
-
-  if ( libname ) {
-    lua_getglobal(L, libname); 
-    if (lua_isnil(L, -1)) { 
-      lua_pop(L, 1); 
-      lua_newtable(L); 
-    }
-  }
-  luaL_setfuncs(L, l, 0); 
-  if ( libname )   lua_setglobal(L, libname);
-}
-
-// create a metatable for our array type
-static void create_array_type(lua_State* L) {
-   static const struct luaL_reg array[] = {
-      { "__index",  array_index  },
-      { "__newindex",  array_newindex  },
-      NULL, NULL
-   };
-   luaL_newmetatable(L, "array");
-   luaL_openlib(L, NULL, array, 0);
-}
-
-// expose an array to lua, by storing it in a userdata with the array metatable
-static int expose_array(lua_State* L, int array[]) {
-   int** parray = lua_newuserdata(L, sizeof(int**));
-   *parray = array;
-   luaL_getmetatable(L, "array");
-   lua_setmetatable(L, -2);
-   return 1;
-}
-
-// test data
-int mydata[] = { 1, 2, 3, 4 };
-
-// test routine which exposes our test array to Lua 
-static int getarray (lua_State* L) { 
-   return expose_array( L, mydata ); 
-}
-
-int  luaopen_array (lua_State* L) {
-   create_array_type(L);
-
-   // make our test routine available to Lua
-   lua_register(L, "array", getarray);
-   return 0;
-}
-
-*/
-
-
-
-
-
 /**
 * Get a pointer to a variable
 */
@@ -6392,4 +6302,974 @@ int mkptr(lua_State * L)
 	return 1;
 }
 
+
+/**
+* lua2c() - Convert Lua arrays to C arrays
+*/
+
+
+/**
+* Garbage collection - cleanup when Lua GC runs
+*/
+static int carray_gc(lua_State *L)
+{
+	carray_t *carr = (carray_t *) luaL_checkudata(L, 1, CARRAY_META);
+	if (carr->data) {
+		if (carr->type == CARRAY_CHARPTR) {
+			// Free individual strings first
+			char **strings = (char **) carr->data;
+			for (size_t i = 0; i < carr->length; i++) {
+				if (strings[i]) {
+					free(strings[i]);
+				}
+			}
+		}
+		free(carr->data);
+		carr->data = NULL;
+	}
+	return 0;
+}
+
+/**
+* Array indexing and method dispatch: carray[index] or carray.method
+*/
+static int carray_index(lua_State *L)
+{
+	carray_t *carr = (carray_t *) luaL_checkudata(L, 1, CARRAY_META);
+
+	lua_Integer index = 0;
+	int is_numeric = 0;
+
+	// Try to get numeric index (handles both numbers and numeric strings)
+	if (lua_isinteger(L, 2)) {
+		index = lua_tointeger(L, 2);
+		is_numeric = 1;
+	} else if (lua_isnumber(L, 2)) {
+		index = lua_tointeger(L, 2);
+		is_numeric = 1;
+	} else if (lua_isstring(L, 2)) {
+		const char *key = lua_tostring(L, 2);
+
+		// Try to convert string to number
+		char *endptr;
+		long num = strtol(key, &endptr, 10);
+		if (*endptr == '\0' && endptr != key) {
+			// Successfully converted string to number
+			index = num;
+			is_numeric = 1;
+		} else {
+			// Not a number, treat as method name
+			if (strcmp(key, "ptr") == 0) {
+				lua_pushcfunction(L, carray_ptr);
+				return 1;
+			} else if (strcmp(key, "debug") == 0) {
+				lua_pushcfunction(L, print_array);
+				return 1;
+			}
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	if (!is_numeric) {
+		lua_pushnil(L);
+		return 1;
+	}
+	// Use 0-based indexing (C-style) - no conversion needed
+	if (index < 0 || (size_t) index >= carr->length) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	switch (carr->type) {
+	case CARRAY_CHARPTR:{
+			char **strings = (char **) carr->data;
+			if (strings[index]) {
+				lua_pushstring(L, strings[index]);
+			} else {
+				lua_pushnil(L);
+			}
+			break;
+		}
+	case CARRAY_INT:{
+			int *ints = (int *) carr->data;
+			lua_pushinteger(L, ints[index]);
+			break;
+		}
+	case CARRAY_LONG:{
+			long *longs = (long *) carr->data;
+			lua_pushinteger(L, longs[index]);
+			break;
+		}
+	case CARRAY_VOIDPTR:{
+			void **ptrs = (void **) carr->data;
+			lua_pushinteger(L, (lua_Integer) (uintptr_t) ptrs[index]);
+			break;
+		}
+	}
+	return 1;
+}
+
+/**
+* Array assignment: carray[index] = value
+*/
+static int carray_newindex(lua_State *L)
+{
+	carray_t *carr = (carray_t *) luaL_checkudata(L, 1, CARRAY_META);
+	lua_Integer index = luaL_checkinteger(L, 2);
+
+	// Use 0-based indexing (C-style) - no conversion needed
+	if (index < 0 || (size_t) index >= carr->length) {
+		return luaL_error(L, "array index out of bounds");
+	}
+
+	switch (carr->type) {
+	case CARRAY_CHARPTR:{
+			char **strings = (char **) carr->data;
+			// Free existing string
+			if (strings[index]) {
+				free(strings[index]);
+				strings[index] = NULL;
+			}
+			// Set new string
+			if (lua_isstring(L, 3)) {
+				const char *str = lua_tostring(L, 3);
+				strings[index] = strdup(str);
+			} else if (lua_isinteger(L, 3)) {
+				// Allow setting raw pointer
+				strings[index] = (char *) (uintptr_t) lua_tointeger(L, 3);
+			}
+			break;
+		}
+	case CARRAY_INT:{
+			int *ints = (int *) carr->data;
+			ints[index] = (int) luaL_checkinteger(L, 3);
+			break;
+		}
+	case CARRAY_LONG:{
+			long *longs = (long *) carr->data;
+			longs[index] = (long) luaL_checkinteger(L, 3);
+			break;
+		}
+	case CARRAY_VOIDPTR:{
+			void **ptrs = (void **) carr->data;
+			ptrs[index] = (void *) (uintptr_t) luaL_checkinteger(L, 3);
+			break;
+		}
+	}
+	return 0;
+}
+
+/**
+* Get raw C pointer for FFI usage
+*/
+static int carray_ptr(lua_State *L)
+{
+	carray_t *carr = (carray_t *) luaL_checkudata(L, 1, CARRAY_META);
+	lua_pushinteger(L, (lua_Integer) (uintptr_t) carr->data);
+	return 1;
+}
+
+/**
+* Standalone function to print/debug any carray
+*/
+static int print_array(lua_State *L)
+{
+	// Check if argument is a carray userdata
+	carray_t *carr = (carray_t *) luaL_testudata(L, 1, CARRAY_META);
+	if (!carr) {
+		return luaL_argerror(L, 1, "expected carray (created with lua2c)");
+	}
+	// Determine type name for display
+	const char *type_name;
+	switch (carr->type) {
+	case CARRAY_CHARPTR:
+		type_name = "char*";
+		break;
+	case CARRAY_INT:
+		type_name = "int";
+		break;
+	case CARRAY_LONG:
+		type_name = "long";
+		break;
+	case CARRAY_VOIDPTR:
+		type_name = "void*";
+		break;
+	default:
+		type_name = "unknown";
+		break;
+	}
+
+	printf("Array (%s[%zu]) at %p:\n", type_name, carr->length, carr->data);
+
+	for (size_t i = 0; i < carr->length; i++) {
+		printf("  [%zu] = ", i);
+
+		switch (carr->type) {
+		case CARRAY_CHARPTR:{
+				char **strings = (char **) carr->data;
+				if (strings[i]) {
+					if ((uintptr_t) strings[i] < 0x10000) {
+						// Looks like a small number, probably a raw pointer value
+						printf("(ptr) %p", (void *) strings[i]);
+					} else {
+						// Check if it's a readable string
+						printf("\"%s\" (at %p)", strings[i], (void *) strings[i]);
+					}
+				} else {
+					printf("NULL");
+				}
+				break;
+			}
+		case CARRAY_INT:{
+				int *ints = (int *) carr->data;
+				printf("%d", ints[i]);
+				break;
+			}
+		case CARRAY_LONG:{
+				long *longs = (long *) carr->data;
+				printf("%ld", longs[i]);
+				break;
+			}
+		case CARRAY_VOIDPTR:{
+				void **ptrs = (void **) carr->data;
+				printf("%p", ptrs[i]);
+				break;
+			}
+		}
+		printf("\n");
+	}
+
+	return 0;
+}
+
+/**
+* Get array length
+*/
+static int carray_len(lua_State *L)
+{
+	carray_t *carr = (carray_t *) luaL_checkudata(L, 1, CARRAY_META);
+	lua_pushinteger(L, carr->length);
+	return 1;
+}
+
+/**
+* Main conversion function: lua2c(table, type)
+*/
+static int lua2c(lua_State *L)
+{
+	// Check arguments
+	luaL_checktype(L, 1, LUA_TTABLE);
+	const char *type_str = luaL_checkstring(L, 2);
+
+	// Determine target type
+	carray_type_t type;
+	size_t element_size;
+
+	if (strcmp(type_str, "char*") == 0) {
+		type = CARRAY_CHARPTR;
+		element_size = sizeof(char *);
+	} else if (strcmp(type_str, "int") == 0) {
+		type = CARRAY_INT;
+		element_size = sizeof(int);
+	} else if (strcmp(type_str, "long") == 0) {
+		type = CARRAY_LONG;
+		element_size = sizeof(long);
+	} else if (strcmp(type_str, "void*") == 0) {
+		type = CARRAY_VOIDPTR;
+		element_size = sizeof(void *);
+	} else {
+		return luaL_error(L, "unsupported type: %s", type_str);
+	}
+
+	// Get table length
+	size_t length = lua_rawlen(L, 1);
+	if (length == 0) {
+		return luaL_error(L, "empty table");
+	}
+	// Create userdata
+	carray_t *carr = (carray_t *) lua_newuserdata(L, sizeof(carray_t));
+	carr->data = calloc(length, element_size);
+	carr->length = length;
+	carr->type = type;
+
+	if (!carr->data) {
+		return luaL_error(L, "memory allocation failed");
+	}
+	// Convert elements based on type
+	for (size_t i = 0; i < length; i++) {
+		lua_rawgeti(L, 1, i + 1);	// Lua arrays are 1-indexed
+
+		switch (type) {
+		case CARRAY_CHARPTR:{
+				char **strings = (char **) carr->data;
+				if (lua_isstring(L, -1)) {
+					const char *str = lua_tostring(L, -1);
+					strings[i] = strdup(str);
+				} else if (lua_isinteger(L, -1)) {
+					// Allow raw pointer addresses
+					strings[i] = (char *) (uintptr_t) lua_tointeger(L, -1);
+				} else {
+					strings[i] = NULL;
+				}
+				break;
+			}
+		case CARRAY_INT:{
+				int *ints = (int *) carr->data;
+				ints[i] = (int) luaL_checkinteger(L, -1);
+				break;
+			}
+		case CARRAY_LONG:{
+				long *longs = (long *) carr->data;
+				longs[i] = (long) luaL_checkinteger(L, -1);
+				break;
+			}
+		case CARRAY_VOIDPTR:{
+				void **ptrs = (void **) carr->data;
+				ptrs[i] = (void *) (uintptr_t) luaL_checkinteger(L, -1);
+				break;
+			}
+		}
+		lua_pop(L, 1);	// Remove value from stack
+	}
+
+	// Set metatable
+	if (luaL_getmetatable(L, CARRAY_META) == LUA_TNIL) {
+		return luaL_error(L, "carray metatable not found - call create_carray_metatable() first");
+	}
+	lua_setmetatable(L, -2);
+
+	return 1;
+}
+
+/**
+* Create metatable for carray objects
+*/
+static void create_carray_metatable(lua_State *L)
+{
+	static const struct luaL_Reg carray_meta[] = {
+		{ "__gc", carray_gc },
+		{ "__index", carray_index },
+		{ "__newindex", carray_newindex },
+		{ "__len", carray_len },
+		{ NULL, NULL }
+	};
+
+	luaL_newmetatable(L, CARRAY_META);
+	luaL_setfuncs(L, carray_meta, 0);
+	lua_pop(L, 1);
+}
+
+/**
+* Initialize lua2c functionality 
+*/
+void init_lua2c(lua_State *L)
+{
+	create_carray_metatable(L);
+	lua_pushcfunction(L, print_array);
+	lua_setglobal(L, "print_array");
+}
+
+
+
+/**
+* struct2c() - JSON-defined C structures for wsh
+* Extends lua2c() with complex structure support
+*/
+
+
+/**
+* GC for struct definitions
+*/
+static int struct_def_gc(lua_State *L)
+{
+	struct_def_t **def_ptr = (struct_def_t **) lua_touserdata(L, 1);
+	if (def_ptr && *def_ptr) {
+		free((*def_ptr)->fields);
+		free(*def_ptr);
+		*def_ptr = NULL;
+	}
+	return 0;
+}
+
+/**
+* Garbage collection for structures
+*/
+static int cstruct_gc(lua_State *L)
+{
+	cstruct_t *cstruct = (cstruct_t *) luaL_checkudata(L, 1, CSTRUCT_META);
+	if (cstruct->is_owned && cstruct->data) {
+		// Free any allocated strings first
+		struct_def_t *def = cstruct->definition;
+		for (size_t i = 0; i < def->field_count; i++) {
+			struct_field_t *field = &def->fields[i];
+			if (strcmp(field->type, "char*") == 0) {
+				void *field_ptr = (char *) cstruct->data + field->offset;
+				char *str = *(char **) field_ptr;
+				// Free string if it looks like we allocated it (not a low address)
+				if (str && (uintptr_t) str > 0x10000) {
+					free(str);
+				}
+			}
+		}
+
+		// Free the structure itself
+		free(cstruct->data);
+		cstruct->data = NULL;
+	}
+	// Note: struct_def_t is owned by separate userdata with its own GC
+	return 0;
+}
+
+/**
+* Get raw C pointer
+*/
+static int cstruct_ptr(lua_State *L)
+{
+	cstruct_t *cstruct = (cstruct_t *) luaL_checkudata(L, 1, CSTRUCT_META);
+	lua_pushinteger(L, (lua_Integer) (uintptr_t) cstruct->data);
+	return 1;
+}
+
+/**
+* Field access: struct.field_name
+*/
+static int cstruct_index(lua_State *L)
+{
+	cstruct_t *cstruct = (cstruct_t *) luaL_checkudata(L, 1, CSTRUCT_META);
+	const char *field_name = luaL_checkstring(L, 2);
+
+	// Check for methods first
+	if (strcmp(field_name, "ptr") == 0) {
+		lua_pushcfunction(L, cstruct_ptr);
+		return 1;
+	}
+	// Look for field by name
+	struct_def_t *def = cstruct->definition;
+	for (size_t i = 0; i < def->field_count; i++) {
+		if (strcmp(def->fields[i].name, field_name) == 0) {
+			struct_field_t *field = &def->fields[i];
+			void *field_ptr = (char *) cstruct->data + field->offset;
+
+			// Convert C value to Lua based on type
+			if (strcmp(field->type, "int") == 0) {
+				lua_pushinteger(L, *(int *) field_ptr);
+			} else if (strcmp(field->type, "unsigned int") == 0) {
+				lua_pushinteger(L, *(unsigned int *) field_ptr);
+			} else if (strcmp(field->type, "long") == 0) {
+				lua_pushinteger(L, *(long *) field_ptr);
+			} else if (strcmp(field->type, "unsigned long") == 0) {
+				lua_pushinteger(L, *(unsigned long *) field_ptr);
+			} else if (strcmp(field->type, "unsigned short") == 0) {
+				lua_pushinteger(L, *(unsigned short *) field_ptr);
+			} else if (strcmp(field->type, "unsigned char") == 0) {
+				lua_pushinteger(L, *(unsigned char *) field_ptr);
+			} else if (strcmp(field->type, "char*") == 0) {
+				char *str = *(char **) field_ptr;
+				if (str) {
+					lua_pushstring(L, str);
+				} else {
+					lua_pushnil(L);
+				}
+			} else if (strcmp(field->type, "void*") == 0) {
+				lua_pushinteger(L, (lua_Integer) (uintptr_t) (*(void **) field_ptr));
+			} else if (strstr(field->type, "[") != NULL) {
+				// Handle arrays - return as hex string for now
+				char hex_str[256] = { 0 };
+				snprintf(hex_str, sizeof(hex_str), "Array@%p[%zu]", field_ptr, field->size);
+				lua_pushstring(L, hex_str);
+			} else {
+				// Unknown type, return as raw pointer
+				lua_pushinteger(L, (lua_Integer) (uintptr_t) field_ptr);
+			}
+			return 1;
+		}
+	}
+
+	// Field not found
+	lua_pushnil(L);
+	return 1;
+}
+
+/**
+* Field assignment: struct.field_name = value
+*/
+static int cstruct_newindex(lua_State *L)
+{
+	cstruct_t *cstruct = (cstruct_t *) luaL_checkudata(L, 1, CSTRUCT_META);
+	const char *field_name = luaL_checkstring(L, 2);
+
+	// Look for field by name
+	struct_def_t *def = cstruct->definition;
+	for (size_t i = 0; i < def->field_count; i++) {
+		if (strcmp(def->fields[i].name, field_name) == 0) {
+			struct_field_t *field = &def->fields[i];
+			void *field_ptr = (char *) cstruct->data + field->offset;
+
+			// Set C value from Lua based on type
+			if (strcmp(field->type, "int") == 0) {
+				*(int *) field_ptr = (int) luaL_checkinteger(L, 3);
+			} else if (strcmp(field->type, "unsigned int") == 0) {
+				*(unsigned int *) field_ptr = (unsigned int) luaL_checkinteger(L, 3);
+			} else if (strcmp(field->type, "long") == 0) {
+				*(long *) field_ptr = (long) luaL_checkinteger(L, 3);
+			} else if (strcmp(field->type, "char*") == 0) {
+				char **str_ptr = (char **) field_ptr;
+				// Free existing string if it looks like we allocated it
+				if (*str_ptr && (uintptr_t) * str_ptr > 0x10000) {
+					free(*str_ptr);
+				}
+				// Set new string
+				if (lua_isstring(L, 3)) {
+					const char *str = lua_tostring(L, 3);
+					*str_ptr = strdup(str);
+				} else if (lua_isinteger(L, 3)) {
+					*str_ptr = (char *) (uintptr_t) lua_tointeger(L, 3);
+				} else {
+					*str_ptr = NULL;
+				}
+			} else if (strcmp(field->type, "void*") == 0) {
+				*(void **) field_ptr = (void *) (uintptr_t) luaL_checkinteger(L, 3);
+			}
+			return 0;
+		}
+	}
+
+	return luaL_error(L, "unknown field '%s' in structure", field_name);
+}
+
+/**
+* Debug function to print structure contents
+*/
+static int print_struct(lua_State *L)
+{
+	cstruct_t *cstruct = (cstruct_t *) luaL_testudata(L, 1, CSTRUCT_META);
+	if (!cstruct) {
+		return luaL_argerror(L, 1, "expected cstruct (created with struct2c)");
+	}
+
+	struct_def_t *def = cstruct->definition;
+	printf("Struct %s (%zu bytes) at %p:\n", def->name, def->total_size, cstruct->data);
+
+	for (size_t i = 0; i < def->field_count; i++) {
+		struct_field_t *field = &def->fields[i];
+		void *field_ptr = (char *) cstruct->data + field->offset;
+
+		printf("  .%s (@%zu, %s) = ", field->name, field->offset, field->type);
+
+		if (strcmp(field->type, "int") == 0) {
+			printf("%d", *(int *) field_ptr);
+		} else if (strcmp(field->type, "unsigned int") == 0) {
+			printf("%u", *(unsigned int *) field_ptr);
+		} else if (strcmp(field->type, "long") == 0) {
+			printf("%ld", *(long *) field_ptr);
+		} else if (strcmp(field->type, "unsigned long") == 0) {
+			printf("0x%lx", *(unsigned long *) field_ptr);
+		} else if (strcmp(field->type, "unsigned short") == 0) {
+			printf("%u", *(unsigned short *) field_ptr);
+		} else if (strcmp(field->type, "unsigned char") == 0) {
+			printf("%u", *(unsigned char *) field_ptr);
+		} else if (strcmp(field->type, "char*") == 0) {
+			char *str = *(char **) field_ptr;
+			if (str) {
+				printf("\"%s\" (at %p)", str, (void *) str);
+			} else {
+				printf("NULL");
+			}
+		} else if (strcmp(field->type, "void*") == 0) {
+			printf("%p", *(void **) field_ptr);
+		} else if (strstr(field->type, "[") != NULL) {
+			// Handle arrays - show first few bytes as hex
+			printf("[ ");
+			unsigned char *bytes = (unsigned char *) field_ptr;
+			size_t show_bytes = (field->size > 16) ? 16 : field->size;
+			for (size_t j = 0; j < show_bytes; j++) {
+				printf("%02x ", bytes[j]);
+			}
+			if (field->size > 16)
+				printf("... ");
+			printf("]");
+		} else {
+			printf("<%s at %p>", field->type, field_ptr);
+		}
+		printf("\n");
+	}
+
+	return 0;
+}
+
+/**
+* Load JSON structure definition: load_struct_def("filename.json")
+*/
+static int load_struct_def(lua_State *L)
+{
+	const char *filename = luaL_checkstring(L, 1);
+
+	// Read JSON file
+	FILE *f = fopen(filename, "r");
+	if (!f) {
+		return luaL_error(L, "cannot open file '%s'", filename);
+	}
+	// Get file size
+	fseek(f, 0, SEEK_END);
+	long fsize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	// Read file contents
+	char *json_str = malloc(fsize + 1);
+	fread(json_str, fsize, 1, f);
+	json_str[fsize] = '\0';
+	fclose(f);
+
+	// Parse JSON using Lua's json library
+	lua_getglobal(L, "json");
+	if (lua_isnil(L, -1)) {
+		free(json_str);
+		return luaL_error(L, "json library not loaded - require('json') first");
+	}
+
+	lua_getfield(L, -1, "decode");
+	lua_pushstring(L, json_str);
+	lua_call(L, 1, 1);	// Call json.decode(json_str)
+	free(json_str);
+	lua_remove(L, -2);	// Remove json module from stack
+
+	// Now we have the parsed JSON table on stack
+	// Convert to struct_def_t
+	struct_def_t *def = malloc(sizeof(struct_def_t));
+	memset(def, 0, sizeof(struct_def_t));
+
+	// Extract structure name
+	lua_getfield(L, -1, "name");
+	if (lua_isstring(L, -1)) {
+		strncpy(def->name, lua_tostring(L, -1), sizeof(def->name) - 1);
+	}
+	lua_pop(L, 1);
+
+	// Extract size
+	lua_getfield(L, -1, "size");
+	if (lua_isinteger(L, -1)) {
+		def->total_size = (size_t) lua_tointeger(L, -1);
+	}
+	lua_pop(L, 1);
+
+	// Extract alignment (optional, default to 8)
+	lua_getfield(L, -1, "alignment");
+	if (lua_isinteger(L, -1)) {
+		def->alignment = (size_t) lua_tointeger(L, -1);
+	} else {
+		def->alignment = 8;	// Default alignment
+	}
+	lua_pop(L, 1);
+
+	// Extract fields array
+	lua_getfield(L, -1, "fields");
+	if (!lua_istable(L, -1)) {
+		free(def);
+		return luaL_error(L, "structure definition missing 'fields' array");
+	}
+	// Get number of fields
+	def->field_count = lua_rawlen(L, -1);
+	if (def->field_count == 0) {
+		free(def);
+		lua_pop(L, 2);
+		return luaL_error(L, "structure has no fields");
+	}
+	// Allocate fields array
+	def->fields = malloc(def->field_count * sizeof(struct_field_t));
+
+	// Parse each field
+	for (size_t i = 0; i < def->field_count; i++) {
+		lua_rawgeti(L, -1, i + 1);	// Get field[i]
+
+		if (!lua_istable(L, -1)) {
+			free(def->fields);
+			free(def);
+			return luaL_error(L, "field %zu is not a table", i);
+		}
+
+		struct_field_t *field = &def->fields[i];
+		memset(field, 0, sizeof(struct_field_t));
+
+		// Field name
+		lua_getfield(L, -1, "name");
+		if (lua_isstring(L, -1)) {
+			strncpy(field->name, lua_tostring(L, -1), sizeof(field->name) - 1);
+		}
+		lua_pop(L, 1);
+
+		// Field type
+		lua_getfield(L, -1, "type");
+		if (lua_isstring(L, -1)) {
+			strncpy(field->type, lua_tostring(L, -1), sizeof(field->type) - 1);
+		}
+		lua_pop(L, 1);
+
+		// Field offset
+		lua_getfield(L, -1, "offset");
+		if (lua_isinteger(L, -1)) {
+			field->offset = (size_t) lua_tointeger(L, -1);
+		}
+		lua_pop(L, 1);
+
+		// Field size
+		lua_getfield(L, -1, "size");
+		if (lua_isinteger(L, -1)) {
+			field->size = (size_t) lua_tointeger(L, -1);
+		}
+		lua_pop(L, 1);
+
+		lua_pop(L, 1);	// Remove field table
+	}
+
+	lua_pop(L, 2);		// Remove fields array and main table
+
+	// Store definition in userdata with proper metatable
+	struct_def_t **def_ptr = (struct_def_t **) lua_newuserdata(L, sizeof(struct_def_t *));
+	*def_ptr = def;
+
+	// Set the proper metatable
+	luaL_getmetatable(L, STRUCT_DEF_META);
+	lua_setmetatable(L, -2);
+
+	return 1;		// Return userdata containing struct definition
+}
+
+/**
+* Create metatable for structure objects
+*/
+static void create_cstruct_metatable(lua_State *L)
+{
+	static const struct luaL_Reg cstruct_meta[] = {
+		{ "__gc", cstruct_gc },
+		{ "__index", cstruct_index },
+		{ "__newindex", cstruct_newindex },
+		{ NULL, NULL }
+	};
+
+	luaL_newmetatable(L, CSTRUCT_META);
+	luaL_setfuncs(L, cstruct_meta, 0);
+	lua_pop(L, 1);
+}
+
+/**
+* Create metatable for structure definitions
+*/
+static void create_struct_def_metatable(lua_State *L)
+{
+	static const struct luaL_Reg struct_def_meta[] = {
+		{ "__gc", struct_def_gc },
+		{ NULL, NULL }
+	};
+
+	luaL_newmetatable(L, STRUCT_DEF_META);
+	luaL_setfuncs(L, struct_def_meta, 0);
+	lua_pop(L, 1);
+}
+
+/**
+* Main structure creation function: struct2c(data, struct_def)
+*/
+static int struct2c(lua_State *L)
+{
+	// Arg 1: Lua table with field data
+	luaL_checktype(L, 1, LUA_TTABLE);
+
+	// Arg 2: Structure definition (userdata from load_struct_def)
+	struct_def_t **def_ptr = (struct_def_t **) luaL_checkudata(L, 2, STRUCT_DEF_META);
+	if (!def_ptr || !*def_ptr) {
+		return luaL_error(L, "invalid structure definition");
+	}
+
+	struct_def_t *def = *def_ptr;
+
+	// Allocate memory for the C structure
+	void *struct_data = calloc(1, def->total_size);
+	if (!struct_data) {
+		return luaL_error(L, "memory allocation failed for structure");
+	}
+	// Populate fields from Lua table
+	for (size_t i = 0; i < def->field_count; i++) {
+		struct_field_t *field = &def->fields[i];
+		void *field_ptr = (char *) struct_data + field->offset;
+
+		// Skip padding fields (names starting with _pad)
+		if (strncmp(field->name, "_pad", 4) == 0) {
+			continue;
+		}
+		// Get field value from Lua table
+		lua_getfield(L, 1, field->name);
+
+		if (lua_isnil(L, -1)) {
+			// Field not provided, leave as zero (calloc initialized)
+			lua_pop(L, 1);
+			continue;
+		}
+		// Set field value based on type
+		if (strcmp(field->type, "int") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(int *) field_ptr = (int) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "unsigned int") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(unsigned int *) field_ptr = (unsigned int) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "long") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(long *) field_ptr = (long) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "unsigned long") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(unsigned long *) field_ptr = (unsigned long) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "unsigned short") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(unsigned short *) field_ptr = (unsigned short) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "unsigned char") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(unsigned char *) field_ptr = (unsigned char) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "char*") == 0) {
+			if (lua_isstring(L, -1)) {
+				const char *str = lua_tostring(L, -1);
+				*(char **) field_ptr = strdup(str);
+			} else if (lua_isinteger(L, -1)) {
+				// Allow raw pointer values
+				*(char **) field_ptr = (char *) (uintptr_t) lua_tointeger(L, -1);
+			}
+		} else if (strcmp(field->type, "void*") == 0) {
+			if (lua_isinteger(L, -1)) {
+				*(void **) field_ptr = (void *) (uintptr_t) lua_tointeger(L, -1);
+			}
+		} else if (strstr(field->type, "[") != NULL) {
+			// Handle arrays - skip for now in struct2c (would need special handling)
+			printf("Warning: array field '%s' of type '%s' skipped in struct2c\n", field->name, field->type);
+		} else {
+			// Unknown type - skip with warning
+			printf("Warning: unknown field type '%s' for field '%s'\n", field->type, field->name);
+		}
+
+		lua_pop(L, 1);	// Remove field value
+	}
+
+	// Create cstruct userdata
+	cstruct_t *cstruct = (cstruct_t *) lua_newuserdata(L, sizeof(cstruct_t));
+	cstruct->data = struct_data;
+	cstruct->definition = def;
+	cstruct->is_owned = 1;	// We own this memory
+
+	// Set metatable
+	luaL_getmetatable(L, CSTRUCT_META);
+	lua_setmetatable(L, -2);
+
+	return 1;		// Return cstruct userdata
+}
+
+/**
+* Overlay structure definition onto existing memory: ptr2struct(memory_ptr, size, struct_def)
+*/
+static int ptr2struct(lua_State *L)
+{
+	// Arg 1: Memory pointer (integer address)
+	lua_Integer ptr_addr = luaL_checkinteger(L, 1);
+	void *memory_ptr = (void *) (uintptr_t) ptr_addr;
+
+	// Arg 2: Size of memory region (for bounds checking)
+	size_t memory_size = (size_t) luaL_checkinteger(L, 2);
+
+	// Arg 3: Structure definition
+	struct_def_t **def_ptr = (struct_def_t **) luaL_checkudata(L, 3, STRUCT_DEF_META);
+	if (!def_ptr || !*def_ptr) {
+		return luaL_error(L, "invalid structure definition");
+	}
+
+	struct_def_t *def = *def_ptr;
+
+	// Validate memory region size
+	if (memory_size < def->total_size) {
+		return luaL_error(L, "memory region too small: need %zu bytes, got %zu", def->total_size, memory_size);
+	}
+	// Create cstruct that points to existing memory (not owned)
+	cstruct_t *cstruct = (cstruct_t *) lua_newuserdata(L, sizeof(cstruct_t));
+	cstruct->data = memory_ptr;
+	cstruct->definition = def;
+	cstruct->is_owned = 0;	// We don't own this memory - don't free it!
+
+	// Set metatable
+	luaL_getmetatable(L, CSTRUCT_META);
+	lua_setmetatable(L, -2);
+
+	return 1;		// Return cstruct userdata (overlay view)
+}
+
+/**
+* Copy memory data into new managed structure: memory2c(memory_ptr, struct_def)
+*/
+static int memory2c(lua_State *L)
+{
+	// Arg 1: Memory pointer (integer address)
+	lua_Integer ptr_addr = luaL_checkinteger(L, 1);
+	void *memory_ptr = (void *) (uintptr_t) ptr_addr;
+
+	// Arg 2: Structure definition
+	struct_def_t **def_ptr = (struct_def_t **) luaL_checkudata(L, 2, STRUCT_DEF_META);
+	if (!def_ptr || !*def_ptr) {
+		return luaL_error(L, "invalid structure definition");
+	}
+
+	struct_def_t *def = *def_ptr;
+
+	// Allocate new memory for the structure
+	void *struct_data = malloc(def->total_size);
+	if (!struct_data) {
+		return luaL_error(L, "memory allocation failed for structure");
+	}
+	// Copy raw memory data
+	memcpy(struct_data, memory_ptr, def->total_size);
+
+	// For string fields, we need to copy the pointed-to strings too
+	for (size_t i = 0; i < def->field_count; i++) {
+		struct_field_t *field = &def->fields[i];
+		if (strcmp(field->type, "char*") == 0) {
+			void *field_ptr = (char *) struct_data + field->offset;
+			char *original_str = *(char **) field_ptr;
+			if (original_str && (uintptr_t) original_str > 0x10000) {
+				// Copy the string to our own memory
+				*(char **) field_ptr = strdup(original_str);
+			}
+		}
+	}
+
+	// Create cstruct that owns the copied memory
+	cstruct_t *cstruct = (cstruct_t *) lua_newuserdata(L, sizeof(cstruct_t));
+	cstruct->data = struct_data;
+	cstruct->definition = def;
+	cstruct->is_owned = 1;	// We own this memory
+
+	// Set metatable
+	luaL_getmetatable(L, CSTRUCT_META);
+	lua_setmetatable(L, -2);
+
+	return 1;		// Return cstruct userdata (independent copy)
+}
+
+/**
+* Initialize struct2c functionality
+*/
+void init_struct2c(lua_State *L)
+{
+	create_cstruct_metatable(L);
+	create_struct_def_metatable(L);
+	lua_pushcfunction(L, print_struct);
+	lua_setglobal(L, "print_struct");
+	lua_pushcfunction(L, load_struct_def);
+	lua_setglobal(L, "load_struct_def");
+	lua_pushcfunction(L, struct2c);
+	lua_setglobal(L, "struct2c");
+	lua_pushcfunction(L, ptr2struct);
+	lua_setglobal(L, "ptr2struct");
+	lua_pushcfunction(L, memory2c);
+	lua_setglobal(L, "memory2c");
+}
 

@@ -122,7 +122,10 @@ char *default_options[] = {
 "disablecore",
 "gencore",
 "getptr",
-"mkptr"
+"mkptr",
+"lua2c",
+"print_array",
+"struct2c"
 };
 
 // All lua 5.3 Functions and global variables
@@ -386,7 +389,10 @@ tuple_t exposed[] = {
 {wsh_appear, "unhide"},
 {wsh_hide, "unappear"},
 {getptr, "getptr"},
-{mkptr, "mkptr"}
+{mkptr, "mkptr"},
+{lua2c,"lua2c"},
+{print_array, "print_array"},
+{struct2c, "struct2c"}
 };
 
 range_t ranges[] = {

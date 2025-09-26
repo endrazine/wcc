@@ -458,6 +458,7 @@ char *myblacklist[] = {
 "lsys_sym",
 "lsys_unloadlib",
 "ltrace",
+"lua2c",
 "assert",
 "auxwrap",
 "cocreate",
@@ -945,6 +946,7 @@ char *myblacklist[] = {
 "yindex",
 // extra symbols
 "fprintf",
-"fflush"
+"fflush",
+"print_array"
 };
 
