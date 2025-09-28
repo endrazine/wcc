@@ -7,3 +7,6 @@
 [submodule "doc/wikidocs"]
 	path = doc/wikidocs
 	url = https://github.com/endrazine/wcc.wiki.git
+[submodule "src/wsh/linenoise"]
+	path = src/wsh/linenoise
+	url = https://github.com/endrazine/linenoise.git
