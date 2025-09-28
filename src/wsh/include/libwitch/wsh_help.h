@@ -88,6 +88,12 @@ help_t fcnhelp[] ={
 	{"disasm", "<address>, [length], [arch]", "Disassemble code at <address> for [length] bytes using [arch] architecture. Automatic architecture detection from ELF headers. Manual override supported. Supports 20+ architectures including x86, ARM, MIPS, RISC-V, BPF, EVM, etc.", "", "Returns lua table with disassembly results."},
 	{"arch_set", "<architecture>", "Set default architecture for disassembly. Use arch_list() to see supported architectures.", "", "None"},
 	{"arch_info", "", "Display current architecture configuration and loaded binaries.", "", "None"},
-	{"arch_list", "", "List all supported architectures with build status.", "", "None"}
+	{"arch_list", "", "List all supported architectures with build status.", "", "None"},
+	{"lua2c", "<table>", "Maps a Lua table to a corresponding C structure, allowing seamless conversion and use of Lua data in C contexts within the wsh address space.", "", "Pointer to the mapped C structure (or nil on failure)"},
+	{"struct2c", "<json_struct>", "Transforms a structure defined in JSON format into a Lua representation, enabling further manipulation or mapping to C.", "", "Lua table representing the structure (or nil on error)"},
+	{"memory2c", "<address>, <size>", "Maps a region of memory at the given address and size to a C structure, facilitating direct access and conversion for binary analysis.", "", "Pointer to the mapped C structure (or nil if mapping fails)"},
+	{"load_struct_def", "<json_file_or_string>", "Loads a JSON structure definition into Lua, creating a table or metatable for use in scripting and reflection.", "", "Lua table or metatable from the loaded definition (or nil on parse error)."},
+	{"ptr2struct", "<pointer>, <struct_def>", "Performs binary reification by mapping a C structure at the given pointer to a Lua-accessible form, allowing direct reading and modification from scripts. The struct_def can be a loaded definition or table.", "", "Lua table mirroring the structure (or nil on failure)."}
+
 };
 

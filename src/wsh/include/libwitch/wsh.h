@@ -374,7 +374,8 @@ int disasm_sym(lua_State * L);
 int arch_set(lua_State * L);
 int arch_info(lua_State * L);
 int arch_list(lua_State * L);
-
+static int load_struct_def(lua_State *L);
+static int ptr2struct(lua_State * L);
 static int headers(lua_State * L);
 static int prototypes(lua_State * L);
 static int bsspolute(lua_State * L);

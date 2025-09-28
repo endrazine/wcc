@@ -131,7 +131,9 @@ char *default_options[] = {
 "disasm_sym",
 "arch_set",
 "arch_info",
-"arch_list"
+"arch_list",
+"ptr2struct",
+"load_struct_def"
 };
 
 // All lua 5.3 Functions and global variables
@@ -404,7 +406,9 @@ tuple_t exposed[] = {
 {disasm_sym, "disasm_sym"},
 {arch_set, "arch_set"},
 {arch_info, "arch_info"},
-{arch_list, "arch_list"}
+{arch_list, "arch_list"},
+{load_struct_def, "load_struct_def"},
+{ptr2struct, "ptr2struct"}
 };
 
 range_t ranges[] = {

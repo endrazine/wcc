@@ -769,11 +769,10 @@ int help(lua_State * L)
 		printf(" + control flow:\n\t breakpoint(), bp()\n\n");
 		printf(" + system settings:\n\tenableaslr(), disableaslr()\n\n");
 		printf(" + settings:\n\t verbose(), hollywood()\n\n");
+		printf(" + disassembly: disasm(), disasm_sym()\n\n");
+		printf(" + architecture management: arch_set(), arch_info(), arch_list()\n\n");
+		printf(" + structure manipulation: lua2c(), struct2c(), memory2c(), load_struct_def(), ptr2struct()\n\n");
 		printf(" + advanced:\n\tltrace()\n\nTry help(\"cmdname\") for detailed usage on command cmdname.\n\n");
-		printf(" + disassembly:\n\n");
-		printf(" + disasm(), disasm_sym()\n\n");
-		printf(" + architecture management:\n\n");
-		printf(" + arch_set(), arch_info(), arch_list()\n\n");
 	}
 	return 0;
 }
@@ -2114,84 +2113,91 @@ static int incomplete(lua_State *L, int status)
 }
 
 /**
-* Main function to run a WSH shell
-*/
+ * Main function to run a WSH shell
+ */
 int run_shell(lua_State *L)
 {
 	if (!isatty(STDIN_FILENO)) {
-		/* Non-interactive mode - preserve original behavior */
-		char shell_prompt[4096] = { 0 };
-
-		for (;;) {
-			if (fgets(shell_prompt, sizeof(shell_prompt), stdin) == 0 || strcmp(shell_prompt, "cont\n") == 0) {
-				return 0;
-			}
-
-			if (luaL_loadbuffer(wsh->L, shell_prompt, strlen(shell_prompt), "=(shell)") || lua_pcall(L, 0, 0, 0)) {
-				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
-				lua_pop(L, 1);
-			}
-			lua_settop(L, 0);
-		}
-	} else {
-		/* Interactive mode with multiline support */
-
-		/* Set up history and completion */
-		char *SHELL_HISTORY = calloc(1024, 1);
-		snprintf(SHELL_HISTORY, 1023, "%s/%s", getenv("HOME"), SHELL_HISTORY_NAME);
-		linenoiseHistoryLoad(SHELL_HISTORY);
-		linenoiseSetCompletionCallback(completion);
-		linenoiseSetMultiLine(1);	/* Enable multiline support */
-
-		/* Buffer for accumulating multiline input */
+		/* Non-interactive mode with multiline support */
 		char *input_buffer = NULL;
 		size_t buffer_size = 0;
 		size_t buffer_len = 0;
+		char line[4096];	/* Temp buffer for fgets */
 
-		while (1) {
-			const char *prompt = (buffer_len > 0) ? ">> " : "> ";
-			char *line = linenoise(prompt);
+		for (;;) {
+			if (fgets(line, sizeof(line), stdin) == NULL) {
+				/* EOF: try to process any remaining buffer */
+				if (buffer_len > 0) {
+					int status = luaL_loadbuffer(L, input_buffer, buffer_len, "=(shell)");
+					if (status == LUA_OK) {
+						/* Execute */
+						status = lua_pcall(L, 0, LUA_MULTRET, 0);
+						if (status == LUA_OK) {
+							/* Print any return values */
+							int n = lua_gettop(L);
+							if (n > 0) {
+								luaL_checkstack(L, LUA_MINSTACK, "too many results to print");
+								lua_getglobal(L, "print");
+								lua_insert(L, 1);
+								if (lua_pcall(L, n, 0, 0) != LUA_OK) {
+									fprintf(stderr, "error calling 'print' (%s)\n", lua_tostring(L, -1));
+									lua_pop(L, 1);
+								}
+							}
+						} else {
+							fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+							lua_pop(L, 1);
+						}
+						lua_settop(L, 0);
+					} else {
+						/* Treat incomplete or syntax error at EOF as error */
+						fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+						lua_pop(L, 1);
+						lua_settop(L, 0);
+					}
+					buffer_len = 0;
+				}
+				free(input_buffer);
+				return 0;
+			}
 
-			if (line == NULL)
-				break;	/* EOF (Ctrl+D) */
+			/* Trim trailing newline if present */
+			size_t line_len = strlen(line);
+			if (line_len > 0 && line[line_len - 1] == '\n') {
+				line[--line_len] = '\0';
+			}
+
+			/* Check for special "cont" to exit */
+			if (strcmp(line, "cont") == 0) {
+				free(input_buffer);
+				return 0;
+			}
 
 			/* Allocate or expand buffer */
-			size_t line_len = strlen(line);
-			size_t needed = buffer_len + line_len + 2;	/* +1 for \n, +1 for \0 */
-
+			size_t needed = buffer_len + line_len + 2;	/* +1 for \n if needed, +1 for \0 */
 			if (needed > buffer_size) {
-				buffer_size = needed + 1024;	/* extra space */
+				buffer_size = needed + 1024;
 				input_buffer = realloc(input_buffer, buffer_size);
 				if (input_buffer == NULL) {
 					fprintf(stderr, "Out of memory\n");
-					free(line);
-					break;
+					free(input_buffer);
+					return 0;
 				}
 			}
 
-			/* Add line to buffer */
-			if (buffer_len == 0) {
-				strcpy(input_buffer, line);
-				buffer_len = line_len;
-			} else {
-				input_buffer[buffer_len] = '\n';
-				strcpy(input_buffer + buffer_len + 1, line);
-				buffer_len += line_len + 1;
+			/* Append line to buffer */
+			if (buffer_len > 0) {
+				input_buffer[buffer_len++] = '\n';
 			}
+			memcpy(input_buffer + buffer_len, line, line_len);
+			buffer_len += line_len;
+			input_buffer[buffer_len] = '\0';
 
-			free(line);
-
-			/* Try to compile the accumulated input */
-			int status = luaL_loadbuffer(L, input_buffer, buffer_len, "=stdin");
-
+			/* Try to compile */
+			int status = luaL_loadbuffer(L, input_buffer, buffer_len, "=(shell)");
 			if (status == LUA_OK) {
 				/* Success - execute it */
-				if (buffer_len > 0) {
-					linenoiseHistoryAdd(input_buffer);
-				}
-
 				status = lua_pcall(L, 0, LUA_MULTRET, 0);
-
 				if (status == LUA_OK) {
 					/* Print any return values */
 					int n = lua_gettop(L);
@@ -2208,29 +2214,101 @@ int run_shell(lua_State *L)
 					fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
 					lua_pop(L, 1);
 				}
-
 				/* Clear buffer for next input */
 				buffer_len = 0;
 				lua_settop(L, 0);
-
 			} else if (incomplete(L, status)) {
 				/* Incomplete input - continue reading */
 				continue;
-
 			} else {
 				/* Real syntax error */
 				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
 				lua_pop(L, 1);
-
 				/* Clear buffer and start over */
 				buffer_len = 0;
 				lua_settop(L, 0);
 			}
-
-			linenoiseHistorySave(SHELL_HISTORY);
-
 		}
-
+	} else {
+		/* Interactive mode with multiline support */
+		/* Set up history and completion */
+		char *SHELL_HISTORY = calloc(1024, 1);
+		snprintf(SHELL_HISTORY, 1023, "%s/%s", getenv("HOME"), SHELL_HISTORY_NAME);
+		linenoiseHistoryLoad(SHELL_HISTORY);
+		linenoiseSetCompletionCallback(completion);
+		linenoiseSetMultiLine(1);	/* Enable multiline support */
+		lua_settop(L, 0);	// Ignore previous errors in Lua
+		/* Buffer for accumulating multiline input */
+		char *input_buffer = NULL;
+		size_t buffer_size = 0;
+		size_t buffer_len = 0;
+		while (1) {
+			const char *prompt = (buffer_len > 0) ? ">> " : "> ";
+			char *line = linenoise(prompt);
+			if (line == NULL)
+				break;	/* EOF (Ctrl+D) */
+			/* Allocate or expand buffer */
+			size_t line_len = strlen(line);
+			size_t needed = buffer_len + line_len + 2;	/* +1 for \n, +1 for \0 */
+			if (needed > buffer_size) {
+				buffer_size = needed + 1024;	/* extra space */
+				input_buffer = realloc(input_buffer, buffer_size);
+				if (input_buffer == NULL) {
+					fprintf(stderr, "Out of memory\n");
+					free(line);
+					break;
+				}
+			}
+			/* Add line to buffer */
+			if (buffer_len == 0) {
+				strcpy(input_buffer, line);
+				buffer_len = line_len;
+			} else {
+				input_buffer[buffer_len] = '\n';
+				strcpy(input_buffer + buffer_len + 1, line);
+				buffer_len += line_len + 1;
+			}
+			free(line);
+			/* Try to compile the accumulated input */
+			int status = luaL_loadbuffer(L, input_buffer, buffer_len, "=stdin");
+			if (status == LUA_OK) {
+				/* Success - execute it */
+				if (buffer_len > 0) {
+					linenoiseHistoryAdd(input_buffer);
+				}
+				status = lua_pcall(L, 0, LUA_MULTRET, 0);
+				if (status == LUA_OK) {
+					/* Print any return values */
+					int n = lua_gettop(L);
+					if (n > 0) {
+						luaL_checkstack(L, LUA_MINSTACK, "too many results to print");
+						lua_getglobal(L, "print");
+						lua_insert(L, 1);
+						if (lua_pcall(L, n, 0, 0) != LUA_OK) {
+							fprintf(stderr, "error calling 'print' (%s)\n", lua_tostring(L, -1));
+							lua_pop(L, 1);
+						}
+					}
+				} else {
+					fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+					lua_pop(L, 1);
+				}
+				/* Clear buffer for next input */
+				buffer_len = 0;
+				lua_settop(L, 0);
+			} else if (incomplete(L, status)) {
+				/* Incomplete input - continue reading */
+				continue;
+			} else {
+				/* Real syntax error */
+				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+				lua_pop(L, 1);
+				/* Clear buffer and start over */
+				buffer_len = 0;
+				lua_settop(L, 0);
+			}
+			linenoiseHistorySave(SHELL_HISTORY);
+		}
 		/* Cleanup */
 		if (input_buffer) {
 			free(input_buffer);
@@ -2238,7 +2316,6 @@ int run_shell(lua_State *L)
 		linenoiseHistorySave(SHELL_HISTORY);
 		free(SHELL_HISTORY);
 	}
-
 	return 0;
 }
 
@@ -3601,7 +3678,9 @@ int exec_luabuff(void)
 	* Load buffer in lua
 	*/
 	if ((err = luaL_loadbuffer(wsh->L, wsh->luabuff, strlen(wsh->luabuff), "=Wsh internal lua buffer")) != 0) {
-		printf("WARNING: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
+		if (wsh->opt_verbose) {
+			printf("WARNING: Wsh internal lua initialization (%s): %s\n", lua_strerror(err), lua_tostring(wsh->L, -1));
+		}
 		//
 		// Run line by line instead...
 		//
@@ -3614,7 +3693,7 @@ int exec_luabuff(void)
 			}
 		    
 	    		if(lua_pcall(wsh->L, 0, 0, 0)){
-				fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+				fprintf(stderr, "WARNING: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
 			}
 skipthisone:
 			buff += n;            
@@ -3632,7 +3711,7 @@ skipthisone:
 	* Execute buffer
 	*/
 	if(lua_pcall(wsh->L, 0, 0, 0)){
-		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+		fprintf(stderr, "WARNING: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
 	}
 
 	/**
@@ -5557,7 +5636,7 @@ int run_script(char *name)
 	memset(myerror, 0x00, 200);
 
 	if (lua_pcall(wsh->L, 0, 0, 0)) {	/* Run the loaded Lua script */
-		fprintf(stderr, "lua_pcall() failed with %s, for: %s\n",lua_tostring(wsh->L, -1), name);	/* Error out if Lua file has an error */
+		fprintf(stderr, "WARNING: lua_pcall() failed with %s, for: %s\n",lua_tostring(wsh->L, -1), name);	/* Error out if Lua file has an error */
 		lua_pop(wsh->L, 1);	// pop error message from the stack 
 	}
 	lua_settop(wsh->L, 0);	// remove eventual returns 
@@ -5624,7 +5703,7 @@ int exec_default_scripts(void)
 		fatal_error(wsh->L, "luaL_loadfile() failed");
 	}
 	if(lua_pcall(wsh->L, 0, 0, 0)){
-		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+		fprintf(stderr, "WARNING: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
 	}
 
 	return 0;
@@ -5665,7 +5744,7 @@ int load_home_user_file(char *fname)
 	}
 
 	if(lua_pcall(wsh->L, 0, 0, 0)){
-		fprintf(stderr, "ERROR: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
+		fprintf(stderr, "WARNING: lua_pcall() failed with %s\n",lua_tostring(wsh->L, -1));
 	}
 
 	return 0;
@@ -7294,15 +7373,5 @@ void init_struct2c(lua_State *L)
 {
 	create_cstruct_metatable(L);
 	create_struct_def_metatable(L);
-	lua_pushcfunction(L, print_struct);
-	lua_setglobal(L, "print_struct");
-	lua_pushcfunction(L, load_struct_def);
-	lua_setglobal(L, "load_struct_def");
-	lua_pushcfunction(L, struct2c);
-	lua_setglobal(L, "struct2c");
-	lua_pushcfunction(L, ptr2struct);
-	lua_setglobal(L, "ptr2struct");
-	lua_pushcfunction(L, memory2c);
-	lua_setglobal(L, "memory2c");
 }
 
