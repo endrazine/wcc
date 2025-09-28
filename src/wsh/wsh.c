@@ -770,6 +770,10 @@ int help(lua_State * L)
 		printf(" + system settings:\n\tenableaslr(), disableaslr()\n\n");
 		printf(" + settings:\n\t verbose(), hollywood()\n\n");
 		printf(" + advanced:\n\tltrace()\n\nTry help(\"cmdname\") for detailed usage on command cmdname.\n\n");
+		printf(" + disassembly:\n\n");
+		printf(" + disasm(), disasm_sym()\n\n");
+		printf(" + architecture management:\n\n");
+		printf(" + arch_set(), arch_info(), arch_list()\n\n");
 	}
 	return 0;
 }
@@ -2110,7 +2114,7 @@ static int incomplete(lua_State *L, int status)
 }
 
 /**
-* Modified run_shell function - replace your existing one
+* Main function to run a WSH shell
 */
 int run_shell(lua_State *L)
 {
@@ -2222,11 +2226,15 @@ int run_shell(lua_State *L)
 				buffer_len = 0;
 				lua_settop(L, 0);
 			}
+
+			linenoiseHistorySave(SHELL_HISTORY);
+
 		}
 
 		/* Cleanup */
-		if (input_buffer)
+		if (input_buffer) {
 			free(input_buffer);
+		}
 		linenoiseHistorySave(SHELL_HISTORY);
 		free(SHELL_HISTORY);
 	}
@@ -5475,6 +5483,9 @@ int wsh_init(void)
 
 	// Set process name
 	prctl(PR_SET_NAME,"wsh",NULL,NULL,NULL);
+
+	// Register disassembler functions
+	init_multiarch_support();
 
 	// Initialize lua2c()
 	init_lua2c(wsh->L);

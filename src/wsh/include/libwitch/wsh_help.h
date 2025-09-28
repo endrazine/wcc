@@ -84,5 +84,10 @@ help_t fcnhelp[] ={
 	{"breakpoint", "<address>, [weight]", "Set a breakpoint at memory <address>. Optionally add a <weight> to breakpoint score if hit.", "", "None"},
 	{"bp", "<address>, [weight]", "Set a breakpoint at memory <address>. Optionally add a <weight> to breakpoint score if hit. Alias for breakpoint() function.", "", "None"},
 	{"hollywood", "<level>", "Change hollywood (fun) display setting to <level>, impacting color display (enable/disable).", "", "None"},
+	{"disasm_sym", "<symbol>, [length], [arch]", "Disassemble code at symbol <symbol> for [length] bytes. Uses symbol size if available. Architecture auto-detected from context.", "", "Returns lua table with disassembly results"},
+	{"disasm", "<address>, [length], [arch]", "Disassemble code at <address> for [length] bytes using [arch] architecture. Automatic architecture detection from ELF headers. Manual override supported. Supports 20+ architectures including x86, ARM, MIPS, RISC-V, BPF, EVM, etc.", "", "Returns lua table with disassembly results."},
+	{"arch_set", "<architecture>", "Set default architecture for disassembly. Use arch_list() to see supported architectures.", "", "None"},
+	{"arch_info", "", "Display current architecture configuration and loaded binaries.", "", "None"},
+	{"arch_list", "", "List all supported architectures with build status.", "", "None"}
 };
 

@@ -126,7 +126,12 @@ char *default_options[] = {
 "lua2c",
 "print_array",
 "struct2c",
-"memory2c"
+"memory2c",
+"disasm",
+"disasm_sym",
+"arch_set",
+"arch_info",
+"arch_list"
 };
 
 // All lua 5.3 Functions and global variables
@@ -394,7 +399,12 @@ tuple_t exposed[] = {
 {lua2c,"lua2c"},
 {print_array, "print_array"},
 {struct2c, "struct2c"},
-{memory2c, "memory2c"}
+{memory2c, "memory2c"},
+{disasm, "disasm"},
+{disasm_sym, "disasm_sym"},
+{arch_set, "arch_set"},
+{arch_info, "arch_info"},
+{arch_list, "arch_list"}
 };
 
 range_t ranges[] = {

@@ -1,4 +1,4 @@
-#!/usr/bin/wsh
+#!/usr/bin/wsh /lib/x86_64-linux-gnu/libssl.so.3
 
 -- Computing a MD5 sum using cryptographic functions from foreign binaries (eg: sshd/OpenSSL)
 
@@ -24,4 +24,4 @@ hash = str2md5(input)
 print(" [*] Computed md5 hash:")
 hexdump(hash,16)
 
--- exit(0)
+exit(0)
