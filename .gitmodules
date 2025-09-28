@@ -1,6 +1,3 @@
-[submodule "src/wsh/linenoise"]
-	path = src/wsh/linenoise
-	url = https://github.com/antirez/linenoise.git
 [submodule "src/wsh/openlibm"]
 	path = src/wsh/openlibm
 	url = https://github.com/JuliaMath/openlibm.git
