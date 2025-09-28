@@ -947,6 +947,7 @@ char *myblacklist[] = {
 // extra symbols
 "fprintf",
 "fflush",
-"print_array"
+"print_array",
+"memory2c"
 };
 

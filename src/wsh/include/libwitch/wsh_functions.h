@@ -125,7 +125,8 @@ char *default_options[] = {
 "mkptr",
 "lua2c",
 "print_array",
-"struct2c"
+"struct2c",
+"memory2c"
 };
 
 // All lua 5.3 Functions and global variables
@@ -392,7 +393,8 @@ tuple_t exposed[] = {
 {mkptr, "mkptr"},
 {lua2c,"lua2c"},
 {print_array, "print_array"},
-{struct2c, "struct2c"}
+{struct2c, "struct2c"},
+{memory2c, "memory2c"}
 };
 
 range_t ranges[] = {

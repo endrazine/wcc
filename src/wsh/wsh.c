@@ -2099,6 +2099,7 @@ int luaopen_array(lua_State * L)
 }
 */
 
+#ifdef OLD
 /**
 * Run minimal lua shell
 */
@@ -2213,8 +2214,159 @@ int run_shell(lua_State * L)
 	// never reached
 	return 0;
 }
+#endif
 
+/**
+*
+* Enable multi-line paste into WSH
+*
+*/
 
+/**
+* Check if syntax error is due to incomplete statement
+*/
+static int incomplete(lua_State *L, int status)
+{
+	if (status == LUA_ERRSYNTAX) {
+		size_t lmsg;
+		const char *msg = lua_tolstring(L, -1, &lmsg);
+		const char *tp = msg + lmsg - (sizeof("<eof>") - 1);
+		if (strstr(msg, "<eof>") != NULL) {
+			lua_pop(L, 1);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/**
+* Modified run_shell function - replace your existing one
+*/
+int run_shell(lua_State *L)
+{
+	if (!isatty(STDIN_FILENO)) {
+		/* Non-interactive mode - preserve original behavior */
+		char shell_prompt[4096] = { 0 };
+
+		for (;;) {
+			if (fgets(shell_prompt, sizeof(shell_prompt), stdin) == 0 || strcmp(shell_prompt, "cont\n") == 0) {
+				return 0;
+			}
+
+			if (luaL_loadbuffer(wsh->L, shell_prompt, strlen(shell_prompt), "=(shell)") || lua_pcall(L, 0, 0, 0)) {
+				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+				lua_pop(L, 1);
+			}
+			lua_settop(L, 0);
+		}
+	} else {
+		/* Interactive mode with multiline support */
+
+		/* Set up history and completion */
+		char *SHELL_HISTORY = calloc(1024, 1);
+		snprintf(SHELL_HISTORY, 1023, "%s/%s", getenv("HOME"), SHELL_HISTORY_NAME);
+		linenoiseHistoryLoad(SHELL_HISTORY);
+		linenoiseSetCompletionCallback(completion);
+		linenoiseSetMultiLine(1);	/* Enable multiline support */
+
+		/* Buffer for accumulating multiline input */
+		char *input_buffer = NULL;
+		size_t buffer_size = 0;
+		size_t buffer_len = 0;
+
+		while (1) {
+			const char *prompt = (buffer_len > 0) ? ">> " : "> ";
+			char *line = linenoise(prompt);
+
+			if (line == NULL)
+				break;	/* EOF (Ctrl+D) */
+
+			/* Allocate or expand buffer */
+			size_t line_len = strlen(line);
+			size_t needed = buffer_len + line_len + 2;	/* +1 for \n, +1 for \0 */
+
+			if (needed > buffer_size) {
+				buffer_size = needed + 1024;	/* extra space */
+				input_buffer = realloc(input_buffer, buffer_size);
+				if (input_buffer == NULL) {
+					fprintf(stderr, "Out of memory\n");
+					free(line);
+					break;
+				}
+			}
+
+			/* Add line to buffer */
+			if (buffer_len == 0) {
+				strcpy(input_buffer, line);
+				buffer_len = line_len;
+			} else {
+				input_buffer[buffer_len] = '\n';
+				strcpy(input_buffer + buffer_len + 1, line);
+				buffer_len += line_len + 1;
+			}
+
+			free(line);
+
+			/* Try to compile the accumulated input */
+			int status = luaL_loadbuffer(L, input_buffer, buffer_len, "=stdin");
+
+			if (status == LUA_OK) {
+				/* Success - execute it */
+				if (buffer_len > 0) {
+					linenoiseHistoryAdd(input_buffer);
+				}
+
+				status = lua_pcall(L, 0, LUA_MULTRET, 0);
+
+				if (status == LUA_OK) {
+					/* Print any return values */
+					int n = lua_gettop(L);
+					if (n > 0) {
+						luaL_checkstack(L, LUA_MINSTACK, "too many results to print");
+						lua_getglobal(L, "print");
+						lua_insert(L, 1);
+						if (lua_pcall(L, n, 0, 0) != LUA_OK) {
+							fprintf(stderr, "error calling 'print' (%s)\n", lua_tostring(L, -1));
+							lua_pop(L, 1);
+						}
+					}
+				} else {
+					fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+					lua_pop(L, 1);
+				}
+
+				/* Clear buffer for next input */
+				buffer_len = 0;
+				lua_settop(L, 0);
+
+			} else if (incomplete(L, status)) {
+				/* Incomplete input - continue reading */
+				continue;
+
+			} else {
+				/* Real syntax error */
+				fprintf(stderr, "ERROR: %s\n", lua_tostring(L, -1));
+				lua_pop(L, 1);
+
+				/* Clear buffer and start over */
+				buffer_len = 0;
+				lua_settop(L, 0);
+			}
+		}
+
+		/* Cleanup */
+		if (input_buffer)
+			free(input_buffer);
+		linenoiseHistorySave(SHELL_HISTORY);
+		free(SHELL_HISTORY);
+	}
+
+	return 0;
+}
+
+/**
+* Learn function prototypes
+*/
 int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason)
 {
 	char *vreason = 0;

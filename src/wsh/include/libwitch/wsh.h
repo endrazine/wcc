@@ -337,6 +337,7 @@ static void unrtrace(lua_State * L);
 static int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
 static void segment_add(unsigned long int addr, unsigned long int size, char *perms, char *fname, char *ptype, int flags);
 
+static int memory2c(lua_State * L);
 static int lua2c(lua_State *L);
 static int struct2c(lua_State * L);
 static int alloccharbuf(lua_State * L);
