@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2025 Jonathan Brossard
+* Copyright (c) 2016-2026 Jonathan Brossard
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -1501,17 +1501,26 @@ int print_symbols(lua_State * L)
 	char *symname = 0;
 	char *libname = 0;
 	unsigned int returnall = 0;
+	unsigned int paginate = 0;
 
 	read_arg1(symname);
 	read_arg2(libname);
 	read_arg3(returnall);
+
+	paginate = wsh->opt_pagination;
+
+	// Auto-detect if we should paginate
+	// Only paginate if stdout is a terminal AND stdin is a terminal
+	if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
+		paginate = 0;
+	}
 
 	DL_COUNT(wsh->symbols, s, scount);
 
 	if(returnall < 2){
 		printf(" -- Total: %u symbols\n", scount);	
 		printf(" -- Symbols:\n\n");
-	//      printf("    Type       Size                     Path                  Address              Name           (Demangled)\n");
+	        printf("    Type       Size                     Path                  Address              Name           (Demangled)\n");
 		printf("-----------------------------------------------------------------------------------------------------------------\n");
 	}
 
@@ -1540,11 +1549,44 @@ int print_symbols(lua_State * L)
 				lua_getglobal(L, s->symbol);		/* get pointer to global with this name : keep it as value on top of stack */
 			        lua_settable(L, -3);
 
-				pcnt++;
-				if((!returnall)&&(pcnt == LINES_MAX)){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
+
+					/* Handle pagination with smart detection */
+					pcnt++;
+					if (paginate && pcnt == LINES_MAX) {
+						pcnt = 0;
+
+						printf("\n-- More -- (%u functions displayed, 'a' for all, 'q' to quit, any key to continue)\n", scount);
+
+						int c = getchar();
+
+						// Handle EOF
+						if (c == EOF) {
+							break;
+						}
+
+						switch (c) {
+						case 0x61:	// 'a'
+						case 0x41:	// 'A'
+							paginate = 0;	// Show all remaining
+							break;
+						case 0x71:	// 'q'
+						case 0x51:	// 'Q'
+							printf("\n");
+							goto cleanup;
+						default:
+							break;
+						}
+
+						// Clear remaining input
+						while ((c = getchar()) != '\n' && c != EOF);
+					}
+
+
 			}
 		}
 	}
+
+cleanup:
 
 	if(returnall < 2){
 		printf("\n");
@@ -1569,10 +1611,19 @@ int print_functions(lua_State * L)
 	char *libname = 0;
 	char *symname = 0;
 	unsigned int returnall = 0;
+	unsigned int paginate = 0;
 
 	read_arg1(symname);
 	read_arg2(libname);
 	read_arg3(returnall);
+
+	paginate = wsh->opt_pagination;
+
+	// Auto-detect if we should paginate
+	// Only paginate if stdout is a terminal AND stdin is a terminal
+	if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
+		paginate = 0;
+	}
 
 	DL_COUNT(wsh->symbols, s, scount);
 
@@ -1588,16 +1639,12 @@ int print_functions(lua_State * L)
 	lua_newtable(L);
 
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
-
-		if(!strncmp(s->htype,"Function",8)){
-
-			if((!symname)||(strstr(s->symbol, symname))){
-
-				if((!libname)||(strstr(s->libname, libname))){
+		if (!strncmp(s->htype, "Function", 8)) {
+			if ((!symname) || (strstr(s->symbol, symname))) {
+				if ((!libname) || (strstr(s->libname, libname))) {
 					scount++;
 
-					if(returnall < 2){
-
+					if (returnall < 2) {
 						printf("%s ", strlen(s->libname) ? s->libname : wsh->selflib);
 						for (i = strlen(s->libname); i < 40; i++)
 							printf(" ");
@@ -1607,65 +1654,102 @@ int print_functions(lua_State * L)
 						printf("%s ", s->htype);
 						for (i = strlen(s->htype); i < 10; i++)
 							printf(" ");
-						printf(" %s	%lx	\t\t%lu	%lx\n", s->hbind, s->value, s->size, s->addr);
+						printf(" %s\t%lx\t\t%lu\t%lx\n", s->hbind, s->value, s->size, s->addr);
 					}
 
 					/* Add function to Lua table */
-					lua_pushstring(L, s->symbol);		/* push key */
-					lua_getglobal(L, s->symbol);		/* get pointer to global with this name : keep it as value on top of stack */
+					lua_pushstring(L, s->symbol);	/* push key */
+					lua_getglobal(L, s->symbol);	/* get pointer to global with this name */
 					lua_settable(L, -3);
 
-					/* handle breaks via getchar() */
+					/* Handle pagination with smart detection */
 					pcnt++;
-//					if((!returnall)&&(pcnt == LINES_MAX)){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
-				}
+					if (paginate && pcnt == LINES_MAX) {
+						pcnt = 0;
 
+						printf("\n-- More -- (%u functions displayed, 'a' for all, 'q' to quit, any key to continue)\n", scount);
+
+						int c = getchar();
+
+						// Handle EOF
+						if (c == EOF) {
+							break;
+						}
+
+						switch (c) {
+						case 0x61:	// 'a'
+						case 0x41:	// 'A'
+							paginate = 0;	// Show all remaining
+							break;
+						case 0x71:	// 'q'
+						case 0x51:	// 'Q'
+							printf("\n");
+							goto cleanup;
+						default:
+							break;
+						}
+
+						// Clear remaining input
+						while ((c = getchar()) != '\n' && c != EOF);
+					}
+				}
 			}
 		}
 	}
 
-	if(returnall < 2){
+cleanup:
+	if (returnall < 2) {
 		printf("\n");
-		printf(" -- %u functions matched\n", scount);	
+		printf(" -- %u functions matched\n", scount);
 	}
-
 	// Return scount as second return value
 	lua_pushinteger(L, scount);
-
-	return 2;	// Return 1 table + number of match
+	return 2;		// Return 1 table + number of match
 }
 
 /**
 * Display objects (typically globals)
 */
-int print_objects(lua_State * L)
+int print_objects(lua_State *L)
 {
 	unsigned int scount = 0;
 	symbols_t *s = 0, *stmp = 0;
 	unsigned int i = 0;
 	unsigned int pcnt = 0;
-
 	char *libname = 0;
+	unsigned int paginate = 0;
 
 	read_arg1(libname);
 
+	paginate = wsh->opt_pagination;
+
+	// Auto-detect if we should paginate
+	// Only paginate if stdout is a terminal AND stdin is a terminal
+	if (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)) {
+		paginate = 0;
+	}
+
+	// Check for explicit pagination control in environment
+	char *no_pager = getenv("WSH_NO_PAGER");
+	if (no_pager && strcmp(no_pager, "1") == 0) {
+		paginate = 0;
+	}
+
 	DL_COUNT(wsh->symbols, s, scount);
-	printf(" -- Total: %u symbols\n", scount);	
+	printf(" -- Total: %u symbols\n", scount);
 
 	scount = 0;
 	printf(" -- Objects:\n\n");
-//      printf("    Type       Size                     Path                  Address              Name           (Demangled)\n");
+	printf("    Type       Size                     Path                  Address              Name           (Demangled)\n");
 	printf("-----------------------------------------------------------------------------------------------------------------\n");
 
-
 	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
-
-		if((!libname)||(strstr(s->libname, libname))){
-
-			if(!strncmp(s->htype,"Object",6)){
-				char *sname = 0;
-				sname = strlen(s->libname) ? s->libname : wsh->selflib;
+		if ((!libname) || (strstr(s->libname, libname))) {
+			if (!strncmp(s->htype, "Object", 6)) {
+				char *sname = strlen(s->libname) ? s->libname : wsh->selflib;
 				scount++;
+
+				// Print the object info
 				printf("%s ", sname);
 				for (i = strlen(sname); i < 40; i++)
 					printf(" ");
@@ -1675,17 +1759,48 @@ int print_objects(lua_State * L)
 				printf("%s ", s->htype);
 				for (i = strlen(s->htype); i < 10; i++)
 					printf(" ");
-				printf(" %s	%lx	\t\t%lu	%lx\n", s->hbind, s->value, s->size, s->addr);
+				printf(" %s\t%lx\t\t%lu\t%lx\n", s->hbind, s->value, s->size, s->addr);
 
 				pcnt++;
-				if(pcnt == LINES_MAX){ pcnt = 0; int c = getchar(); switch(c){case 0x61: pcnt = LINES_MAX + 1; break; case 0x71: return 0; break; default: break;   }; }
+
+				// Handle pagination
+				if (paginate && pcnt == LINES_MAX) {
+					pcnt = 0;
+
+					// Show pagination prompt
+					printf("\n-- More -- (%u objects displayed, press 'a' for all, 'q' to quit, or any key to continue)\n", scount);
+
+					int c = getchar();
+
+					// Handle EOF or error
+					if (c == EOF) {
+						break;
+					}
+
+					switch (c) {
+					case 0x61:	// 'a' - show all
+					case 0x41:	// 'A' - show all
+						paginate = 0;	// Disable pagination
+						break;
+					case 0x71:	// 'q' - quit
+					case 0x51:	// 'Q' - quit
+						printf("\n");
+						goto cleanup;
+					default:
+						// Continue showing next page
+						break;
+					}
+
+					// Clear any remaining input (like newline)
+					while ((c = getchar()) != '\n' && c != EOF);
+				}
 			}
 		}
 	}
 
+      cleanup:
 	printf("\n");
-	printf(" -- %u objects matched\n", scount);	
-
+	printf(" -- %u objects matched\n", scount);
 	return 0;
 }
 
@@ -1902,7 +2017,11 @@ int man(lua_State * L)
 /**
 * Display information on an object/memory address
 */
-int info(lua_State * L)
+/**
+ * Display information on an object/memory address
+ * Enhanced to accept: string (function name), number (address), or function object
+ */
+int info(lua_State *L)
 {
 	void *symbol = 0;
 	unsigned long long int ret = 0;
@@ -1911,101 +2030,199 @@ int info(lua_State * L)
 	Elf_Sym *s = 0;
 	unsigned int stype = 0, sbind = 0;
 	char *htype = 0, *hbind = 0;
+	unsigned long long int n = 0;
+	const char *func_name = NULL;
 
-	unsigned long long int n = lua_tonumber(L, 1);
+	// Check argument type in order: string, function, userdata, number
 
-	if(msync(n & ~0xfff, 4096, 0) == 0){	// if read as a number, destination address is mapped
-
-		/**
-		* Address is mapped
-		*/
-	        printf(" * address 0x%llx is mapped\n", n);
-
-		/**
-		* Search corresponding symbols
-		*/
-		symbols_t *sym = symbol_from_addr(n);
-		if((sym)&&(sym->addr == n)){
-			printf(" * %s %s %s from %s\tsize:%lu\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
-		}else if(sym){
-			printf(" * %llu bytes within %s %s %s from %s\tsize:%lu\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
-		}
-
-		/**
-		* Search corresponding section
-		*/
-		sections_t *sec = section_from_addr(n);
-		if(sec){
-			printf(" * %llu bytes within %s:%s  %s\n", n - sec->addr, sec->libname, sec->name, sec->perms);
-		}
-
-		/**
-		* Search corresponding segment
-		*/
-		sections_t *seg = segment_from_addr(n);
-		if(seg){
-			printf(" * %llu bytes within %s:%s  %s\n", n - seg->addr, seg->libname, seg->name, seg->perms);
-		}
-
-	}else if (lua_isstring(L, 1)) {
+	// Case 1: String (function name)
+	if (lua_isstring(L, 1)) {
 		symbol = luaL_checkstring(L, 1);
 
-		/**
-		* Search corresponding symbols
-		*/
+		// Existing string handling code...
 		symbols_t *sym = symbol_from_name(symbol);
-		if(!sym){
-			printf(" * Symbol %s does not exist\n", (char *)symbol);
+		if (!sym) {
+			printf(" * Symbol %s does not exist\n", (char *) symbol);
 			return 0;
 		}
-
-		/**
-		* Resolve symbol...
-		*/
 		ret = (unsigned long int) dlsym(wsh->mainhandle, symbol);
 		if ((error = dlerror()) != NULL) {
 			fprintf(stderr, "ERROR: %s\n", error);
 			return 0;
 		}
-
 #ifdef __GLIBC__
-		if (dladdr1(ret, &dli, (void **) &s, RTLD_DL_SYMENT)&&(s)) {
+		if (dladdr1(ret, &dli, (void **) &s, RTLD_DL_SYMENT) && (s)) {
 			stype = ELF_ST_TYPE(s->st_info);
 			htype = symbol_totype(stype);
-
 			sbind = ELF_ST_BIND(s->st_info);
 			hbind = symbol_tobind(sbind);
-
 			char *secname = "";
 			sections_t *sec = section_from_addr(dli.dli_saddr);
-			if(sec){
+			if (sec) {
 				secname = sec->name;
 			}
-
-			printf(" * %s %s %s at %p	%s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, s->st_size /*, s->st_value */ );
+			printf(" * %s %s %s at %p	%s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, s->st_size);
 #else
 		if (dladdr(ret, &dli)) {
-			stype = 2; // Assume function
+			stype = 2;
 			htype = symbol_totype(stype);
 			sbind = 1;
 			hbind = symbol_tobind(sbind);
 			char *secname = "";
 			sections_t *sec = section_from_addr(dli.dli_saddr);
-			if(sec){
+			if (sec) {
 				secname = sec->name;
 			}
-			printf(" * %s %s %s at %p %s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, 0 /* s->st_size */ );
+			printf(" * %s %s %s at %p %s:%s size:%lu\n", htype, hbind, dli.dli_sname, dli.dli_saddr, dli.dli_fname, secname, 0);
 #endif
 		} else {
-			printf(" * symbol %s does not exist.\n", (char *)symbol);
+			printf(" * symbol %s does not exist.\n", (char *) symbol);
 		}
-	} else {
-		printf("ERROR: info requires a string argument\n");
+		return 0;
 	}
+	// Case 2: Function object (try to extract name and look up)
+	if (lua_isfunction(L, 1)) {
+		// First, try direct C function
+		lua_CFunction cfunc = lua_tocfunction(L, 1);
+
+		if (cfunc) {
+			// It's a C function - get its address directly
+			n = (unsigned long long int) cfunc;
+			printf(" * C function at address: 0x%llx\n", n);
+
+			symbols_t *sym = symbol_from_addr(n);
+			if (sym) {
+				if (sym->addr == n) {
+					printf(" * %s %s %s from %s\tsize:%lu\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+				} else {
+					printf(" * %llu bytes within %s %s %s from %s\tsize:%lu\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+				}
+			}
+
+			sections_t *sec = section_from_addr(n);
+			if (sec) {
+				printf(" * %llu bytes within %s:%s  %s\n", n - sec->addr, sec->libname, sec->name, sec->perms);
+			}
+			return 0;
+		}
+		// It's a Lua function (wrapped by wsh)
+		// Strategy: Search global namespace for this function reference
+		// Then use the name to look up the symbol
+
+		printf(" * Lua-wrapped function detected\n");
+
+		// Push the function argument onto the stack again (it's at index 1)
+		// Then iterate through _G to find its name
+		lua_pushvalue(L, 1);	// Push function to top of stack
+
+		// Get the global table
+		lua_pushglobaltable(L);	// Now global table is on top
+
+		// Iterate through globals to find this function
+		lua_pushnil(L);	// First key
+		while (lua_next(L, -2) != 0) {
+			// Stack: ..., function, _G, key, value
+
+			// Check if value equals our function (at index -4 now)
+			if (lua_rawequal(L, -1, -4)) {
+				// Found it! Get the key (name)
+				if (lua_isstring(L, -2)) {
+					func_name = lua_tostring(L, -2);
+					printf(" * Found function name: %s\n", func_name);
+
+					// Now look it up in symbol table
+					symbols_t *sym = symbol_from_name(func_name);
+					if (sym) {
+						printf(" * %s %s %s from %s\tsize:%lu bytes\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+
+						// Show address if it looks valid
+						if (sym->addr > 0x10000) {
+							printf(" * at address: 0x%llx\n", sym->addr);
+
+							sections_t *sec = section_from_addr(sym->addr);
+							if (sec) {
+								printf(" * within %s:%s  %s\n", sec->libname, sec->name, sec->perms);
+							}
+						} else if (sym->addr > 0) {
+							printf(" * offset in file: 0x%llx\n", sym->addr);
+						}
+					} else {
+						printf(" * Symbol not found in symbol table\n");
+					}
+
+					lua_pop(L, 2);	// Pop value and key
+					break;
+				}
+			}
+
+			lua_pop(L, 1);	// Pop value, keep key for next iteration
+		}
+
+		lua_pop(L, 2);	// Pop global table and function copy
+
+		if (!func_name) {
+			printf(" * Could not determine function name from globals\n");
+			printf(" * Tip: Use info('function_name') instead\n");
+		}
+
+		return 0;
+	}
+	// Case 3: Userdata
+	if (lua_islightuserdata(L, 1) || lua_isuserdata(L, 1)) {
+		void *ptr = lua_touserdata(L, 1);
+		n = (unsigned long long int) ptr;
+
+		printf(" * userdata at address: 0x%llx\n", n);
+
+		symbols_t *sym = symbol_from_addr(n);
+		if (sym) {
+			if (sym->addr == n) {
+				printf(" * %s %s %s from %s\tsize:%lu\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+			} else {
+				printf(" * %llu bytes within %s %s %s from %s\tsize:%lu\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+			}
+		}
+
+		return 0;
+	}
+	// Case 4: Number (address)
+	if (lua_isnumber(L, 1)) {
+		n = lua_tonumber(L, 1);
+
+		if (msync((void *) (n & ~0xfff), 4096, 0) == 0) {
+			printf(" * address 0x%llx is mapped\n", n);
+
+			symbols_t *sym = symbol_from_addr(n);
+			if (sym) {
+				if (sym->addr == n) {
+					printf(" * %s %s %s from %s\tsize:%lu\n", sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+				} else {
+					printf(" * %llu bytes within %s %s %s from %s\tsize:%lu\n", n - sym->addr, sym->hbind, sym->htype, sym->symbol, sym->libname, sym->size);
+				}
+			}
+
+			sections_t *sec = section_from_addr(n);
+			if (sec) {
+				printf(" * %llu bytes within %s:%s  %s\n", n - sec->addr, sec->libname, sec->name, sec->perms);
+			}
+
+			sections_t *seg = segment_from_addr(n);
+			if (seg) {
+				printf(" * %llu bytes within %s:%s  %s\n", n - seg->addr, seg->libname, seg->name, seg->perms);
+			}
+		} else {
+			printf(" * address 0x%llx is not mapped\n", n);
+		}
+
+		return 0;
+	}
+	// Case 5: Unsupported type
+	printf("ERROR: info() requires a string (function name), number (address), or function object\n");
+	printf("       Usage: info('function_name') or info(function) or info(0xaddress)\n");
+	printf("       Got type: %s\n", lua_typename(L, lua_type(L, 1)));
 
 	return 0;
 }
-
 /**
 * Buffer management subroutines
 */
@@ -6074,7 +6291,7 @@ int wsh_loadlibs(void)
 */
 int wsh_getopt(int argc, char **argv)
 {
-	const char *short_opt = "hqvVxgu";
+	const char *short_opt = "hqvVxgup";
 	int count = 0;
 	struct stat sb;
 	int c = 0, i = 0;
@@ -6086,7 +6303,8 @@ int wsh_getopt(int argc, char **argv)
 		{"global", no_argument, NULL, 'g'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"version", no_argument, NULL, 'V'},
-		{"version", no_argument, NULL, 'u'},
+		{"userland", no_argument, NULL, 'u'},
+		{"pagination", no_argument, NULL, 'p'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -6108,6 +6326,10 @@ int wsh_getopt(int argc, char **argv)
 
 		case 'g':
 			wsh->opt_global = 1;
+			break;
+
+		case 'p':
+			wsh->opt_pagination = 1;
 			break;
 
 		case 'q':
@@ -6202,6 +6424,7 @@ int wsh_usage(char *name)
 	printf("Options:\n\n");
 	printf("    -x, --args                Optional script argument separator\n");
 	printf("    -q, --quiet               Display less output\n");
+	printf("    -p, --pagination          Use pagination in outputs\n");
 	printf("    -v, --verbose             Display more output\n");
 	printf("    -g, --global              Bind symbols globally\n");
 	printf("    -u, --userland-load       Force use userland loader\n");	
