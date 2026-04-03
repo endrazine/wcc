@@ -16,12 +16,13 @@ The WCC user manual is available online at : https://github.com/endrazine/wcc/wi
 ### Installation Requirements
 The Witchcraft Compiler Collection requires the following software to be installed:
 
-    capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make
+    capstone, glibc, libbfd, libdl, zlib, libelf, libreadline, libgsl, make, cargo
 
 ### Installation Requirements on Ubuntu/Debian
-Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 22.04):
+Under Ubuntu/Debian those dependencies can be installed with the following commands (tested on Ubuntu 24.04):
     
-    sudo apt-get install -y clang libbfd-dev uthash-dev libelf-dev libcapstone-dev  libreadline-dev libiberty-dev libgsl-dev build-essential git debootstrap file
+	sudo apt install -y clang libbfd-dev uthash-dev libelf-dev libcapstone-dev  libreadline-dev libiberty-dev libgsl-dev build-essential git debootstrap file cargo openssh-server apache2 nginx gcc
+	sudo apt install -y libbpf1 libtirpc-dev
 
 ## Building and Installing:
 
