@@ -63,7 +63,7 @@ The following commands constitute the core of the Witchcraft Compiler Collection
 wld takes an ELF executable as an input and modifies it to create a shared library.
 #### wld command line options
 	jonathan@blackbox:~$ wld
-	Witchcraft Compiler Collection (WCC) version:0.0.6    (18:10:51 May 10 2024)
+	Witchcraft Compiler Collection (WCC) version:0.0.12
 
 	Usage: wld -libify [-noinit] file
 
@@ -86,7 +86,7 @@ The wcc compiler takes binaries (ELF, PE, ...) as an input and creates valid ELF
 
 #### wcc command line options
 	jonathan@blackbox:~$ wcc
-	Witchcraft Compiler Collection (WCC) version:0.0.6    (18:10:50 May 10 2024)
+	Witchcraft Compiler Collection (WCC) version:0.0.12
 
 	Usage: wcc [options] file
 
