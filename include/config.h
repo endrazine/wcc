@@ -6,7 +6,7 @@
 *
 *******************************************************************************
 * The MIT License (MIT)
-* Copyright (c) 2016-2024 Jonathan Brossard
+* Copyright (c) 2016-2026 Jonathan Brossard
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@
 */
 
 #define WNAME   "Witchcraft Compiler Collection (WCC)"
-#define WVERSION "0.0.11"
+#define WVERSION "0.0.12"
 #define WDATE __DATE__
 #define WTIME __TIME__
 
