@@ -29,7 +29,14 @@
 *
 */
 
-#include <linux/elf-em.h>
+/* supporting elf-em with other kernels (only constants definitions) */
+#ifdef __FreeBSD_kernel__
+  #include "elf-em.h"
+#elif defined __GNU__
+  #include "elf-em.h"
+#else
+  #include <linux/elf-em.h>
+#endif
 
 typedef struct archi_t{
 	char *name;

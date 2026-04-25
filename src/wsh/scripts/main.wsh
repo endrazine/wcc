@@ -1,3 +1,5 @@
+#!/usr/bin/wsh
+
 local ffi = require("ffi")
 ffi.cdef[[
 unsigned long compressBound(unsigned long sourceLen);

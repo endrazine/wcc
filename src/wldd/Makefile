@@ -1,7 +1,7 @@
-CFLAGS := -W -Wall
+CFLAGS ?= -W -Wall
 
 all::
-	$(CC) $(CFLAGS) wldd.c -o wldd -lelf
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) wldd.c -o wldd -lelf
 	cp wldd ../../bin/
 
 clean:

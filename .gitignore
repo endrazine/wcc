@@ -11,3 +11,21 @@ bin/
 #
 doc/html/
 
+src/wsh/lua/src/liblua.a
+src/wsh/lua/src/lua
+src/wsh/lua/src/luac
+NEW.txt
+doc/latex/
+elf64_header.json
+learnwitch.log
+process_info.json
+src/wcc/do_gdb.sh
+src/wcc/libc/
+src/wcc/wcc.c.bak.new
+src/wcc/wcc.c.epic.c
+src/wcc/wcc.c.epic.c.bak
+src/wcc/wcc.c.old
+src/wcc/wcc.c.take2
+src/wcc/wcc.c.working.c
+src/wldd/tmp/
+trace.txt

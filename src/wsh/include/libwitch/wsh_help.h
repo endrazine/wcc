@@ -56,7 +56,7 @@ help_t cmdhelp[] ={
 * Internal help : wsh functions
 */
 help_t fcnhelp[] ={
-	{"help", "[topic]","Display help on [topic]. If [topic] is ommitted, display general help.", "", "None"},
+	{"help", "[topic]","Display help on [topic]. If [topic] is omitted, display general help.", "", "None"},
 	{"man", "[page]", "Display system manual page for [page].", "", "None"},
 	{"hexdump", "<address>, <num>", "Display <num> bytes from memory <address> in enhanced hexadecimal form.", "", "None"},
 	{"hex", "<object>", "Display lua <object> in enhanced hexadecimal form.", "", "None"},
@@ -68,7 +68,7 @@ help_t fcnhelp[] ={
 	{"symbols", "[sympattern], [libpattern], [mode]", "Display all the symbols in memory matching [sympattern], from library [libpattern]. If [mode] is set to 1 or 2, do not wait user input between pagers. [mode] = 2 provides a shorter output.", "", "None"},
 	{"functions","[sympattern], [libpattern], [mode]", "Display all the functions in memory matching [sympattern], from library [libpattern]. If [mode] is set to 1 or 2, do not wait user input between pagers. [mode] = 2 provides a shorter output.", "table func = ", "Return 1 lua table _func_ whose keys are valid function names in address space, and values are pointers to them in memory."},
 	{"objects","[pattern]", "Display all the functions in memory matching [sympattern]", "", "None"},
-	{"info", "[address] | [name]", "Display various informations about the [address] or [name] provided : if it is mapped, and if so from which library and in which section if available.", "", "None"},
+	{"info", "[address] | [name]", "Display various information about the [address] or [name] provided : if it is mapped, and if so from which library and in which section if available.", "", "None"},
 	{"search", "<pattern>", "Search all object names matching <pattern> in address space.", "", "None"},
 	{"headers", "", "Display C headers suitable for linking against the API loaded in address space.", "", "None"},
 	{"grep", "<pattern>, [patternlen], [dumplen], [before]","Search <pattern> in all ELF sections in memory. Match [patternlen] bytes, then display [dumplen] bytes, optionally including [before] bytes before the match. Results are displayed in enhanced decimal form", "table match = ", "Returns 1 lua table containing matching memory addresses."},

@@ -28,17 +28,17 @@ all::
 	cd librustdemangle && cargo build --release
 	cd openlibm && make CFLAGS="-fpie -fPIC"
 	cd lua && make linux CFLAGS="-fpie -fPIC"
-	$(CC) $(CFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline
-	$(CC) $(CFLAGS) wshmain.c -o wshmain.o -c -fpie -fPIC -ldl -lreadline
-	$(CC) $(CFLAGS) helper.c -o helper.o -c -fpie -fPIC
-	$(CC) $(CFLAGS) linenoise/linenoise.c -o linenoise.o -c -fpie -fPIC
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) wsh.c -o wsh.o -c -fpie -fPIC -ldl -lreadline
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) wshmain.c -o wshmain.o -c -fpie -fPIC -ldl -lreadline
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) helper.c -o helper.o -c -fpie -fPIC
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) linenoise/linenoise.c -o linenoise.o -c -fpie -fPIC
 	$(CC) $(CFLAGS) wsh.o helper.o linenoise.o -shared -fPIC -o libwitch.so
 	ar cr libwitch.a wsh.o helper.o linenoise.o
 	$(CC) $(CFLAGS) elfloader64.c -o elfloader64.o -c
 	$(CC) $(CFLAGS) disasm.c -o disasm.o -c
-	$(CC) $(CFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(WLINK) -liberty $(OBJLIB) -ldl -lcapstone
-	$(CC) $(CFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-static-`uname -m` $(WLINK) -liberty $(OBJLIB) -static  -lcapstone
-	$(CC) $(CFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-`uname -m` $(WLINK) -liberty -lcapstone $(OBJLIB) -ldl -Wl,-rpath=/tmp/wsh/`uname -m`/,-rpath=/tmp/wsh/,-rpath=.
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh $(WLINK) -liberty $(OBJLIB) -ldl -lcapstone
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-static-`uname -m` $(WLINK) -liberty $(OBJLIB) -static  -lcapstone
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) ../wld/wld.o disasm.o elfloader64.o wsh.o helper.o linenoise.o wshmain.o -o wsh-`uname -m` $(WLINK) -liberty -lcapstone $(OBJLIB) -ldl -Wl,-rpath=/tmp/wsh/`uname -m`/,-rpath=/tmp/wsh/,-rpath=.
 	cp wsh libwsh.so
 	../wld/wld -l libwsh.so
 	cp wsh ../../bin/

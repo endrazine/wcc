@@ -1612,7 +1612,7 @@ static unsigned int write_phdrs(ctx_t *ctx)
 	ctx->phnum += 2;
 
 	if (ctx->opt_verbose) {
-		printf(" -- Writting %u segment headers\n", ctx->phnum);
+		printf(" -- Writing %u segment headers\n", ctx->phnum);
 	}
 
 	// first entry is the program header itself
@@ -4796,7 +4796,7 @@ int usage(char *name)
 */
 int print_version(void)
 {
-	printf("%s version:%s    (%s %s)\n", WNAME, WVERSION, WTIME, WDATE);
+	printf("%s version:%s\n", WNAME, WVERSION);
 	return 0;
 }
 
