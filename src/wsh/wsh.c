@@ -101,6 +101,7 @@ void rust_demangle_free(char* ptr);
 */
 int userland_load_binary(char *fname);
 int mk_lib(char *name, unsigned int noinit, unsigned int strip_vernum, unsigned int no_now_flag, unsigned int use_segments);
+void init_multiarch_support(void);
 
 /**
 * Forward declarations
