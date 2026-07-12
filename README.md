@@ -24,6 +24,13 @@ Under Ubuntu/Debian those dependencies can be installed with the following comma
 	sudo apt install -y clang libbfd-dev uthash-dev libelf-dev libcapstone-dev  libreadline-dev libiberty-dev libgsl-dev build-essential git debootstrap file cargo openssh-server apache2 nginx gcc
 	sudo apt install -y libbpf1 libtirpc-dev
 
+#### Installation under Ubuntu 26.04
+Under Ubuntu 26.04, libsframe.a, that used to be shipped with libbfd-dev is now part of the package libsframe-dev. The correct dependencies may be installed using:
+
+	sudo apt-get install -y --no-install-recommends libbfd-dev libsframe-dev uthash-dev libelf-dev \
+	    libcapstone-dev libreadline-dev libiberty-dev libgsl-dev build-essential git \
+	    debootstrap file nano xxd ca-certificates cargo
+
 ## Building and Installing:
 
 ### Fetching the code over git
