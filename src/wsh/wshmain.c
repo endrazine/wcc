@@ -54,5 +54,5 @@ int main(int argc, char **argv, char **envp)
 
 int wshmain()
 {
-    main(1, &"wsh", environ);
+    return main(1, &"wsh", environ);
 }

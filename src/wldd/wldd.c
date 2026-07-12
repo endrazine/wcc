@@ -130,7 +130,7 @@ char* find_library_path(const char* libname) {
                 continue;
             }
             
-            char full_path[1024];
+            char full_path[1024+1];
             snprintf(full_path, sizeof(full_path), "%s/%s", line, libname);
             
             if (access(full_path, F_OK) == 0) {

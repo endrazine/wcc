@@ -116,7 +116,7 @@ int custom_add_symbol(char *symbol, char *libname, char *htype, char *hbind, uns
 int validate_elf(Elf64_Ehdr *hdr)
 {
         // Verify ELF signature
-        if (strncmp(hdr->e_ident, "\x7f\x45\x4c\x46", 4)) {
+        if (strncmp((char*)hdr->e_ident, "\x7f\x45\x4c\x46", 4)) {
                 return 1;
         }
 
@@ -155,13 +155,13 @@ void do_rel(Elf64_Shdr *shdr, const Elf64_Sym *syms, const char *strtab, const c
 			if (wsh->opt_verbose) {
 				printf("JUMP slot to: %p\n", (void *) resolve(sym));
 			}
-			*(Elf64_Word *) (dst + rel[j].r_offset) = (Elf64_Word) resolve(sym);
+			*(Elf64_Word *) (dst + rel[j].r_offset) = resolve(sym);
 			break;
 		case R_X86_64_GLOB_DAT:
 			if (wsh->opt_verbose) {
 				printf("GLOB DAT to: %p\n", (void *) resolve(sym));
 			}
-			*(Elf64_Word *) (dst + rel[j].r_offset) = (Elf64_Word) resolve(sym);
+			*(Elf64_Word *) (dst + rel[j].r_offset) = resolve(sym);
 			break;
 		}
 
@@ -324,7 +324,7 @@ void *parse_sym(unsigned int maxsyms, Elf64_Sym *symtab, const char *strtab, con
 		hbind = symbol_tobind(sbind);
 
 		if (wsh->opt_verbose) {
-			printf("[%03d] %08p %s %s %s\n", i, (void *) symtab[i].st_value, symtab[i].st_name + strtab, htype, hbind);
+			printf("[%03d] %p %s %s %s\n", i, (void *) symtab[i].st_value, symtab[i].st_name + strtab, htype, hbind);
 		}
 			custom_add_symbol((char*)(symtab[i].st_name + strtab), libname, htype, hbind, (unsigned long int)symtab[i].st_value, (unsigned int)symtab[i].st_size, (unsigned long int)ret);
 
@@ -433,7 +433,6 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 	char *raw = 0;
 	unsigned int nsyms = 0;
 	int scount = 0, scount2 = 0;
-//	char *text_base = 0;
 	symbols_t *s = 0;
 
 	Elf64_Shdr *shstrtab = 0;
@@ -487,7 +486,6 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 		start = elf_start + phdr[i].p_offset;
 		taddr = phdr[i].p_vaddr + raw;
 		memmove(taddr, start, phdr[i].p_filesz);
-//		printf("*** SEGMENT: %p\n", taddr);
 		if (!(phdr[i].p_flags & PF_W)) {
 			// READ ONLY SEGMENT
 			mprotect((unsigned char *) taddr, phdr[i].p_memsz, PROT_READ);
@@ -496,13 +494,8 @@ void *elf_load(char *elf_start, unsigned int size, char *libname)
 		if (phdr[i].p_flags & PF_X) {
 			// EXECUTABLE SEGMENT
 			mprotect((unsigned char *) taddr, phdr[i].p_memsz, PROT_EXEC | PROT_READ);
-//			if(!text_base) {
-//				text_base = taddr;
-//				printf(" **** TEXT BASE: %p\n", text_base);
-//			}
 		}
 	}
-
 
 	// Load dynamic symbols
 	shdr = (Elf64_Shdr *) (elf_start + hdr->e_shoff);
@@ -578,8 +571,6 @@ int userland_load_binary(char *fname)
 	int fd = 0;
 	struct stat sb;
 	char *map = 0;
-	Elf32_Ehdr *ehdr32;
-	Elf64_Ehdr *ehdr64;
 
 	printf(" ** attempting to load %s using userland loader\n", fname);
 

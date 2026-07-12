@@ -354,7 +354,7 @@ int fix_relocations_sections64(char *map)
 		// Find Dynamic Symbol Table
 		if (shdr64[i].sh_type == SHT_DYNSYM) {
 			sym64 = map + shdr64[i].sh_offset;
-			char *dynstr = map + shdr64[i+1].sh_offset;			
+//			char *dynstr = map + shdr64[i+1].sh_offset;			
 			for (j = 0; j < (shdr64[i].sh_size / sizeof(Elf64_Sym)); j++) {
 
 				if (j == sym_to_patch[k]) {

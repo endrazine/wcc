@@ -630,7 +630,7 @@ int rd_symbols(ctx_t *ctx)
 	/**
 	* Process dynamic symbol table
 	*/
-      dynsym:
+dynsym:
 	if (symbol_table) {
 		free(symbol_table);
 	}
@@ -677,7 +677,7 @@ int rd_symbols(ctx_t *ctx)
 			continue;
 		}
 	}
-      out:
+out:
 	if (symbol_table) {
 		free(symbol_table);
 	}
@@ -791,13 +791,13 @@ int rd_pe_symbols(ctx_t *ctx)
 	ret = 1;
 	goto cleanup;
 
-      cleanup_and_try_regular:
+cleanup_and_try_regular:
 	if (symbol_table) {
 		free(symbol_table);
 		symbol_table = NULL;
 	}
 
-      try_regular_symtab:
+try_regular_symtab:
 	/**
 	* Try regular symbol table as fallback
 	*/
@@ -852,7 +852,7 @@ int rd_pe_symbols(ctx_t *ctx)
 		}
 	}
 
-      cleanup:
+cleanup:
 	if (symbol_table) {
 		free(symbol_table);
 	}
@@ -979,7 +979,7 @@ int rd_macho_symbols(ctx_t *ctx)
 
 	ret = 1;
 
-      dynsym:
+dynsym:
 	if (symbol_table) {
 		free(symbol_table);
 	}
@@ -1013,7 +1013,6 @@ int rd_macho_symbols(ctx_t *ctx)
 		}
 	}
 
-      out:
 	if (symbol_table) {
 		free(symbol_table);
 	}
@@ -1067,7 +1066,7 @@ msec_t *section_from_name(ctx_t *ctx, char *name)
 /**
 * Return a section from its address
 */
-    msec_t * section_from_addr(ctx_t *ctx, unsigned long int addr)
+msec_t * section_from_addr(ctx_t *ctx, unsigned long int addr)
 {
 	msec_t *s = 0;
 
@@ -1423,7 +1422,7 @@ int create_phdrs(ctx_t *ctx)
 int merge_phdrs(ctx_t *ctx)
 {
 	mseg_t *ms = 0, *n = 0;
-      retry:
+retry:
 	ms = ctx->mphdrs;
 	while (ms) {
 		if (ms->next) {
@@ -1449,7 +1448,7 @@ int merge_phdrs(ctx_t *ctx)
 			goto retry;
 
 		}
-	      skipseg:
+skipseg:
 		ms = (mseg_t *) ms->next;
 	}
 	return 0;
@@ -1797,7 +1796,7 @@ static int fix_symtab_bindings(ctx_t *ctx)
 {
 	char *sname = 0;
 	Elf_Sym *s = 0;
-	unsigned int i = 0, sindex = 0;
+	unsigned int sindex = 0;
 	char sclass = 0;
 
 	if (!globalsymtab) {
@@ -2353,11 +2352,6 @@ static int create_section_symbols(ctx_t *ctx)
 
 	deltastrtab = globalstrtablen;
 
-/*	if (ctx->opt_debug) {
-		printf(" -- Base sections symbol index: %u\n", 0);
-		printf(" -- Delta string table: %u\n", deltastrtab);
-	}
-*/
 	return 0;
 }
 
@@ -2454,12 +2448,8 @@ static unsigned int process_data_rel_ro(ctx_t *ctx)
 				create_rela_data_rel_ro_local_entry(2 /* .rodata */, i, val - rodata->s_elf->sh_offset);
 
 				memset(t->data + i, 0x00, 8);	// overwrite pointer with a Null value
-
-//			} else if ((val >= datavma)&&(val <= datavma + maxdata - mindata)) {
-//				printf("[%04u] %lx in [%lx ; %lx] (data)\n",i, val, datavma, datavma + maxdata - mindata);
 			}			
 		}
-
 		
 	}
 
@@ -2507,7 +2497,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 		rela_data_rel_ro_local_offset = tmpm;
 		write(ctx->fdout, rela_data_rel_ro_local, rela_data_rel_ro_local_len);
 		tmpm = lseek(ctx->fdout, 0x00, SEEK_END);
-
 
 		// align on 8 bytes boundaries
 		if ((tmpm % 8) == 0) {
@@ -2616,8 +2605,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	ctx->shnum++;
 	maxsec++;
 	ctx->strndx_index = ctx->shnum + 1;
-	// append sections string table to binary
-	//write(ctx->fdout, ctx->strndx, ctx->strndx_len);
 
 	/**
 	* Add a section header for relocations
@@ -2626,7 +2613,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	memcpy(ctx->strndx + ctx->strndx_len, ".rela.all", 10);
 
 	shdr = calloc(1, sizeof(Elf_Shdr));
-
 	shdr->sh_name = ctx->strndx_len;		// index in string table
 	shdr->sh_type = SHT_RELA;			// Section type
 	shdr->sh_flags = 2;				// Section flags
@@ -2645,8 +2631,6 @@ static unsigned int write_shdrs(ctx_t *ctx)
 	free(shdr);
 
 	ctx->strndx_index = ctx->shnum + 1;
-	// append sections string table to binary
-	//  write(ctx->fdout, ctx->strndx, ctx->strndx_len);
 
 	/**
 	* Add a section header for .data relocations
@@ -2914,6 +2898,7 @@ static int rd_extended_data(ctx_t *ctx)
 		printf(" index\t\tname\t\t\trange\tsize\tpermissions\toffset\n");
 		printf("--------------------------------------------------------------------\n");
 	}
+
 	s = ctx->abfd->sections;
 	for (i = 0; i < ctx->shnum; i++) {
 		perms = parse_bfd_perm(s->flags);
@@ -2936,6 +2921,7 @@ static int rd_extended_data(ctx_t *ctx)
 	if (ctx->opt_debug) {
 		printf(" --> .data future boundaries: offset:%lu sz:%lu vma:%lx\n\n", mindata, maxdata - mindata, datavma);
 	}
+
 	return 0;
 }
 
@@ -2947,12 +2933,10 @@ static int extend_text(ctx_t *ctx)
 	unsigned int i = 0;
 	asection *s = 0;
 	char const *target = NULL;
-	int is_pe64 = 0, is_pe32 = 0, is_macho = 0;
+	int is_macho = 0;
 
 	target = bfd_get_target(ctx->abfd);
 
-	is_pe64 = (strcmp(target, "pe-x86-64") == 0 || strcmp(target, "pei-x86-64") == 0);
-	is_pe32 = (strcmp(target, "pe-i386") == 0 || strcmp(target, "pei-i386") == 0 || strcmp(target, "pe-arm-wince-little") == 0 || strcmp(target, "pei-arm-wince-little") == 0);
 	is_macho = (strstr(target, "mach-o") != NULL);
 
 	if(is_macho){
@@ -3096,11 +3080,9 @@ unsigned int open_best(ctx_t *ctx)
 	formatok = bfd_check_format(ctx->abfd, bfd_object);
 	if (!formatok) {
 		fprintf(stderr, " !! WARNING: bfd_check_format() failed : %s\n", bfd_errmsg(bfd_get_error()));
-//        }else{
-//              printf("Fileformat ok: %x\n", formatok);
 	}
-	ok = bfd_check_format_matches(ctx->abfd, bfd_object, &matching);
 
+	ok = bfd_check_format_matches(ctx->abfd, bfd_object, &matching);
 	if (!ok) {
 		fprintf(stderr, " !! WARNING: bfd_check_format_matches() failed : %s\n", bfd_errmsg(bfd_get_error()));
 
@@ -3120,12 +3102,6 @@ unsigned int open_best(ctx_t *ctx)
 
 			goto retry;
 		}
-
-		//        }else{
-//              printf(" -- matching formats:\n");
-//                list_matching_formats(matching);
-//                printf(" -- BFD parsing: ok\n");        
-//                printf(" -- arch size: %u\n", bfd_get_arch_size(ctx->abfd));
 	}
 
 	ctx->shnum = bfd_count_sections(ctx->abfd);
@@ -3467,8 +3443,6 @@ int patch_symbol_index(ctx_t *ctx, Elf_Sym *s)
 	if (sec) {
 		// patch section index in symbol table
 		s->st_shndx = secindex_from_name_after_strip(ctx, sec->name);
-	} else {
-//              printf(" no section info for symbol: %s\n", sname);
 	}
 
 	return 0;
@@ -3734,11 +3708,9 @@ int save_data_reloc(ctx_t *ctx, Elf_Rela *r, unsigned int sindex, int has_addend
 {
 	Elf_Sym *s = 0;
 	char *sname = 0;
-	unsigned int i = 0;
 
-	int rtype = 0, outtype = 0;
+	int outtype = 0;
 	char *htype = 0;
-	msec_t *sec = 0;
 
 	Elf_Rela *rout = 0;
 
@@ -4060,7 +4032,6 @@ static int create_text_data_reloc(ctx_t *ctx, cs_insn *ins, msec_t *m, unsigned 
 			for (wheretowrite = 0; wheretowrite <= ins->size; wheretowrite++) {
 				unsigned int searchval = x86->operands[0].mem.disp;
 				if (!memcmp(t->data + (ins->address - textvma + wheretowrite), &searchval, 4)) {
-//                                      printf(" * patching instruction at offset: %u addend: %d relative:%d\n", wheretowrite, soff, rip_relative ? rip_relative : 0);
 					break;
 				}
 			}
@@ -4076,9 +4047,7 @@ static int create_text_data_reloc(ctx_t *ctx, cs_insn *ins, msec_t *m, unsigned 
 		if (rip_relative) {	// compute new addend and set reloc type
 			cs_x86_op *op = &(x86->operands[argnum]);
 
-			r->r_addend = ((op->mem.disp) + ins->address) - m->s_bfd->vma + ins->size - 4;	// TODO   // (rip + (immediate|displacement)) - m->s_bfd->vma;    // dst - (section vma)
-//                      printf("* new rip based addend : %llx\n", r->r_addend);
-
+			r->r_addend = ((op->mem.disp) + ins->address) - m->s_bfd->vma + ins->size - 4;
 			newtype = R_X86_64_PC32;
 
 		} else {
@@ -4090,24 +4059,13 @@ static int create_text_data_reloc(ctx_t *ctx, cs_insn *ins, msec_t *m, unsigned 
 
 		if ((argnum == 0) && (rip_relative)) {	// write at custom location
 			memset(t->data + r->r_offset, 0x00, 4);	// write back where computed previously
-//                      r->r_addend = -4;
 		} else if (rip_relative) {	// patch back register index (from rip to 0x00)
 			memset(t->data + r->r_offset, 0x00, 4);	// write back 4 bytes (one 32b address) + 1 if relative (overwrite rip)
-//                      r->r_addend = 0;//0x29a;
 		} else if (ELFMACHINE == EM_386) {	// R_386_32 doesn't account for the addend : write it back to .text
 			memcpy(t->data + r->r_offset, &soff, 4);
 		} else {
 			memset(t->data + r->r_offset, 0x00, 4);	// write back 4 bytes (one 32b address) + 1 if relative (overwrite rip)
 		}
-/**
-* FIXED : Problem : http://fossies.org/linux/glibc/sysdeps/x86_64/dl-machine.h line 452 : possible overflow in relocation amd64 when using type R_X86_64_32 : should be fixed
-*
-*/
-
-//              if (ctx->opt_verbose) {
-//                      printf("%"PRIx64"\t%s+0x%lx\t\t\t(%s %s)\n",ins->address, m->name, soff, ins->mnemonic, ins->op_str);
-//                      printf("%012lx\t%012lx\t%s\t%s+%u\n", r->r_offset, r->r_info, reloc_htype(newtype), m->name, soff);
-//              }
 
 		// append relocation
 		append_reloc(r);
@@ -4183,14 +4141,10 @@ static void parse_text_data_reloc(ctx_t *ctx, csh ud, cs_mode mode, cs_insn *ins
 
 					if ((str_eq(ins->mnemonic, "call"))
 					    && (str_eq(m->name, ".text"))) {
-//                                                      printf(" --> call to internal function at %lx\n", op->imm);
 						internal_function_store(ctx, op->imm);
 					} else {
-// TODO instrument internal/cross sections jumps and calls
-//                                                      printf("We have a problem: (dst section: %s)\n", m->name);
-//                                                      printf("0x%llx %s %s\n", ins->address, ins->mnemonic, ins->op_str);
+						// TODO instrument internal/cross sections jumps and calls
 					}
-
 				}
 			}
 			break;
@@ -4212,15 +4166,13 @@ static void parse_text_data_reloc(ctx_t *ctx, csh ud, cs_mode mode, cs_insn *ins
 			    && (!str_eq(m->name, ".text") || ctx->has_relativerelocations)
 			    && (cs_reg_name(ud, op->mem.base))
 			    && (str_eq(cs_reg_name(ud, op->mem.base), "rip"))) {
-//                                      printf(" * handling 1st arg access : %llx %s %s (%s)\n",ins->address, ins->mnemonic, ins->op_str, m ? m->name : "-");
 				create_text_data_reloc(ctx, ins, m, op->mem.disp + ins->address - m->s_bfd->vma, 1, i);	// Addressing is rip relative
 				break;
 			}
 
 			break;
 
-		case X86_OP_REG:
-//                      case X86_OP_MEM:
+//		case X86_OP_REG:
 		default:
 			break;
 		}

@@ -151,8 +151,12 @@ void init_struct2c(lua_State * L);
 #endif
 
 #if defined(__i386__) || defined(__amd64__)
+#ifndef REG_EFL
 #define REG_EFL 0
+#endif
+#ifndef REG_ERR
 #define REG_ERR 0
+#endif
 #endif
 
 #ifdef __LP64__ // Generic 64b
@@ -666,12 +670,9 @@ void completion(const char *buf, linenoiseCompletions * lc)
 				}
 			}
 
-
 		} else {	// There is more than one word in this command
-//TODO
-
+				//TODO
 		}
-//              linenoiseAddCompletion(lc, buf);
 		break;
 	}
 
@@ -1361,16 +1362,6 @@ const char* indirect_function_names[] = {
 	NULL
 };
 
-/**
-* Helper function
-*/
-/*
-uintptr_t find_libc_base() {
-    uintptr_t libc_pointer;
-    for(libc_pointer = (uintptr_t)printf & (~0xFFF); *(uint32_t*)libc_pointer != 0x464c457f; libc_pointer-=0x1000);
-    return libc_pointer;
-}
-*/
 #define MAX_NUM_IMPL 256
 
 //From "include/ifunc-impl-list.h"
@@ -1444,9 +1435,8 @@ int load_indirect_functions(lua_State * L)
         }
     }
 
-    return 0;
-
 	return 0;
+	return retv;
 }
 
 /**
@@ -1799,7 +1789,7 @@ int print_objects(lua_State *L)
 		}
 	}
 
-      cleanup:
+cleanup:
 	printf("\n");
 	printf(" -- %u objects matched\n", scount);
 	return 0;
@@ -2018,10 +2008,6 @@ int man(lua_State * L)
 /**
 * Display information on an object/memory address
 */
-/**
- * Display information on an object/memory address
- * Enhanced to accept: string (function name), number (address), or function object
- */
 int info(lua_State *L)
 {
 	void *symbol = 0;
@@ -2138,14 +2124,14 @@ int info(lua_State *L)
 
 						// Show address if it looks valid
 						if (sym->addr > 0x10000) {
-							printf(" * at address: 0x%llx\n", sym->addr);
+							printf(" * at address: 0x%lx\n", sym->addr);
 
 							sections_t *sec = section_from_addr(sym->addr);
 							if (sec) {
 								printf(" * within %s:%s  %s\n", sec->libname, sec->name, sec->perms);
 							}
 						} else if (sym->addr > 0) {
-							printf(" * offset in file: 0x%llx\n", sym->addr);
+							printf(" * offset in file: 0x%lx\n", sym->addr);
 						}
 					} else {
 						printf(" * Symbol not found in symbol table\n");
@@ -2224,6 +2210,7 @@ int info(lua_State *L)
 
 	return 0;
 }
+
 /**
 * Buffer management subroutines
 */
@@ -2321,7 +2308,6 @@ static int incomplete(lua_State *L, int status)
 	if (status == LUA_ERRSYNTAX) {
 		size_t lmsg;
 		const char *msg = lua_tolstring(L, -1, &lmsg);
-		const char *tp = msg + lmsg - (sizeof("<eof>") - 1);
 		if (strstr(msg, "<eof>") != NULL) {
 			lua_pop(L, 1);
 			return 1;
@@ -2542,7 +2528,6 @@ int run_shell(lua_State *L)
 */
 int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason)
 {
-	char *vreason = 0;
 	char *tag = 0;
 	long int offset = 0;
 	unsigned int i = 0;
@@ -2555,15 +2540,12 @@ int learn_proto(unsigned long*arg, unsigned long int faultaddr, int reason)
 	if(faultaddr > 0xf000000000000000) { return 0; }	// Address out of userland
 	switch(reason){
 	case 1:	// read
-		vreason = "read";
 		tag = "_input_ptr";
 		break;
 	case 2: // write
-		vreason = "write";
 		tag = "_output_ptr";
 		break;
 	case 4: // Exec
-		vreason = "exec";
 		tag = "_exec_ptr";
 		break;
 	default:
@@ -2884,47 +2866,9 @@ static int libcall(lua_State * L)
 	if (!wsh->errcontext) {
 		wsh->errcontext = calloc(1, sizeof(ucontext_t));
 	}
-//	if (!wsh->initcontext) {
-//		wsh->initcontext = calloc(1, sizeof(ucontext_t));
-//	}
 
 	memset(wsh->errcontext, 0x00, sizeof(ucontext_t));
 
-//	save_context(wsh->initcontext);	// this is saved to initcontext
-
-	/**
-	* Handle (reverse-) system calls tracing
-	*/
-/*	pid_t parent = 0;
-	pid_t child = 0;
-	if((wsh->trace_strace)||(wsh->trace_rtrace)){
-		enable_trace();
-		parent = getpid();
-		child = fork();
-		enable_trace();
-
-		if (child == 0) {	// child process
-			if(wsh->trace_rtrace){
-			        return do_tracer(parent, syscall);
-			}else{
-//			        return do_tracee(argc-push, argv+push);
-				printf(" -- tracee pid:%d\n", getpid());
-//				kill(getpid(), SIGSTOP);
-				goto do_tracee;
-			}
-		} else {		// parent process
-			if(wsh->trace_rtrace){
-//			        return do_tracee(argc-push-1, argv+push+1);
-				printf(" -- tracee2 pid:%d\n", getpid());
-//				kill(getpid(), SIGSTOP);
-				goto do_tracee;
-			}else{
-		        	return do_tracer(child, syscall);
-			}
-		}
-	}
-*/
-//do_tracee:
 	/**
 	* Make the library call
 	*/
@@ -2957,7 +2901,6 @@ static int libcall(lua_State * L)
 
 		ret = f(arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8]);
 	}else{
-//		printf(" + Restored shell execution\n");
 		ret = -1;
 	}
 	unsigned int n = 0, j = 0, notascii = 0;
@@ -2992,6 +2935,10 @@ static int libcall(lua_State * L)
 	/**
 	* Analyse return value
 	*/
+	if(ret == 0){
+		lua_pushinteger(L, ret);	// Push as a number
+		goto skipmsync;	
+	}
 	n = !msync((long int)ret & (long int)~0xfff, 4096, 0);
 	notascii = 0;
 	if (n) {
@@ -3020,6 +2967,7 @@ static int libcall(lua_State * L)
 		lua_pushinteger(L, ret);	// Push as a number
 	}
 
+skipmsync:
 	if (callerrno) {
 		fprintf(stderr, "ERROR: %s (%u)\n", strerror(callerrno), callerrno);
 	}
@@ -3246,10 +3194,7 @@ static int libcall(lua_State * L)
 		lua_settable(L, -3);
 	}
 
-
-
-//* This function returns 9 values: ret (returned by library call), errno, firstsignal, total number of signals, firstsicode, firsterrno, faultaddr, reason, context
-
+	// This function returns 9 values: ret (returned by library call), errno, firstsignal, total number of signals, firstsicode, firsterrno, faultaddr, reason, context
 
 	/**
 	* Invoke store running function on context
@@ -3295,7 +3240,6 @@ int luabuff_append(char *cmd){
 	*/
 	strcat(wsh->luabuff, cmd);
 
-//printf("Appending %s\n", cmd);
 	return 0;
 }
 
@@ -4013,7 +3957,7 @@ int procmap_lua(void)
 
 int execlib(lua_State * L)
 {
-	int ret = 0;
+//	int ret = 0;
 	int child = 0;
 	int status = 0;
 	int pid = 0;
@@ -4023,7 +3967,8 @@ int execlib(lua_State * L)
 	if (child == 0) {	// child
 		ptrace(PTRACE_TRACEME, 0, 0, 0);
 
-		ret = libcall(L);
+//		ret = libcall(L);
+		libcall(L);
 		_Exit(EXIT_SUCCESS);
 	} else if (child == -1) {
 		fprintf(stderr, "ERROR: fork() : %s\n", strerror(errno));
@@ -4227,21 +4172,6 @@ void btr_disable(int procnum)
 
 inline void set_branch_flag(void)
 {
-/*
-//
-// The following code only works in ring0
-//
-
-	// Enable LBR
-	asm(".intel_syntax noprefix;"
-	"xor rdx, rdx;"
-	"xor rax, rax;"
-	"inc rax;"
-	"mov rcx, 0x1d9;"
-	"wrmsr;"
-	);
-*/
-
 	// set affinity to processor MY_CPU
 	affinity(MY_CPU);
 
@@ -4366,27 +4296,12 @@ void restore_exit(void)
 	errno = ECANCELED;
 	longjmp(wsh->longjmp_ptr, 1);
 }
-/*
-void exit(int status)
-{
-	fprintf(stderr, " + Called exit(%d), restoring...\n", status);
-	restore_exit();
-}
 
-//#if defined(__i386__) || defined(__amd64__)
-void _exit(int status)
-{
-	fprintf(stderr, " + Called _exit(%d), restoring...\n", status);
-	restore_exit();
-}
-//#endif
-*/
 void exit_group(int status)
 {
 	fprintf(stderr, " + Called exit_group(%d), restoring...\n", status);
 	restore_exit();
 }
-
 
 int printarg(unsigned long int val)
 {
@@ -4416,7 +4331,6 @@ void traphandler(int signal, siginfo_t * s, void *ptr)
 	unsigned int i = 0;
 	char *ptrd = 0x00;
 	ucontext_t *u = 0;
-	unsigned int fault = 0;
 	char *hfault = 0;
 	char *signame = 0;
 
@@ -4550,13 +4464,10 @@ void traphandler(int signal, siginfo_t * s, void *ptr)
 		* This is an unhandled exception : exit
 		*/
 		if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
-			fault = FAULT_WRITE;	// Write fault
 			hfault = "WRITE";
 		} else if (s->si_addr == (void *)u->uc_mcontext.gregs[REG_RIP]) {
-			fault = FAULT_EXEC;	// Exec fault
 			hfault = "EXEC";
 		} else {
-			fault = FAULT_READ;	// Read fault
 			hfault = "READ";
 		}
 		signame = signaltoname(signal);
@@ -4703,7 +4614,6 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	char *accesscolor = "";
 
 #if defined(__i386__) || defined(__amd64__)
-//#if defined(__toto__)
 	/**
 	* Get access type
 	*/
@@ -5115,7 +5025,6 @@ int ralloc(lua_State * L)
 	unsigned char poison = 0;
 	unsigned long int ret = 0;
 	char *ptr = 0;
-//	unsigned long int *ptr2 = 0;
 	unsigned int sz = 0;
 	unsigned long int baseaddr = 0;
 
@@ -5341,8 +5250,6 @@ void unsinglebranch(lua_State * L)
 */
 int grepptr(lua_State * L)
 {
-//	char *ptr = 0;
-//	unsigned long int maxlen = 0, i = 0;
 	char *match = 0;
 	int count = 1;
 	unsigned int dumplen = 200;
@@ -5405,9 +5312,6 @@ int grepptr(lua_State * L)
 //		s = s->next;
 	}
 
-	// Push number of results as lua return variable
-//	lua_pushinteger(L, count);
-
 	return 1;
 }
 
@@ -5436,8 +5340,6 @@ int loadbin(lua_State * L)
 */
 int grep(lua_State * L)
 {				// Pattern, patternlen, hexadumplen, nbytesbeforematch
-//	char *ptr = 0;
-//	unsigned int maxlen = 0, i = 0;
 	char *match = 0;
 	int count = 0;
 	char *pattern = 0;
@@ -5494,9 +5396,6 @@ int grep(lua_State * L)
 			}
 		}
 	}
-
-	// Push number of results as lua return variable
-//	lua_pushinteger(L, count);
 
 	return 1;
 }
@@ -5562,8 +5461,6 @@ int priv_strcpy(lua_State * L)
 int priv_strcat(lua_State * L)
 {
 	void *arg1 = 0, *arg2 = 0;
-//	char *ptr = 0;
-//	char *addr = 0;
 	int ret = 0;
 
 	read_arg1(arg1);
@@ -5892,7 +5789,7 @@ unsigned int read_archive_sig(char *fname, struct stat *sb)
 {
 	int fd = 0;
 	char sig[10];
-//	char validelf[4] = "\177ELF";
+
 	if (sb->st_size < 20) {
 		return 0;	// Failure
 	}
@@ -6134,7 +6031,7 @@ char *ar2lib(char *name)
 	memset(cmd, 0x00, 1024);
 	snprintf(cmd, 1023, "/tmp/.wsh-%u/%s.so", getpid(), basename(name));
 
-	if(verbose){
+	if(wsh->opt_verbose){
 		printf(" -- relinked static library (ar archive) %s into dynamic shared library %s\n", name, cmd);	
 	}
 	return strdup(cmd);

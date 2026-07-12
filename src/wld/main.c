@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 	while (1) {
 
 		c = getopt_long(argc, argv, "lnNsS", long_options, &option_index);
-		if ((c == 0xff)||(c == -1)) {
+		if (c == -1) {
 			break;
 		}
 
