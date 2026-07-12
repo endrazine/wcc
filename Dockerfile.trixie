@@ -1,0 +1,17 @@
+#
+# Dockerfile : build WCC under Debian 13 (Trixie)
+#
+
+FROM debian:trixie
+
+WORKDIR /root
+
+# Clean and update package lists
+RUN apt-get clean && apt-get update && apt-get upgrade -y
+
+RUN apt-get install -y --no-install-recommends libbfd-dev uthash-dev libelf-dev libcapstone-dev  libreadline-dev libiberty-dev libgsl-dev build-essential git debootstrap file nano xxd ca-certificates cargo
+
+# Build wcc & install it
+RUN git clone https://github.com/endrazine/wcc.git && cd wcc && git submodule init && git submodule update && make && make install
+
+
