@@ -1,0 +1,17 @@
+--
+-- Regression driver for on-disk .symtab name resolution.
+--
+-- libstatic.so's globals are file-local (static), present only in .symtab.
+-- rescan() (via loadbin) merges the on-disk .symtab, so globals_show() should
+-- name them (s_counter / s_bss) rather than printing <section+offset>.
+--
+-- Copyright 2016-2026 Jonathan Brossard. MIT License.
+--
+
+loadbin("./libstatic.so")
+
+globals_trace()
+touch()                 -- reads+writes s_counter (.data) and s_bss (.bss)
+globals_show()
+
+exit(0)

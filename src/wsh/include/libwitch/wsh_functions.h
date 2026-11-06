@@ -60,6 +60,13 @@ char *default_options[] = {
 "appear",
 "autoscan",
 "bsspolute",
+"globals_trace",
+"globals_untrace",
+"globals_poison",
+"globals_unpoison",
+"globals_show",
+"globals_reify",
+"globals_addr",
 "dumptable",
 "dt",
 "symbols",
@@ -101,6 +108,10 @@ char *default_options[] = {
 "rescan",
 "procmap",
 "prototypes",
+"prototypes_c",
+"load_symtab",
+"lsyscall",
+"syscall",
 "testlib",
 "testfunc",
 "grep",
@@ -133,7 +144,12 @@ char *default_options[] = {
 "arch_info",
 "arch_list",
 "ptr2struct",
-"load_struct_def"
+"load_struct_def",
+"eflags_get",
+"eflags_set",
+"fsbase_get",
+"gsbase_get",
+"kcontext"
 };
 
 // All lua 5.3 Functions and global variables
@@ -363,6 +379,10 @@ tuple_t exposed[] = {
 {xalloc,"xalloc"},
 {xfree,"xfree"},
 {prototypes,"prototypes"},
+{prototypes_c,"prototypes_c"},
+{load_symtab,"load_symtab"},
+{lsyscall,"lsyscall"},
+{lsyscall,"syscall"},
 {traceunaligned,"utrace"},
 {untraceunaligned,"unutrace"},
 {singlestep,"sstrace"},
@@ -376,6 +396,13 @@ tuple_t exposed[] = {
 {verbosetrace,"vtrace"},
 {unverbosetrace,"unvtrace"},
 {bsspolute,"bsspolute"},
+{globalstrace,"globals_trace"},
+{unglobalstrace,"globals_untrace"},
+{globalspoison,"globals_poison"},
+{unglobalspoison,"globals_unpoison"},
+{globals_show,"globals_show"},
+{globals_reify,"globals_reify"},
+{globals_addr,"globals_addr"},
 {priv_memcpy,"memcpy"},
 {priv_strcpy,"strcpy"},
 {priv_strcat,"strcat"},
@@ -408,7 +435,12 @@ tuple_t exposed[] = {
 {arch_info, "arch_info"},
 {arch_list, "arch_list"},
 {load_struct_def, "load_struct_def"},
-{ptr2struct, "ptr2struct"}
+{ptr2struct, "ptr2struct"},
+{eflags_get,"eflags_get"},
+{eflags_set,"eflags_set"},
+{fsbase_get,"fsbase_get"},
+{gsbase_get,"gsbase_get"},
+{kcontext,"kcontext"}
 };
 
 range_t ranges[] = {

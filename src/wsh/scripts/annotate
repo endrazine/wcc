@@ -12,8 +12,10 @@
 	arg3r = ralloc(100,0x43); 
 	arg4r = ralloc(100,0x44); 
 	arg5r = ralloc(100,0x45); 
-	arg6r = ralloc(100,0x46); 
+	arg6r = ralloc(100,0x46);
 
+	bargs = {string.rep("Z", 1025), string.rep("Y", 1025), string.rep("X", 1025), string.rep("W", 1025), string.rep("V", 1025), string.rep("U", 1025), string.rep("T", 1025), string.rep("S", 1025), string.rep("R", 1025)}
+	bargv = lua2c(bargs, "char*")
 
 
 function swap(array, index1, index2)
@@ -33,16 +35,16 @@ function fuzzargs(a,b,c,d,e,f, seed, rate)
 --	math.randomseed(seed)
 --	math.randomseed(os.time())
 
-	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, 2, 5, 13, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s" }
+	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, 2, 5, 13, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv }
 
 	aout,bout,cout,dout,eout,fout = a,b,c,d,e,f
 
-	if math.random(100) < rate then aout = rargs[math.random(40)]; end
-	if math.random(100) < rate then bout = rargs[math.random(40)]; end
-	if math.random(100) < rate then cout = rargs[math.random(40)]; end
-	if math.random(100) < rate then dout = rargs[math.random(40)]; end
-	if math.random(100) < rate then eout = rargs[math.random(40)]; end
-	if math.random(100) < rate then fout = rargs[math.random(40)]; end
+	if math.random(100) < rate then aout = rargs[math.random(41)]; end
+	if math.random(100) < rate then bout = rargs[math.random(41)]; end
+	if math.random(100) < rate then cout = rargs[math.random(41)]; end
+	if math.random(100) < rate then dout = rargs[math.random(41)]; end
+	if math.random(100) < rate then eout = rargs[math.random(41)]; end
+	if math.random(100) < rate then fout = rargs[math.random(41)]; end
 
 	return aout,bout,cout,dout,eout,fout
 end
@@ -55,6 +57,7 @@ function annotate(fun,a,b,c,d,e,f, seed, rate)
 	-- Make the call, with a max timeout
 	ret,ctx=fun(a,b,c,d,e,f)
 
+--	dtt(ctx)
 --	storerun(ctx)
 --	alarm(0);
 end

@@ -1,0 +1,27 @@
+--
+-- Example + regression driver for wsh raw system calls (lsyscall).
+--
+-- Exercises the syscall call path: a no-arg syscall (getpid), a second
+-- no-arg syscall (getuid), a deliberately invalid syscall number (expect
+-- ENOSYS), and a pointer-argument syscall (uname) whose success is checked
+-- via its return value. run_test.sh verifies the output.
+--
+-- Syscall numbers are x86_64 (SYS_getpid=39, SYS_getuid=102, SYS_uname=63).
+--
+-- Copyright 2016-2026 Jonathan Brossard. MIT License.
+--
+
+p1, e1 = lsyscall(39)            -- getpid
+p2, e2 = lsyscall(39)            -- getpid again (must be stable)
+u,  eu = lsyscall(102)           -- getuid
+bad, eb = lsyscall(400000)       -- no such syscall -> -1 / ENOSYS(38)
+
+buf = balloc(512, 0)             -- writable region for uname's struct utsname*
+r,  er = lsyscall(63, buf)       -- uname(buf)
+
+print(string.format("getpid %d %d %s", p1, e1, tostring(p1 == p2 and p1 > 0)))
+print(string.format("getuid %d %d", u, eu))
+print(string.format("enosys %d %d", bad, eb))
+print(string.format("uname %d %d", r, er))
+
+exit(0)

@@ -7,8 +7,8 @@
 # This file is licensed under MIT License.
 #
 
-CC := gcc 
-CFLAGS := -W -Wall -Wextra 
+CC := gcc
+CFLAGS := -W -Wall -Wextra -Wno-int-conversion
 LDFLAGS := /usr/sbin/sshd
 
 all::

@@ -2433,7 +2433,7 @@ static unsigned int process_data_rel_ro(ctx_t *ctx)
 		printf(" -- No .rodata section found\n");	
 	} else {
 		printf(" -- Parsing section .data.rel.ro\n");
-		printf("-- .rodata boundaries: [%lx;%lx]\n", rodata->s_elf->sh_offset, rodata->s_elf->sh_offset + rodata->s_elf->sh_size);		
+		printf("-- .rodata boundaries: [%lx;%lx]\n", rodata->s_elf->sh_offset, rodata->s_elf->sh_offset + rodata->s_elf->sh_size);
 
 		// Rename .data.rel.ro to .data.rel.ro.local
 		t->name = strdup(".data.rel.ro.local");
@@ -3338,7 +3338,13 @@ static int read_section(ctx_t *ctx, asection *s)
 			n = s->size;
 			// initialized at 0x00 by calloc
 		} else if (n != s->size) {
-			printf("read failed: %u != %u\n", n, (unsigned int) s->size);
+			// Fallback: try bfd_get_section_contents() in case
+			// BFD can still read the section data internally
+			if (bfd_get_section_contents(ctx->abfd, s, buf, 0, s->size)) {
+				n = s->size;
+			} else {
+				printf("read failed: %u != %u\n", n, (unsigned int) s->size);
+			}
 		}
 	}
 
@@ -4495,6 +4501,121 @@ int strip_binary_reloc(ctx_t *ctx)
 /**
 * Main routine
 */
+/**
+* Fixup BFD section metadata from ELF headers using libelf.
+*
+* On some toolchains (e.g. Ubuntu 26.04 / GCC 15 / binutils 2.44+),
+* BFD may report incorrect filepos and vma values for sections in
+* stripped executables. This function reads the actual ELF section
+* headers via libelf and patches BFD's asection structures with the
+* correct sh_offset, sh_addr, and sh_size values.
+*
+* This must be called after load_binary() and before any function
+* that reads s->filepos (print_bfd_sections, rd_extended_text, etc).
+*/
+static int fixup_bfd_sections_from_elf(ctx_t *ctx)
+{
+	Elf *elf = NULL;
+	Elf_Scn *scn = NULL;
+	GElf_Shdr shdr;
+	int fd = 0;
+	struct stat sb;
+	size_t shstrndx = 0;
+	char *sname = NULL;
+	asection *s = NULL;
+	unsigned int i = 0;
+	int needs_fixup = 0;
+	off_t filesize = 0;
+
+	/* First, check if fixup is needed: see if any BFD section has
+	   a filepos beyond the actual file size */
+	fd = open(ctx->binname, O_RDONLY);
+	if (fd < 0) {
+		return -1;
+	}
+	if (fstat(fd, &sb) < 0) {
+		close(fd);
+		return -1;
+	}
+	filesize = sb.st_size;
+
+	s = ctx->abfd->sections;
+	for (i = 0; i < ctx->shnum; i++) {
+		if ((off_t)s->filepos >= filesize && s->size > 0) {
+			needs_fixup = 1;
+			break;
+		}
+		s = s->next;
+	}
+
+	if (!needs_fixup) {
+		close(fd);
+		return 0;  /* BFD metadata looks sane, nothing to do */
+	}
+
+	if (ctx->opt_verbose) {
+		printf(" -- BFD section metadata appears incorrect, applying libelf fixup\n");
+	}
+
+	/* Initialize libelf and open the binary */
+	elf_version(EV_CURRENT);
+
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (!elf) {
+		printf("warning: fixup_bfd_sections_from_elf: elf_begin() failed\n");
+		close(fd);
+		return -1;
+	}
+
+	if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
+		printf("warning: fixup_bfd_sections_from_elf: no .shstrtab\n");
+		elf_end(elf);
+		close(fd);
+		return -1;
+	}
+
+	/* For each BFD section, find the matching ELF section by name
+	   and patch filepos, vma, and size */
+	s = ctx->abfd->sections;
+	for (i = 0; i < ctx->shnum; i++) {
+		/* Search ELF sections for a name match */
+		scn = NULL;
+		while ((scn = elf_nextscn(elf, scn)) != NULL) {
+			if (gelf_getshdr(scn, &shdr) == NULL) {
+				continue;
+			}
+			sname = elf_strptr(elf, shstrndx, shdr.sh_name);
+			if (sname == NULL) {
+				continue;
+			}
+			if (strcmp(s->name, sname) == 0) {
+				/* Found matching section — patch BFD metadata */
+				if (ctx->opt_verbose) {
+					printf("    fixup %-20s: filepos %lx -> %lx, vma %lx -> %lx, size %lx -> %lx\n",
+						s->name,
+						(unsigned long)s->filepos, (unsigned long)shdr.sh_offset,
+						(unsigned long)s->vma, (unsigned long)shdr.sh_addr,
+						(unsigned long)s->size, (unsigned long)shdr.sh_size);
+				}
+				s->filepos = shdr.sh_offset;
+				s->vma = shdr.sh_addr;
+				s->size = shdr.sh_size;
+				break;
+			}
+		}
+		s = s->next;
+	}
+
+	elf_end(elf);
+	close(fd);
+
+	if (ctx->opt_verbose) {
+		printf("\n");
+	}
+
+	return 0;
+}
+
 unsigned int libify(ctx_t *ctx)
 {
 	char const *target = NULL;
@@ -4510,6 +4631,12 @@ unsigned int libify(ctx_t *ctx)
 	* Load each section of binary using bfd
 	*/
 	load_binary(ctx);
+
+	/**
+	* Fixup BFD section metadata from ELF headers (needed for
+	* toolchains where BFD reports incorrect filepos/vma values)
+	*/
+	fixup_bfd_sections_from_elf(ctx);
 
 	/**
 	* Print BFD sections

@@ -41,6 +41,17 @@
 #include <string.h>
 #include <regex.h>
 #include <link.h>
+#include <sys/syscall.h>
+#include <asm/prctl.h>      /* ARCH_GET_FS / ARCH_GET_GS */
+#include <dirent.h>
+#include <linux/capability.h>
+
+#ifndef ARCH_GET_FS
+#define ARCH_GET_FS 0x1003
+#endif
+#ifndef ARCH_GET_GS
+#define ARCH_GET_GS 0x1004
+#endif
 
 #define CARRAY_META "carray_meta"
 #define CSTRUCT_META "cstruct_meta"
@@ -1106,6 +1117,30 @@ symbols_t *symbol_from_addr(unsigned long int addr)
 }
 
 /**
+* Return the data/object symbol (global variable) covering an address.
+*
+* Restricted to STT_OBJECT symbols with a non-zero size, and returns the
+* tightest enclosing one so nested/overlapping symbols resolve to the most
+* specific variable. Returns NULL when no object symbol covers the address --
+* e.g. a stripped binary whose .symtab is gone and whose variable is not an
+* exported dynamic symbol; the caller then falls back to section+offset.
+*/
+symbols_t *object_from_addr(unsigned long int addr)
+{
+	symbols_t *s = 0, *stmp = 0, *res = 0;
+
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if (s->htype && !strncmp(s->htype, "Object", 6) && s->size &&
+		    addr >= s->addr && addr < s->addr + s->size) {
+			if (!res || s->size < res->size) {
+				res = s;
+			}
+		}
+	}
+	return res;
+}
+
+/**
 * Return a symbol from its name
 */
 symbols_t *symbol_from_name(char *fname)
@@ -1384,9 +1419,10 @@ extern size_t __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *
 */
 int load_indirect_functions(lua_State * L)
 {
-    struct libc_ifunc_impl entries[MAX_NUM_IMPL];
+	struct libc_ifunc_impl entries[MAX_NUM_IMPL];
 	size_t i = 0;
 	int retv = 0;
+	char *luacmd;
 
     for(const char** function_name = indirect_function_names; *function_name; function_name++) {
         size_t num_entries = __libc_ifunc_impl_list(*function_name, entries, MAX_NUM_IMPL);
@@ -1406,7 +1442,7 @@ int load_indirect_functions(lua_State * L)
 		retv = add_symbol(*function_name, "indirect:libc.so", "Function", "Global", dlsym(NULL, *function_name), 8, dlsym(NULL, *function_name));
 	}
 
-	char *luacmd = calloc(1, 2048);
+	luacmd = calloc(1, 2048);
 	snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%p, a, b, c, d, e, f, g, h); return j, k; end\n", *function_name, dlsym(NULL, *function_name));
 	luabuff_append(luacmd);
 	exec_luabuff();
@@ -1427,7 +1463,7 @@ int load_indirect_functions(lua_State * L)
 		}
 #endif
 
-		char *luacmd = calloc(1, 2048);
+		luacmd = calloc(1, 2048);
 		snprintf(luacmd, 2047, "function %s (a, b, c, d, e, f, g, h) j,k = libcall(%p, a, b, c, d, e, f, g, h); return j, k; end\n", entries[i].name, (void*)((uintptr_t)entries[i].fn));
 		luabuff_append(luacmd);
 		exec_luabuff();
@@ -2649,6 +2685,331 @@ int prototypes(lua_State * L)
 	return 0;
 }
 
+/**
+* Emit learned prototypes as a C header, annotated with Microsoft SAL.
+*
+* Same learned TAG records as prototypes(), but grouped per function and
+* rendered as compilable declarations. The learned behaviour maps to SAL:
+*   _input_ptr  (read)  -> _In_     const void *
+*   _output_ptr (write) -> _Out_          void *
+*   both                -> _Inout_        void *
+*   _exec_ptr   (exec)  -> _Exec_         void (*)()   (custom; no SAL dir)
+*   (no tag seen)       ->                long         (scalar / unknown)
+*
+* Caveats: these are BEHAVIOURAL types, not true C types (void*, never the
+* element type); the argument count is a lower bound (highest index ever
+* observed faulting); and a pointer never dereferenced in a traced call is
+* indistinguishable from a scalar. Optional args mirror prototypes():
+*   prototypes_c()                 -- all learned functions
+*   prototypes_c("fun")            -- only functions matching this prefix
+*   prototypes_c("fun","libname")  -- ... in libraries matching this
+*/
+#define PROTO_MAXARG 8
+#define PROTO_IN   1
+#define PROTO_OUT  2
+#define PROTO_EXEC 4
+
+/**
+* Gather the learned per-argument tag bitmask for one (lib,function) from the
+* protorecords hash. Returns 1 if any learned argument data was found, with
+* argtag[1..maxarg] filled and *maxarg set to the highest index observed.
+*/
+static int proto_gather_args(const char *lib, const char *func,
+			     unsigned int *argtag, unsigned int *maxarg)
+{
+	learn_t *g = 0, *gt = 0;
+	unsigned int i = 0;
+	int found = 0;
+
+	for(i = 0; i <= PROTO_MAXARG; i++){ argtag[i] = 0; }
+	*maxarg = 0;
+
+	HASH_ITER(hh, protorecords, g, gt) {
+		unsigned int n = 0;
+		if(strcmp(g->key.tlib, lib) || strcmp(g->key.tfunction, func)) { continue; }
+		if(sscanf(g->key.targ, "argument%u", &n) != 1) { continue; }
+		if(n < 1 || n > PROTO_MAXARG) { continue; }
+		if(n > *maxarg) { *maxarg = n; }
+		if(strstr(g->key.tvalue, "_input_ptr"))  { argtag[n] |= PROTO_IN;   }
+		if(strstr(g->key.tvalue, "_output_ptr")) { argtag[n] |= PROTO_OUT;  }
+		if(strstr(g->key.tvalue, "_exec_ptr"))   { argtag[n] |= PROTO_EXEC; }
+		found = 1;
+	}
+	return found;
+}
+
+/**
+* Emit one function declaration. When learned argument data exists the
+* parameters carry SAL annotations; otherwise the arg list is left
+* unspecified -- "void *f();" -- exactly as headers() would print it.
+*/
+static void proto_emit_func(const char *lib, const char *func)
+{
+	unsigned int argtag[PROTO_MAXARG + 1];
+	unsigned int maxarg = 0, i = 0;
+	int found = proto_gather_args(lib, func, argtag, &maxarg);
+
+	printf("/* %s */\n", lib ? lib : "?");
+	printf("void *%s(", func);
+	if(!found || maxarg == 0){
+		// No behaviour learned: arity/types unknown (K&R unspecified args)
+		printf(");\n");
+		return;
+	}
+	for(i = 1; i <= maxarg; i++){
+		unsigned int t = argtag[i];
+		if(i > 1){ printf(", "); }
+		if(t & PROTO_EXEC){
+			printf("_Exec_ void (*argument%u)()", i);
+		}else if((t & PROTO_IN) && (t & PROTO_OUT)){
+			printf("_Inout_ void *argument%u", i);
+		}else if(t & PROTO_OUT){
+			printf("_Out_ void *argument%u", i);
+		}else if(t & PROTO_IN){
+			printf("_In_ const void *argument%u", i);
+		}else{
+			printf("long argument%u", i);
+		}
+	}
+	printf(");\n");
+}
+
+/**
+* Is (lib,function) present in the symbol table as a Function symbol?
+*/
+static int proto_func_in_symbols(const char *lib, const char *func)
+{
+	symbols_t *s = 0, *stmp = 0;
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if(!s->htype || strncmp(s->htype, "Function", 8)) { continue; }
+		if(!s->symbol || strcmp(s->symbol, func)) { continue; }
+		if(lib && (!s->libname || strcmp(s->libname, lib))) { continue; }
+		return 1;
+	}
+	return 0;
+}
+
+/**
+* Emit a C header for the loaded program(s): a superset of headers() enriched
+* with learned argument behaviour. This subsumes headers(): it declares every
+* imported data object as an extern, and every imported function as a
+* prototype -- SAL-annotated (_In_/_Out_/_Inout_/_Exec_) where libcall()
+* tracing has learned how an argument is used, or with an unspecified argument
+* list otherwise. Functions seen only in the learn log (e.g. indirect libc
+* entries not in the symbol table) are appended too.
+*
+* Optional filters mirror prototypes()/headers():
+*   prototypes_c()                 -- everything loaded
+*   prototypes_c("fun")            -- only symbols whose name starts with this
+*   prototypes_c("fun","libname")  -- ... in libraries matching this
+*/
+int prototypes_c(lua_State * L)
+{
+	char *pattern = 0;
+	char *patternlib = 0;
+	char line[1024];
+	learn_t *l = 0, *p = 0;
+	symbols_t *s = 0, *stmp = 0;
+
+	read_arg1(pattern);
+	read_arg2(patternlib);
+
+	if(!wsh->learnfile){
+		wsh->learnfile = fopen( wsh->learnlog ? wsh->learnlog : DEFAULT_LEARN_FILE ,"a+");
+	}
+	fseek(wsh->learnfile, 0, SEEK_SET);
+
+	// Load learnt records into the shared hash (dedup, same as prototypes())
+	while (fgets(line, sizeof(line), wsh->learnfile)) {
+		l = (learn_t*) calloc(1,sizeof(learn_t));
+		sscanf(line, "%10s %200s %200s %20s %200s %20s", l->key.ttype, l->key.tlib, l->key.tfunction, l->key.targ, l->key.tvalue, l->toffset);
+		if(strncmp(l->key.ttype, "TAG", 3)){
+			free(l);
+			continue;
+		}
+		HASH_FIND(hh, protorecords, &l->key, sizeof(learn_key_t), p);
+		if(p){ free(l); } else { HASH_ADD(hh, protorecords, key, sizeof(learn_key_t), l); }
+	}
+	HASH_SRT(hh, protorecords, sort_learnt);
+
+	// SAL preamble so the emitted header compiles anywhere (real sal.h, if
+	// present, defines _In_/_Out_/_Inout_ already; _Exec_ is ours).
+	printf("/**\n* Automatically generated by the Witchcraft Compiler Collection %s\n*\n", WVERSION);
+	printf("* Prototypes inferred from observed argument behaviour (SAL-annotated).\n*/\n\n");
+	printf("#ifndef _In_\n# define _In_\n# define _Out_\n# define _Inout_\n#endif\n");
+	printf("#ifndef _Exec_\n# define _Exec_\n#endif\n\n");
+
+	// 1) Imported data objects, as externs (same surface as headers())
+	printf("/**\n* Imported objects\n**/\n");
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if((patternlib && (!s->libname || !strstr(s->libname, patternlib)))) { continue; }
+		if((pattern && (!s->symbol || strncmp(pattern, s->symbol, strlen(pattern))))) { continue; }
+		if(!s->htype || strncmp(s->htype, "Object", 6)) { continue; }
+		printf("extern void *%s;\t/* %s */\n", s->symbol, s->libname ? s->libname : "?");
+	}
+
+	// 2) Imported functions, enriched with learned argument behaviour
+	printf("\n/**\n* Imported functions\n**/\n");
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if((patternlib && (!s->libname || !strstr(s->libname, patternlib)))) { continue; }
+		if((pattern && (!s->symbol || strncmp(pattern, s->symbol, strlen(pattern))))) { continue; }
+		if(!s->htype || strncmp(s->htype, "Function", 8)) { continue; }
+		if(s->symbol && !strncmp(s->symbol, "main", 5)) { continue; }	// headers() skips main
+		proto_emit_func(s->libname, s->symbol);
+	}
+
+	// 3) Functions known only from the learn log (not in the symbol table),
+	//    e.g. indirect libc entries. Emit each distinct one once.
+	{
+		learn_t *fiter = 0, *ftmp = 0, *giter = 0, *gtmp = 0;
+		HASH_ITER(hh, protorecords, fiter, ftmp) {
+			if(patternlib && !strstr(fiter->key.tlib, patternlib)) { continue; }
+			if(pattern && strncmp(pattern, fiter->key.tfunction, strlen(pattern))) { continue; }
+			if(proto_func_in_symbols(fiter->key.tlib, fiter->key.tfunction)) { continue; }
+
+			// already emitted earlier in this pass?
+			int seen = 0;
+			HASH_ITER(hh, protorecords, giter, gtmp) {
+				if(giter == fiter) { break; }
+				if(!strcmp(giter->key.tlib, fiter->key.tlib) &&
+				   !strcmp(giter->key.tfunction, fiter->key.tfunction)) { seen = 1; break; }
+			}
+			if(seen) { continue; }
+			proto_emit_func(fiter->key.tlib, fiter->key.tfunction);
+		}
+	}
+
+	return 0;
+}
+
+/**
+* Invoke a raw system call by number, with up to 6 arguments.
+*
+* Usage from lua:
+*   ret, err = lsyscall(nr [, a1, a2, a3, a4, a5, a6])
+*
+* Number arguments are passed by value; string/userdata arguments are passed
+* as the address of their bytes (so a buffer allocated with balloc()/xalloc()
+* or a Lua string can back a pointer argument). Returns two values: the raw
+* syscall return (negative values are returned as-is, not folded into errno)
+* and errno (0 on success).
+*
+* This is the syscall sibling of libcall(): where libcall() reaches userland
+* functions, lsyscall() reaches the kernel ABI directly, so a regression
+* suite can probe which syscalls survive the wsh call path.
+*/
+int lsyscall(lua_State * L)
+{
+	long int nr = 0;
+	long int a[6] = { 0, 0, 0, 0, 0, 0 };
+	long int ret = 0;
+	int e = 0;
+	int i = 0;
+
+	nr = (long int) luaL_checkinteger(L, 1);
+
+	for (i = 0; i < 6; i++) {
+		int idx = i + 2;			// args start at lua stack slot 2
+		if (lua_isnil(L, idx)) {
+			a[i] = 0;
+		} else if (lua_isnumber(L, idx)) {
+			a[i] = (long int) lua_tointeger(L, idx);
+		} else if (lua_isstring(L, idx)) {
+			a[i] = (long int) lua_tostring(L, idx);
+		} else if (lua_isuserdata(L, idx)) {
+			a[i] = (long int) lua_touserdata(L, idx);
+		} else {
+			a[i] = 0;
+		}
+	}
+
+	errno = 0;
+	ret = syscall(nr, a[0], a[1], a[2], a[3], a[4], a[5]);
+	e = errno;
+
+	lua_pushinteger(L, ret);
+	lua_pushinteger(L, e);
+	return 2;
+}
+
+/**
+* eflags_get() -> value
+* Read the current RFLAGS.
+*/
+static int eflags_get(lua_State * L)
+{
+#if defined(__amd64__)
+	unsigned long long fl = 0;
+	asm volatile("pushfq; pop %0" : "=r"(fl));
+	lua_pushinteger(L, (lua_Integer) fl);
+	return 1;
+#else
+	(void)L; lua_pushnil(L); return 1;
+#endif
+}
+
+/**
+* eflags_set(value)
+* Write RFLAGS. The Trap Flag (0x100) is masked off: setting it here would
+* single-step the very next instruction into traphandler() with no tracing
+* mode armed, which exits wsh. DF/AC and the rest are honored -- intended for
+* use right before a libcall() to exercise direction-flag / alignment paths.
+*/
+static int eflags_set(lua_State * L)
+{
+#if defined(__amd64__)
+	unsigned long long fl = (unsigned long long) luaL_checkinteger(L, 1);
+	fl &= ~0x100ULL;                 /* never hand ourselves a Trap Flag */
+	asm volatile("push %0; popfq" :: "r"(fl) : "cc");
+#else
+	(void)L;
+#endif
+	return 0;
+}
+
+/**
+* fsbase_get() -> addr   (and gsbase_get())
+* Return the thread-pointer base held in FS (resp. GS). This is the anchor of
+* the thread-local storage block and of the stack canary; errno and other
+* __thread globals live at negative offsets from it. Uses arch_prctl (always
+* available) rather than rdfsbase (which faults unless the kernel enabled it).
+*/
+static int fsbase_get(lua_State * L)
+{
+#if defined(__amd64__)
+	unsigned long long base = 0;
+	if (syscall(SYS_arch_prctl, ARCH_GET_FS, &base) != 0) {
+		lua_pushnil(L);
+		lua_pushstring(L, strerror(errno));
+		return 2;
+	}
+	lua_pushinteger(L, (lua_Integer) base);
+	return 1;
+#else
+	lua_pushnil(L);
+	lua_pushstring(L, "fsbase_get: x86_64 only");
+	return 2;
+#endif
+}
+
+static int gsbase_get(lua_State * L)
+{
+#if defined(__amd64__)
+	unsigned long long base = 0;
+	if (syscall(SYS_arch_prctl, ARCH_GET_GS, &base) != 0) {
+		lua_pushnil(L);
+		lua_pushstring(L, strerror(errno));
+		return 2;
+	}
+	lua_pushinteger(L, (lua_Integer) base);
+	return 1;
+#else
+	lua_pushnil(L);
+	lua_pushstring(L, "gsbase_get: x86_64 only");
+	return 2;
+#endif
+}
+
 /*
 void enable_trace(void){
 	if(prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0)){	// Anyone can trace us
@@ -2832,6 +3193,7 @@ static int libcall(lua_State * L)
 	void *ret = 0;
 	int callerrno = 0;
 	int argnum = 0;
+	static void *base_ptr = 0;
 
 	alarm(3);
 
@@ -2877,6 +3239,9 @@ static int libcall(lua_State * L)
 
 	if (!sigsetjmp(wsh->longjmp_ptr, 1)){ // This is executed only the first time // save stack context + signals
 
+		// Save address of base pointer
+		base_ptr = __builtin_frame_address(0);
+
 		// Set align flag
 		if(wsh->trace_unaligned){
 			wsh->sigbus_count = 0;
@@ -2899,7 +3264,20 @@ static int libcall(lua_State * L)
 			set_trace_flag();
 		}
 
+		// Arm globals tracing: poison data (while still writable), then
+		// mprotect the in-scope data sections to PROT_NONE so every read/write
+		// during the call faults into sighandler() and is logged.
+		if(wsh->trace_globals){
+			wsh->globals_log_count = 0;
+			wsh->globals_hash = 0;
+			if(wsh->globals_poison){
+				globals_poison_sections();
+			}
+			globals_protect_sections();
+		}
+
 		ret = f(arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8]);
+
 	}else{
 		ret = -1;
 	}
@@ -2930,7 +3308,23 @@ static int libcall(lua_State * L)
 		printf("Execution hash: u:%016llx\n", wsh->sigbus_hash);
 	}
 
+	// Disarm globals tracing. Always restore protections here: if the call
+	// longjmp'd back on a real crash we still arrive here, and leaving data
+	// sections at PROT_NONE would wedge the interpreter on the next access.
+	if(wsh->trace_globals){
+		globals_unprotect_sections();
+
+		printf("Total: %u global accesses traced\n", wsh->globals_log_count);
+		printf("Execution hash: g:%016llx\n", wsh->globals_hash);
+	}
+
 	callerrno = errno;
+
+	// Ensure base pointer integrity, detect stack buffer overflows
+	if(wsh->opt_verbose){
+		fprintf(stderr, "delta stack frame: %td (%p %p) mapped ? %d\n", (char *)base_ptr - (char *)__builtin_frame_address(0), base_ptr, __builtin_frame_address(0), !msync((long int)__builtin_frame_address(0) & (long int)~0xfff, 4096, 0));
+	}
+
 
 	/**
 	* Analyse return value
@@ -2964,7 +3358,20 @@ static int libcall(lua_State * L)
 			lua_pushinteger(L, ret);// Push as a number
 		}
 	} else {
-		lua_pushinteger(L, ret);	// Push as a number
+		// L could be corrupt in case of stack overflow
+		n = !msync((long int)L & (long int)~0xfff, 4096, 0);
+		if(n) {
+			lua_pushinteger(L, ret);	// Push as a number
+		}else{
+			printf(" !! Corrupted stack : aborting...\n");
+
+			/**
+			* Restore execution from known good point
+			*/
+			errno = ENOTRECOVERABLE; /*EFAULT;*/
+			longjmp(wsh->longjmp_ptr, 1);
+//			return 0;			// Stack corrupted
+		}
 	}
 
 skipmsync:
@@ -2999,6 +3406,15 @@ skipmsync:
 	*/
 	lua_pushstring(L, "errnostr");		/* push key */
 	lua_pushstring(L, strerror(callerrno));		/* push key */
+        lua_settable(L, -3);
+
+	/**
+	* Push number of global-variable accesses observed during the call.
+	* The full per-access detail (address, section, RIP, symbol, R/W) is
+	* available via globals_show().
+	*/
+	lua_pushstring(L, "globals");		/* push key */
+	lua_pushinteger(L, wsh->trace_globals ? wsh->globals_log_count : 0);
         lua_settable(L, -3);
 
 	/**
@@ -3159,13 +3575,16 @@ skipmsync:
 	if (n) {
 		// is it a string ?
 		char *ptr = ret;
-		for (j = 0; j < strlen(ret); j++) {
-			if (!isascii((ptr[j]))) {
-				notascii = 1;
-				break;
+		if ((ret != -1)&&(!msync((long unsigned int)ret &~0xfff,4096,0))){
+			for (j = 0; j < strlen(ret); j++) {
+				if (!isascii((ptr[j]))) {
+					notascii = 1;
+					break;
+				}
 			}
+		}else{
+			notascii = 1;
 		}
-
 		if (!notascii) {
 			lua_pushstring(L, ret);	// Ascii : push string
 		} else {
@@ -3815,12 +4234,152 @@ int parse_link_map_dyn(struct link_map *map) {
     if (wsh->opt_verbose) {
         printf("  * parse_link_map_dyn (musl): processing loaded modules\n");
     }
-    
+
     // Portable: Use dl_iterate_phdr to parse symbols from all loaded modules
     dl_iterate_phdr(sym_callback, NULL);
     return 0;
 }
 #endif
+
+/**
+* Parse an ELF file's .symtab from disk and merge its data objects (and,
+* when requested, functions) into wsh->symbols. This recovers names that are
+* NOT in the runtime .dynsym -- file-local / static / hidden globals -- which
+* the dynamic linker never maps, so globals_show()/globals_reify()/
+* prototypes_c() can name them on a non-stripped (or de-stripped) binary.
+*
+* 'base' is the object's load bias (dlpi_addr); for ET_DYN the runtime address
+* is base + st_value, for ET_EXEC it is st_value as-is. Returns the number of
+* symbols added. By default only STT_OBJECT is added: pulling every local
+* STT_FUNC would bloat the symbol list and slow symbol_from_addr() on the
+* signal hot path, so functions are added only when want_funcs is set.
+*/
+static int load_symtab_file(const char *path, unsigned long int base, int want_funcs)
+{
+	int fd = -1, added = 0;
+	struct stat st;
+	unsigned char *map = MAP_FAILED;
+	Elf_Ehdr *eh = 0;
+	Elf_Shdr *sh = 0;
+	unsigned int i = 0;
+
+	if (!path || !*path) { return 0; }
+	fd = open(path, O_RDONLY);
+	if (fd < 0) { return 0; }
+	if (fstat(fd, &st) != 0 || (size_t)st.st_size < sizeof(Elf_Ehdr)) { close(fd); return 0; }
+	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd);
+	if (map == MAP_FAILED) { return 0; }
+
+	eh = (Elf_Ehdr *)map;
+	if (memcmp(eh->e_ident, ELFMAG, SELFMAG)) { goto done; }		// not ELF
+	if (eh->e_ident[EI_CLASS] != ELFCLASS) { goto done; }			// wrong class
+	if (!eh->e_shoff || !eh->e_shnum) { goto done; }			// no section headers
+	if (eh->e_shoff + (size_t)eh->e_shnum * sizeof(Elf_Shdr) > (size_t)st.st_size) { goto done; }
+
+	sh = (Elf_Shdr *)(map + eh->e_shoff);
+
+	for (i = 0; i < eh->e_shnum; i++) {
+		if (sh[i].sh_type != SHT_SYMTAB) { continue; }			// only .symtab (not .dynsym)
+		if (sh[i].sh_link >= eh->e_shnum || !sh[i].sh_entsize) { continue; }
+
+		Elf_Shdr *symsh = &sh[i];
+		Elf_Shdr *strsh = &sh[symsh->sh_link];
+		if (symsh->sh_offset + symsh->sh_size > (size_t)st.st_size) { continue; }
+		if (strsh->sh_offset + strsh->sh_size > (size_t)st.st_size) { continue; }
+
+		char *strtab = (char *)(map + strsh->sh_offset);
+		unsigned long int strsz = strsh->sh_size;
+		Elf_Sym *syms = (Elf_Sym *)(map + symsh->sh_offset);
+		unsigned int n = symsh->sh_size / symsh->sh_entsize;
+		unsigned int j = 0;
+
+		for (j = 0; j < n; j++) {
+			Elf_Sym *y = &syms[j];
+			int t = ELF_ST_TYPE(y->st_info);
+
+			if (t != STT_OBJECT && !(want_funcs && t == STT_FUNC)) { continue; }
+			if (y->st_shndx == SHN_UNDEF) { continue; }		// imported, no definition here
+			if (y->st_name >= strsz) { continue; }
+			char *name = strtab + y->st_name;
+			if (!name || !*name) { continue; }
+
+			unsigned long int runtime = (eh->e_type == ET_DYN) ? base + y->st_value : y->st_value;
+			char *htype = (t == STT_OBJECT) ? "Object" : "Function";
+			char *hbind = symbol_tobind(ELF_ST_BIND(y->st_info));
+
+			add_symbol(name, (char *)path, htype, hbind, y->st_value, y->st_size, runtime);
+			added++;
+		}
+	}
+
+done:
+	munmap(map, st.st_size);
+	return added;
+}
+
+// Filter + counter carried through dl_iterate_phdr for .symtab loading.
+struct symtab_filter { const char *lib; int want_funcs; int count; };
+
+static int symtab_file_callback(struct dl_phdr_info *info, size_t size, void *data)
+{
+	struct symtab_filter *f = (struct symtab_filter *)data;
+	(void)size;
+
+	if (!info->dlpi_name || !*info->dlpi_name) { return 0; }	// main exe / anon: no file name
+	if (f && f->lib && !strstr(info->dlpi_name, f->lib)) { return 0; }
+
+	int n = load_symtab_file(info->dlpi_name, (unsigned long int)info->dlpi_addr, f ? f->want_funcs : 0);
+	if (f) { f->count += n; }
+	return 0;
+}
+
+/**
+* Merge .symtab symbols of loaded objects into the symbol table.
+*
+* Usage from lua:
+*   load_symtab()            -- data objects of every loaded object with a .symtab
+*   load_symtab("libfoo")    -- restrict to objects whose path matches
+*   load_symtab("libfoo", 1) -- also include local functions (default: objects only)
+*
+* rescan() does this automatically for the loaded target, so a de-stripped
+* binary names its local globals without an explicit call; use this to pull in
+* additional objects or local functions.
+*/
+static int load_symtab(lua_State * L)
+{
+	struct symtab_filter f = { 0, 0, 0 };
+
+	if (lua_isstring(L, 1)) { f.lib = luaL_checkstring(L, 1); }
+	if (lua_isnumber(L, 2)) { f.want_funcs = (int)lua_tointeger(L, 2); }
+
+	dl_iterate_phdr(symtab_file_callback, &f);
+
+	printf(" -- Loaded %d .symtab symbol(s)%s%s\n",
+		f.count, f.lib ? " from " : "", f.lib ? f.lib : " (all objects)");
+
+	lua_pushinteger(L, f.count);
+	return 1;
+}
+
+/**
+* Merge the loaded target's on-disk .symtab (file-local globals). Called from
+* every symbol-scan path -- rescan() for loadbin(), and wsh_run() for a
+* command-line "wsh <binary>" load -- so a de-stripped target names its local
+* globals however it was loaded. Scoped to the target to keep the symbol list
+* and symbol_from_addr() lean; stripped targets have no .symtab and are
+* skipped cheaply.
+*/
+static void load_target_symtab(void)
+{
+	if (wsh->globals_target_lib) {
+		struct symtab_filter sf = { wsh->globals_target_lib, 0, 0 };
+		dl_iterate_phdr(symtab_file_callback, &sf);
+		if (wsh->opt_verbose && sf.count) {
+			printf("  * merged %d .symtab object(s) for %s\n", sf.count, wsh->globals_target_lib);
+		}
+	}
+}
 
 /**
 * Execute internal lua buffer
@@ -3915,6 +4474,11 @@ void rescan(void)
     
     parse_link_map_dyn(wsh->mainhandle);
     parse_link_vdso();
+
+    // After the runtime .dynsym pass, merge the loaded target's on-disk
+    // .symtab so its file-local / non-exported globals get names too.
+    load_target_symtab();
+
     wsh->opt_rescan = 0;
     exec_luabuff();
     
@@ -4411,6 +4975,32 @@ void traphandler(int signal, siginfo_t * s, void *ptr)
 		u->uc_mcontext.gregs[REG_EFL] |= 0x100;		// Set Trace flag
 		return ;
 
+	} else if(wsh->trace_globals) {
+		/**
+		* We are tracing global variable accesses.
+		* The SIGSEGV handler unprotected a page and set TF.
+		* Now re-protect it so the next access faults again.
+		*/
+		globals_prot_t *gp = NULL, *gtmp = NULL;
+		unsigned long int rip_page = u->uc_mcontext.gregs[REG_RIP] & ~0xfffULL;
+
+		DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+			// Find which protected region's pages were unprotected
+			// We re-protect all pages in protected regions
+			// (the SIGSEGV handler only unprotected one page at a time)
+			unsigned long int pg;
+			for (pg = gp->addr; pg < gp->addr + gp->size; pg += sysconf(_SC_PAGE_SIZE)) {
+				// Don't protect the page we're currently executing on
+				if (pg != rip_page) {
+					mprotect((void*)pg, sysconf(_SC_PAGE_SIZE), PROT_NONE);
+				}
+			}
+		}
+
+		// Clear Trace Flag — we only needed one single-step
+		u->uc_mcontext.gregs[REG_EFL] &= ~0x100ULL;
+		return;
+
 	} else if(wsh->trace_singlestep) {
 		/**
 		* We are single stepping
@@ -4614,6 +5204,127 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	char *accesscolor = "";
 
 #if defined(__i386__) || defined(__amd64__)
+
+	/**
+	* Globals tracing: intercept before longjmp
+	* If the fault address is within a protected data section,
+	* log the access, mprotect the page +rwx, set TF, and return.
+	*/
+	if (wsh->trace_globals && signal == SIGSEGV && s->si_addr) {
+		unsigned long int gaddr = (unsigned long int)s->si_addr;
+		globals_prot_t *gp = NULL, *gtmp = NULL, *match = NULL;
+
+		// Attribute the fault to the section that actually owns this address.
+		// Several sections (.data/.bss/.rodata) can share one page, so a match
+		// on the page-aligned range is ambiguous; prefer the region whose
+		// ORIGINAL [orig_addr, orig_addr+orig_size) bounds contain the address.
+		DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+			if (gaddr >= gp->orig_addr && gaddr < gp->orig_addr + gp->orig_size) {
+				match = gp;
+				break;
+			}
+		}
+		// Fall back to the page-aligned range (address in section padding, or
+		// a straddling access) so we still unprotect and make progress.
+		if (!match) {
+			DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+				if (gaddr >= gp->addr && gaddr < gp->addr + gp->size) {
+					match = gp;
+					break;
+				}
+			}
+		}
+
+		if (match) {
+			gp = match;
+			{
+
+				// Determine access type from error code
+				unsigned int gfault;
+				if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
+					gfault = FAULT_WRITE;
+				} else if (s->si_addr == (void*)u->uc_mcontext.gregs[REG_RIP]) {
+					gfault = FAULT_EXEC;
+				} else {
+					gfault = FAULT_READ;
+				}
+
+				// Resolve the faulting data address to a global variable
+				// name (NULL when stripped / not an exported object).
+				symbols_t *gvar = object_from_addr(gaddr);
+
+				// Log the access
+				if (wsh->globals_log && wsh->globals_log_count < GLOBALS_LOG_MAX) {
+					global_access_t *entry = &wsh->globals_log[wsh->globals_log_count];
+					entry->addr = gaddr;
+					entry->rip = u->uc_mcontext.gregs[REG_RIP];
+					entry->fault = gfault;
+					entry->section_name = gp->name;
+					entry->libname = gp->libname;
+					entry->offset = gaddr - gp->orig_addr;
+					entry->var_name = gvar ? gvar->symbol : NULL;
+					entry->var_offset = gvar ? (gaddr - gvar->addr) : 0;
+					wsh->globals_log_count++;
+				}
+
+				// Rolling hash
+				wsh->globals_hash = (wsh->globals_hash >> 2) ^ (~(unsigned long long int)s->si_addr);
+
+				// Print if verbose
+				if (wsh->opt_verbosetrace) {
+					char *gmode = (gfault == FAULT_WRITE) ? "W" : (gfault == FAULT_READ) ? "R" : "X";
+					symbols_t *sym = symbol_from_addr(u->uc_mcontext.gregs[REG_RIP]);
+
+					// Name the variable if we resolved one, else section+offset.
+					char gwhat[256];
+					if (gvar) {
+						if (gaddr - gvar->addr) {
+							snprintf(gwhat, sizeof(gwhat), "%s+0x%lx", gvar->symbol, gaddr - gvar->addr);
+						} else {
+							snprintf(gwhat, sizeof(gwhat), "%s", gvar->symbol);
+						}
+					} else {
+						snprintf(gwhat, sizeof(gwhat), "%s+0x%lx", gp->name, gaddr - gp->orig_addr);
+					}
+
+					if (sym) {
+						fprintf(stderr, " -- Global[%03u] %s 0x%lx\t%-24s\t%s()+%llu\t%s\n",
+							wsh->globals_log_count, gmode, gaddr, gwhat,
+							sym->symbol, u->uc_mcontext.gregs[REG_RIP] - sym->addr,
+							sym->libname);
+					} else {
+						fprintf(stderr, " -- Global[%03u] %s 0x%lx\t%-24s\trip:0x%llx\n",
+							wsh->globals_log_count, gmode, gaddr, gwhat,
+							u->uc_mcontext.gregs[REG_RIP]);
+					}
+				}
+
+				// Unprotect the faulting page so the instruction can re-execute
+				unsigned long int page = (unsigned long int)s->si_addr & ~0xfff;
+				mprotect((void*)page, sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE | PROT_EXEC);
+
+				// Set Trace Flag so we trap after one instruction
+				u->uc_mcontext.gregs[REG_EFL] |= 0x100;
+
+				return; // Return to re-execute the faulting instruction
+			}
+		}
+	}
+
+	/**
+	* Re-entrancy guard. If we fault again WHILE already handling a crash
+	* (e.g. print_backtrace() unwinds through a corrupt/foreign stack and
+	* dereferences a bad frame), do not recurse into the full handler -- that
+	* second fault inside the handler is what turns a recoverable crash into a
+	* core dump. Instead recover immediately via the known-good longjmp point.
+	*/
+	if (wsh->in_fault) {
+		wsh->in_fault = 0;
+		errno = ENOTRECOVERABLE;
+		longjmp(wsh->longjmp_ptr, 1);
+	}
+	wsh->in_fault = 1;
+
 	/**
 	* Get access type
 	*/
@@ -4776,6 +5487,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	/**
 	* Restore execution from known good point
 	*/
+	wsh->in_fault = 0;		// handled cleanly; clear the re-entrancy guard
 	errno = ENOTRECOVERABLE; /*EFAULT;*/
 	longjmp(wsh->longjmp_ptr, 1);
 }
@@ -4991,6 +5703,581 @@ int bsspolute(lua_State * L)
 	}
 
 	return 0;
+}
+
+
+/**
+* Helper: is this object part of wsh itself or its runtime dependencies?
+* Used by GLOBALS_SCOPE_ALL to avoid trapping our own interpreter's data,
+* which would deadlock the moment the signal handler or Lua touched a global.
+*/
+static int globals_is_self(char *libname)
+{
+	static const char *self[] = {
+		"wsh",           // the interpreter binary itself
+		"libwitch",      // the witch library
+		"liblua", "lua5",// Lua runtime
+		"libreadline", "libhistory", "libncurses", "libtinfo",
+		"libc.", "libc-", "libdl", "libpthread", "libm.", "libm-",
+		"librt", "libgcc", "ld-linux", "ld-musl", "libcapstone",
+		"linux-vdso", "libstdc++",
+		NULL
+	};
+	unsigned int i;
+	const char *base;
+
+	if (!libname) {
+		return 1;	// unknown provenance: treat as self, stay safe
+	}
+
+	// Match on the BASENAME, not the full path: a libified target lives under
+	// a /tmp/.wsh-NNNN/ directory, and matching "wsh" against the path would
+	// wrongly exclude the target (e.g. /tmp/.wsh-155781/apache2.dbg) from the
+	// "all" scope. The directory is not part of the object's identity.
+	base = strrchr(libname, '/');
+	base = base ? base + 1 : libname;
+
+	for (i = 0; self[i]; i++) {
+		if (strstr(base, self[i])) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/**
+* Helper: does this section fall within the active tracing scope?
+*/
+static int globals_section_in_scope(sections_t * s)
+{
+	switch (wsh->globals_scope) {
+	case GLOBALS_SCOPE_NAMED:
+		// Only the explicitly named object
+		if (!wsh->globals_filter_lib || !s->libname) {
+			return 0;
+		}
+		return strstr(s->libname, wsh->globals_filter_lib) ? 1 : 0;
+
+	case GLOBALS_SCOPE_ALL:
+		// Everything the loader mapped, minus wsh and its deps
+		return globals_is_self(s->libname) ? 0 : 1;
+
+	case GLOBALS_SCOPE_TARGET:
+	default:
+		// Only the binary last loaded via loadbin()
+		if (!wsh->globals_target_lib || !s->libname) {
+			return 0;
+		}
+		return strstr(s->libname, wsh->globals_target_lib) ? 1 : 0;
+	}
+}
+
+/**
+* Helper: protect data sections for globals tracing
+* Iterates over known shdrs and mprotects .data, .bss, .rodata to PROT_NONE.
+* Builds the globals_prot linked list for the signal handlers to check.
+*/
+static void globals_protect_sections(void)
+{
+	sections_t *s = 0, *stmp = 0;
+	unsigned long int pagesize = sysconf(_SC_PAGE_SIZE);
+
+	// Free any previous protection list
+	globals_prot_t *gp = NULL, *gtmp = NULL;
+	DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+		DL_DELETE(wsh->globals_prot, gp);
+		free(gp);
+	}
+	wsh->globals_prot = NULL;
+
+	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
+		if (!s->name || !s->addr || !s->size) {
+			continue;
+		}
+
+		// Honor the active scope (target binary / all objects / named lib)
+		if (!globals_section_in_scope(s)) {
+			continue;
+		}
+
+		// Only trace data sections: .data, .bss, .rodata
+		if (strncmp(s->name, ".data", 5) &&
+		    strncmp(s->name, ".bss", 4) &&
+		    strncmp(s->name, ".rodata", 7)) {
+			continue;
+		}
+
+		// Page-align the region
+		unsigned long int aligned_addr = s->addr & ~(pagesize - 1);
+		unsigned long int aligned_end = (s->addr + s->size + pagesize - 1) & ~(pagesize - 1);
+		unsigned long int aligned_size = aligned_end - aligned_addr;
+
+		// Make sure we're not protecting our own pages
+		// (check that the section doesn't overlap with wsh globals or the stack)
+		if ((unsigned long int)wsh >= aligned_addr && (unsigned long int)wsh < aligned_end) {
+			continue;
+		}
+
+		// Record the protection
+		globals_prot_t *prot = calloc(1, sizeof(globals_prot_t));
+		if (!prot) continue;
+		prot->addr = aligned_addr;
+		prot->size = aligned_size;
+		prot->orig_addr = s->addr;
+		prot->orig_size = s->size;
+		prot->name = s->name;
+		prot->libname = s->libname;
+		// Capture the real original protection so .rodata (r--) is not
+		// restored writable. Fall back to RW for writable data sections.
+		prot->orig_prot = 0;
+		if (s->perms) {
+			if (s->perms[0] == 'r') prot->orig_prot |= PROT_READ;
+			if (s->perms[1] == 'w') prot->orig_prot |= PROT_WRITE;
+			if (s->perms[2] == 'x') prot->orig_prot |= PROT_EXEC;
+		}
+		if (prot->orig_prot == 0) {
+			prot->orig_prot = PROT_READ | PROT_WRITE;
+		}
+
+		DL_APPEND(wsh->globals_prot, prot);
+
+		if (wsh->opt_verbose) {
+			printf(" -- Protecting %s\t0x%012lx-0x%012lx (%lu bytes, %lu pages)\t%s\n",
+				s->name, aligned_addr, aligned_end, aligned_size,
+				aligned_size / pagesize, s->libname);
+		}
+
+		// Apply the protection: PROT_NONE traps all accesses
+		mprotect((void*)aligned_addr, aligned_size, PROT_NONE);
+	}
+}
+
+/**
+* Helper: restore all protected sections to their original permissions
+*/
+static void globals_unprotect_sections(void)
+{
+	globals_prot_t *gp = NULL, *gtmp = NULL;
+
+	DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+		mprotect((void*)gp->addr, gp->size, gp->orig_prot);
+		DL_DELETE(wsh->globals_prot, gp);
+		free(gp);
+	}
+	wsh->globals_prot = NULL;
+}
+
+/**
+* Helper: poison data sections with marker bytes
+*/
+static void globals_poison_sections(void)
+{
+	sections_t *s = 0, *stmp = 0;
+	unsigned char poison = 0xDE;
+	unsigned int num = 0;
+
+	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
+		if (!s->name || !s->addr || !s->size) continue;
+
+		// Honor the active scope (target binary / all objects / named lib)
+		if (!globals_section_in_scope(s)) continue;
+
+		// Only poison writable data: .bss and .data (never .rodata)
+		if (!strncmp(s->name, ".bss", 4) || !strncmp(s->name, ".data", 5)) {
+			num++;
+			printf(" -- Poisoning %s 0x%012lx (%lu bytes) with 0x%02x\t%s\n",
+				s->name, s->addr, s->size, poison, s->libname);
+			memset((void*)s->addr, poison, s->size);
+			poison--;
+		}
+	}
+
+	if (num == 0) {
+		printf(" -- Nothing poisoned (no writable data sections in scope)\n");
+	}
+}
+
+/**
+* Enable globals tracing.
+*
+* Usage from lua:
+*   globalstrace()            -- default: only the binary last loaded via loadbin()
+*   globalstrace("all")       -- every loaded object except wsh and its runtime deps
+*   globalstrace("*")         -- synonym for "all"
+*   globalstrace("libfoo.so") -- only the object whose name contains this string
+*/
+static int globalstrace(lua_State * L)
+{
+	if (wsh->globals_filter_lib) {
+		free(wsh->globals_filter_lib);
+		wsh->globals_filter_lib = NULL;
+	}
+
+	if (lua_isstring(L, 1)) {
+		const char *arg = luaL_checkstring(L, 1);
+
+		if (!strcmp(arg, "all") || !strcmp(arg, "*")) {
+			wsh->globals_scope = GLOBALS_SCOPE_ALL;
+			printf(" -- Globals tracing enabled (scope: all objects, excluding wsh + deps)\n");
+		} else {
+			wsh->globals_scope = GLOBALS_SCOPE_NAMED;
+			wsh->globals_filter_lib = strdup(arg);
+			printf(" -- Globals tracing enabled (scope: object matching \"%s\")\n", arg);
+		}
+	} else {
+		wsh->globals_scope = GLOBALS_SCOPE_TARGET;
+		if (wsh->globals_target_lib) {
+			printf(" -- Globals tracing enabled (scope: target binary \"%s\")\n",
+				wsh->globals_target_lib);
+		} else {
+			printf(" -- Globals tracing enabled (scope: target binary -- none loaded yet,"
+				" use loadbin() or globalstrace(\"all\"))\n");
+		}
+	}
+
+	wsh->trace_globals = 1;
+
+	// Allocate the log buffer if not already done
+	if (!wsh->globals_log) {
+		wsh->globals_log = calloc(GLOBALS_LOG_MAX, sizeof(global_access_t));
+	}
+
+	return 0;
+}
+
+/**
+* Disable globals tracing
+*/
+static int unglobalstrace(lua_State * L)
+{
+	wsh->trace_globals = 0;
+	printf(" -- Globals tracing disabled\n");
+	return 0;
+}
+
+/**
+* Enable poisoning of data sections before libcall.
+*
+* Accepts the same optional scope argument as globalstrace() ("all", "*", or a
+* library-name substring). Called with no argument it poisons whatever scope is
+* already active (default: the target binary), so globalstrace("all") +
+* globalspoison() behave as expected.
+*/
+static int globalspoison(lua_State * L)
+{
+	if (lua_isstring(L, 1)) {
+		const char *arg = luaL_checkstring(L, 1);
+
+		if (!strcmp(arg, "all") || !strcmp(arg, "*")) {
+			wsh->globals_scope = GLOBALS_SCOPE_ALL;
+		} else {
+			wsh->globals_scope = GLOBALS_SCOPE_NAMED;
+			if (wsh->globals_filter_lib) free(wsh->globals_filter_lib);
+			wsh->globals_filter_lib = strdup(arg);
+		}
+	}
+
+	wsh->globals_poison = 1;
+	printf(" -- Globals poisoning enabled\n");
+	return 0;
+}
+
+/**
+* Disable poisoning of data sections
+*/
+static int unglobalspoison(lua_State * L)
+{
+	wsh->globals_poison = 0;
+	printf(" -- Globals poisoning disabled\n");
+	return 0;
+}
+
+/**
+* Display the globals access log from the last libcall
+* Returns a Lua table of all accesses
+*/
+static int globals_show(lua_State * L)
+{
+	unsigned int i;
+
+	if (!wsh->globals_log || wsh->globals_log_count == 0) {
+		printf(" -- No global accesses recorded\n");
+		lua_newtable(L);
+		return 1;
+	}
+
+	printf("\n -- Global variable accesses: %u\n\n", wsh->globals_log_count);
+	printf("  %-5s %-4s %-14s %-28s %-20s %s\n", "Num", "Mode", "Address", "Variable", "Section+Offset", "Accessed by");
+	printf("  %-5s %-4s %-14s %-28s %-20s %s\n", "---", "----", "-------", "--------", "--------------", "-----------");
+
+	lua_newtable(L);
+
+	for (i = 0; i < wsh->globals_log_count; i++) {
+		global_access_t *e = &wsh->globals_log[i];
+		char *mode = (e->fault == FAULT_WRITE) ? "W" : (e->fault == FAULT_READ) ? "R" : "X";
+
+		symbols_t *sym = symbol_from_addr(e->rip);
+		char syminfo[256];
+		if (sym) {
+			snprintf(syminfo, sizeof(syminfo), "%s()+%lu", sym->symbol, e->rip - sym->addr);
+		} else {
+			snprintf(syminfo, sizeof(syminfo), "0x%lx", e->rip);
+		}
+
+		// Re-resolve the variable and section FROM THE ADDRESS at display
+		// time, rather than trusting pointers stored during the trace: a
+		// rescan()/load_symtab() between trace and show frees and rebuilds
+		// the sections/symbols tables (so stored pointers would dangle), and
+		// re-resolving also means names that became known after the trace
+		// (e.g. a .symtab just loaded) show up without re-running the call.
+		symbols_t *gv = object_from_addr(e->addr);
+		sections_t *sec = section_from_addr(e->addr);
+		const char *secname = sec ? sec->name : (e->section_name ? e->section_name : "?");
+		unsigned long int secoff = sec ? (e->addr - sec->addr) : e->offset;
+
+		// Variable name when resolved, else "<section+offset>" to make clear
+		// the name was unavailable (stripped / non-exported).
+		char varinfo[256];
+		if (gv) {
+			unsigned long int voff = e->addr - gv->addr;
+			if (voff) {
+				snprintf(varinfo, sizeof(varinfo), "%s+0x%lx", gv->symbol, voff);
+			} else {
+				snprintf(varinfo, sizeof(varinfo), "%s", gv->symbol);
+			}
+		} else {
+			snprintf(varinfo, sizeof(varinfo), "<%s+0x%lx>", secname, secoff);
+		}
+
+		printf("  [%03u] %-4s 0x%012lx %-28s %s+0x%-12lx %s\n",
+			i + 1, mode, e->addr, varinfo, secname, secoff, syminfo);
+
+		// Also build a Lua table entry
+		lua_pushinteger(L, i + 1);
+		lua_newtable(L);
+
+		lua_pushstring(L, "addr");
+		lua_pushinteger(L, e->addr);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "rip");
+		lua_pushinteger(L, e->rip);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "mode");
+		lua_pushstring(L, mode);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "section");
+		lua_pushstring(L, secname);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "offset");
+		lua_pushinteger(L, secoff);
+		lua_settable(L, -3);
+
+		// Resolved global variable name (nil when stripped / unknown)
+		if (gv) {
+			lua_pushstring(L, "var");
+			lua_pushstring(L, gv->symbol);
+			lua_settable(L, -3);
+
+			lua_pushstring(L, "var_offset");
+			lua_pushinteger(L, e->addr - gv->addr);
+			lua_settable(L, -3);
+		}
+
+		if (sym) {
+			lua_pushstring(L, "symbol");
+			lua_pushstring(L, sym->symbol);
+			lua_settable(L, -3);
+
+			lua_pushstring(L, "libname");
+			lua_pushstring(L, sym->libname);
+			lua_settable(L, -3);
+		}
+
+		lua_settable(L, -3);
+	}
+
+	printf("\n  Execution hash: g:%016llx\n\n", wsh->globals_hash);
+
+	return 1;
+}
+
+
+/**
+* Find a global data object (STT_OBJECT) by exact name, optionally restricted
+* to a library whose name contains 'libfilter'. Returns the tightest match.
+*/
+static symbols_t *object_by_name(const char *name, const char *libfilter)
+{
+	symbols_t *s = 0, *stmp = 0, *res = 0;
+
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if (!s->htype || strncmp(s->htype, "Object", 6)) { continue; }
+		if (!s->symbol || strcmp(s->symbol, name)) { continue; }
+		if (libfilter && (!s->libname || !strstr(s->libname, libfilter))) { continue; }
+		if (!res || (s->size && s->size < res->size)) { res = s; }
+	}
+	return res;
+}
+
+/**
+* Return the runtime address (and size) of a global data object by name.
+*
+* Usage from lua:
+*   addr      = globals_addr("name")
+*   addr      = globals_addr("name", "libfoo")
+*   addr,size = globals_addr("name")
+*
+* Handy when a resolved name is not a valid Lua identifier -- e.g. an
+* LTO-privatized static like "server_banner.lto_priv.0", which cannot be
+* written as a bare global -- so it can be inspected by name:
+*   hexdump(globals_addr("server_banner.lto_priv.0"))        -- dumps its size
+*   hexdump(globals_addr("server_banner.lto_priv.0"), 32)    -- dumps 32 bytes
+* Returns nil when no such data object is known.
+*/
+static int globals_addr(lua_State * L)
+{
+	const char *name = luaL_checkstring(L, 1);
+	const char *lib = lua_isstring(L, 2) ? lua_tostring(L, 2) : 0;
+	symbols_t *s = object_by_name(name, lib);
+
+	if (!s) { lua_pushnil(L); return 1; }
+	lua_pushinteger(L, s->addr);
+	lua_pushinteger(L, s->size);
+	return 2;	// address, size (size ignored when caller uses only the first)
+}
+
+/**
+* __index metamethod for a reified globals table: read a global's live value
+* by name. Scalars (size 1/2/4/8) come back as integers; anything else as a
+* Lua string of the raw bytes. Unmapped memory yields nil rather than a fault.
+*/
+static int globals_reify_index(lua_State * L)
+{
+	const char *name = lua_tostring(L, 2);
+	const char *libfilter = 0;
+	symbols_t *s = 0;
+	unsigned long int addr = 0;
+
+	// Optional library filter was stored as upvalue 1 (may be nil)
+	if (lua_isstring(L, lua_upvalueindex(1))) {
+		libfilter = lua_tostring(L, lua_upvalueindex(1));
+	}
+
+	if (!name) { lua_pushnil(L); return 1; }
+	s = object_by_name(name, libfilter);
+	if (!s || !s->size) { lua_pushnil(L); return 1; }
+	addr = s->addr;
+
+	// Don't fault on unmapped / partially mapped objects
+	if (msync((void*)(addr & ~0xfffUL), s->size, 0) != 0) { lua_pushnil(L); return 1; }
+
+	switch (s->size) {
+	case 1: lua_pushinteger(L, *(unsigned char *)addr);       break;
+	case 2: lua_pushinteger(L, *(unsigned short *)addr);      break;
+	case 4: lua_pushinteger(L, *(unsigned int *)addr);        break;
+	case 8: lua_pushinteger(L, *(unsigned long int *)addr);   break;
+	default: lua_pushlstring(L, (char *)addr, s->size);       break;
+	}
+	return 1;
+}
+
+/**
+* __newindex metamethod: write a global's live value by name. A number is
+* stored at the object's width (1/2/4/8, wider truncates to 8); a string is
+* memcpy'd up to the object's size.
+*/
+static int globals_reify_newindex(lua_State * L)
+{
+	const char *name = lua_tostring(L, 2);
+	const char *libfilter = 0;
+	symbols_t *s = 0;
+	unsigned long int addr = 0;
+
+	if (lua_isstring(L, lua_upvalueindex(1))) {
+		libfilter = lua_tostring(L, lua_upvalueindex(1));
+	}
+
+	if (!name) { return 0; }
+	s = object_by_name(name, libfilter);
+	if (!s || !s->size) { return luaL_error(L, "globals: no writable global named '%s'", name); }
+	addr = s->addr;
+
+	if (msync((void*)(addr & ~0xfffUL), s->size, 0) != 0) {
+		return luaL_error(L, "globals: '%s' is not mapped", name);
+	}
+
+	if (lua_isnumber(L, 3)) {
+		unsigned long int v = (unsigned long int) lua_tointeger(L, 3);
+		switch (s->size) {
+		case 1: *(unsigned char *)addr      = (unsigned char) v;  break;
+		case 2: *(unsigned short *)addr     = (unsigned short) v; break;
+		case 4: *(unsigned int *)addr       = (unsigned int) v;   break;
+		default: *(unsigned long int *)addr = v;                  break;
+		}
+	} else if (lua_isstring(L, 3)) {
+		size_t len = 0;
+		const char *p = lua_tolstring(L, 3, &len);
+		memcpy((void*)addr, p, len < s->size ? len : s->size);
+	} else {
+		return luaL_error(L, "globals: unsupported value type for '%s'", name);
+	}
+	return 0;
+}
+
+/**
+* Reify global variables: return a proxy table through which every data
+* object (STT_OBJECT) can be read and written live by its symbol name.
+*
+* Usage from lua:
+*   g = globals_reify()            -- all known data objects
+*   g = globals_reify("libfoo")    -- restrict to objects from this library
+*   print(g.some_global)           -- read live value
+*   g.some_global = 0x41           -- write it back
+*
+* Names resolve through the symbol table, so this covers every global whose
+* symbol is known (exported globals survive strip; see globals tracing notes
+* for the .dynsym-vs-.symtab limitation). Scalars reify as integers, larger
+* objects as raw byte strings; for a C struct view use ptr2struct() with the
+* object's address.
+*/
+static int globals_reify(lua_State * L)
+{
+	const char *libfilter = 0;
+	unsigned int count = 0;
+	symbols_t *s = 0, *stmp = 0;
+
+	if (lua_isstring(L, 1)) { libfilter = luaL_checkstring(L, 1); }
+
+	// Count what we can reach, for a short informational line
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if (!s->htype || strncmp(s->htype, "Object", 6)) { continue; }
+		if (libfilter && (!s->libname || !strstr(s->libname, libfilter))) { continue; }
+		count++;
+	}
+	printf(" -- Reified %u global object(s)%s%s: index by name (read/write)\n",
+		count, libfilter ? " from " : "", libfilter ? libfilter : "");
+
+	// Build the proxy table and attach a metatable whose __index/__newindex
+	// carry the (optional) library filter as an upvalue.
+	lua_newtable(L);				// proxy
+	lua_newtable(L);				// metatable
+
+	lua_pushstring(L, "__index");
+	if (libfilter) { lua_pushstring(L, libfilter); } else { lua_pushnil(L); }
+	lua_pushcclosure(L, globals_reify_index, 1);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "__newindex");
+	if (libfilter) { lua_pushstring(L, libfilter); } else { lua_pushnil(L); }
+	lua_pushcclosure(L, globals_reify_newindex, 1);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);			// proxy now has the metatable
+	return 1;					// return the proxy table
 }
 
 
@@ -5902,6 +7189,11 @@ int wsh_run(void)
 	parse_link_map_dyn((struct link_map *)wsh->mainhandle);
 	parse_link_vdso();
 
+	// Command-line load path ("wsh <binary>") scans symbols here rather than
+	// via rescan(); merge the target's on-disk .symtab so its file-local
+	// globals get names too.
+	load_target_symtab();
+
 	/**
 	* run internal lua buffers
 	*/
@@ -6130,6 +7422,17 @@ struct link_map *do_loadlib(char *libname)
 
 	if (wsh->opt_verbose) {
 		printf("  * Loading %s\n", libname);
+	}
+
+	// Record this as the current globals-tracing target (default scope).
+	// Sections carry the full resolved path as libname; keep the basename so a
+	// loadbin("./foo") still matches the "foo" the loader records.
+	if (wsh->globals_target_lib) {
+		free(wsh->globals_target_lib);
+	}
+	{
+		char *base = strrchr(libname, '/');
+		wsh->globals_target_lib = strdup(base ? base + 1 : libname);
 	}
 
 	handle = dlopen(libname, wsh->opt_global ? RTLD_NOW | RTLD_GLOBAL : RTLD_NOW);
@@ -7496,3 +8799,286 @@ void init_struct2c(lua_State *L)
 	create_struct_def_metatable(L);
 }
 
+/**
+* kcontext() -> table
+*
+* Dump the userland-visible projection of this task's kernel context -- c2 in
+* the context-layer model. The backing task_struct lives in ring 0 and cannot
+* be read directly from here; what this returns is the state the kernel
+* *exports* of it, through two channels:
+*
+*   Tier 1 -- direct syscalls (always available, even with no /proc):
+*             identity (pid/tid/ppid), credentials (uid/gid + capabilities),
+*             cwd, blocked signal mask, resource limits.
+*   Tier 2 -- /proc/self/ (richer, optional): umask, per-fd target + file
+*             offset + flags, signal dispositions (caught/ignored/pending),
+*             namespaces.
+*
+* The two channels do NOT cover the same fields: umask, per-fd offsets, signal
+* dispositions and namespace identities have no syscall mirror, so when /proc
+* is absent (minimal container, chroot, hidepid) that subset of c2 becomes
+* unobservable from userland. The returned table carries a boolean "proc" so
+* the caller knows which projection it got.
+*
+* This is c2 observed as *content* -- contrast c3 (hardware: caches, MSRs),
+* which the kernel exposes only as effect/counts, never as a struct to read.
+*/
+static int kcontext(lua_State * L)
+{
+	char buf[512];
+	int have_proc;
+
+	lua_newtable(L);
+
+	/* One cheap probe decides whether the richer /proc tier runs. */
+	have_proc = (access("/proc/self/status", R_OK) == 0);
+	lua_pushstring(L, "proc");
+	lua_pushboolean(L, have_proc);
+	lua_settable(L, -3);
+
+	/* ================= TIER 1 : syscalls (no /proc needed) ================= */
+
+	/* --- identity (task_struct pid / tgid / real_parent) --- */
+	lua_pushstring(L, "pid");  lua_pushinteger(L, getpid());                   lua_settable(L, -3);
+	lua_pushstring(L, "tid");  lua_pushinteger(L, (lua_Integer)syscall(SYS_gettid)); lua_settable(L, -3);
+	lua_pushstring(L, "ppid"); lua_pushinteger(L, getppid());                  lua_settable(L, -3);
+	lua_pushstring(L, "pgrp"); lua_pushinteger(L, getpgrp());                  lua_settable(L, -3);
+	lua_pushstring(L, "sid");  lua_pushinteger(L, getsid(0));                  lua_settable(L, -3);
+
+	/* --- credentials: ids (struct cred) --- */
+	lua_pushstring(L, "uid");  lua_pushinteger(L, getuid());  lua_settable(L, -3);
+	lua_pushstring(L, "euid"); lua_pushinteger(L, geteuid()); lua_settable(L, -3);
+	lua_pushstring(L, "gid");  lua_pushinteger(L, getgid());  lua_settable(L, -3);
+	lua_pushstring(L, "egid"); lua_pushinteger(L, getegid()); lua_settable(L, -3);
+
+	/* --- credentials: capability sets (struct cred -> cap_*) ---
+	 * Read via capget() so caps are in the always-available tier rather than
+	 * parsed from /proc. CapEff is the behaviour-deciding one: whether a
+	 * privileged operation in the called function succeeds or returns EPERM.
+	 * capget() with the v3 header returns two 32-bit words per set (low/high);
+	 * we fold each set into a 64-bit value. */
+	{
+		struct __user_cap_header_struct hdr;
+		struct __user_cap_data_struct   data[2];	/* _LINUX_CAPABILITY_U32S_3 == 2 */
+
+		memset(&hdr, 0, sizeof(hdr));
+		memset(data, 0, sizeof(data));
+		hdr.version = _LINUX_CAPABILITY_VERSION_3;
+		hdr.pid = 0;	/* self */
+
+		if (syscall(SYS_capget, &hdr, data) == 0) {
+			unsigned long long eff = ((unsigned long long)data[1].effective   << 32) | data[0].effective;
+			unsigned long long prm = ((unsigned long long)data[1].permitted   << 32) | data[0].permitted;
+			unsigned long long inh = ((unsigned long long)data[1].inheritable << 32) | data[0].inheritable;
+
+			lua_pushstring(L, "cap");
+			lua_newtable(L);
+			lua_pushstring(L, "eff"); lua_pushinteger(L, (lua_Integer)eff); lua_settable(L, -3);
+			lua_pushstring(L, "prm"); lua_pushinteger(L, (lua_Integer)prm); lua_settable(L, -3);
+			lua_pushstring(L, "inh"); lua_pushinteger(L, (lua_Integer)inh); lua_settable(L, -3);
+			lua_settable(L, -3);
+		}
+	}
+
+	/* --- fs_struct: cwd (getcwd is a syscall; no /proc) --- */
+	if (getcwd(buf, sizeof(buf))) {
+		lua_pushstring(L, "cwd"); lua_pushstring(L, buf); lua_settable(L, -3);
+	}
+
+	/* --- signal_struct: BLOCKED mask, via sigprocmask (syscall) --- */
+	{
+		sigset_t set;
+		if (sigprocmask(SIG_BLOCK, NULL, &set) == 0) {
+			unsigned long long m = 0;
+			int s;
+			for (s = 0; s < 64 && s < _NSIG; s++)
+				if (sigismember(&set, s + 1)) m |= (1ULL << s);
+			lua_pushstring(L, "sigblk");
+			lua_pushinteger(L, (lua_Integer) m);
+			lua_settable(L, -3);
+		}
+	}
+
+	/* --- signal_struct / rlimit: resource limits, via getrlimit (syscall).
+	 * RLIMIT_STACK bounds recursion depth (ties to wsh's own stack-overflow
+	 * detection); RLIMIT_NOFILE bounds how many fds the function can open.
+	 * RLIM_INFINITY is reported as -1 so "unlimited" is unambiguous in Lua. */
+	{
+		static const struct { int r; const char *k; } rl[] = {
+			{ RLIMIT_NOFILE, "nofile" },
+			{ RLIMIT_STACK,  "stack"  },
+			{ RLIMIT_AS,     "as"     },
+			{ RLIMIT_CORE,   "core"   },
+			{ RLIMIT_CPU,    "cpu"    },
+			{ -1, 0 }
+		};
+		int i;
+		lua_pushstring(L, "rlimit");
+		lua_newtable(L);
+		for (i = 0; rl[i].k; i++) {
+			struct rlimit lim;
+			if (getrlimit(rl[i].r, &lim) == 0) {
+				lua_pushstring(L, rl[i].k);
+				lua_pushinteger(L, lim.rlim_cur == RLIM_INFINITY
+						? (lua_Integer)-1
+						: (lua_Integer)lim.rlim_cur);
+				lua_settable(L, -3);
+			}
+		}
+		lua_settable(L, -3);
+	}
+
+	/* ================= TIER 2 : /proc/self/ (optional) ================= */
+	if (!have_proc) {
+		/* Syscall-only projection. Caller already saw proc=false; the
+		 * /proc-exclusive fields (umask, fd offsets, sig dispositions,
+		 * namespaces) are simply absent -- that part of c2 is dark here. */
+		return 1;
+	}
+
+	/* --- /proc/self/status: umask, signal dispositions ---
+	 * umask is read from status (the "Umask:" line) rather than via the
+	 * umask() syscall ON PURPOSE: umask(m) has no read-only form -- it SETS
+	 * and returns the previous value, so reading it via the syscall would
+	 * perturb the very state we claim to observe. The /proc export exists
+	 * precisely to make it observable without the set side effect.
+	 * SigIgn/SigCgt/SigPnd are the dispositions: which signals are ignored,
+	 * caught, or pending -- relevant because the function under test (and
+	 * wsh's own fault oracle) install handlers. */
+	{
+		FILE *f = fopen("/proc/self/status", "r");
+		if (f) {
+			char line[256];
+			while (fgets(line, sizeof(line), f)) {
+				unsigned int um;
+				unsigned long long v;
+				if (sscanf(line, "Umask:\t%o", &um) == 1) {
+					lua_pushstring(L, "umask");
+					lua_pushinteger(L, (lua_Integer) um);
+					lua_settable(L, -3);
+				} else if (sscanf(line, "SigIgn:\t%llx", &v) == 1) {
+					lua_pushstring(L, "sigign");
+					lua_pushinteger(L, (lua_Integer) v);
+					lua_settable(L, -3);
+				} else if (sscanf(line, "SigCgt:\t%llx", &v) == 1) {
+					lua_pushstring(L, "sigcgt");
+					lua_pushinteger(L, (lua_Integer) v);
+					lua_settable(L, -3);
+				} else if (sscanf(line, "SigPnd:\t%llx", &v) == 1) {
+					lua_pushstring(L, "sigpnd");
+					lua_pushinteger(L, (lua_Integer) v);
+					lua_settable(L, -3);
+				}
+			}
+			fclose(f);
+		}
+	}
+
+	/* --- fs_struct: chroot root, via /proc/self/root symlink --- */
+	{
+		ssize_t rn = readlink("/proc/self/root", buf, sizeof(buf) - 1);
+		if (rn > 0) {
+			buf[rn] = 0;
+			lua_pushstring(L, "root");
+			lua_pushstring(L, buf);
+			lua_settable(L, -3);
+		}
+	}
+
+	/* --- files_struct -> struct file: per-fd target, OFFSET, flags ---
+	 * The offset (f_pos) is live kernel state the function under test depends
+	 * on but never receives as a parameter: the same read(fd,...) returns
+	 * different bytes at a different pos. This is the headline c2 specimen --
+	 * ambient, mutable, per-open-file, with no syscall mirror, exported only
+	 * via /proc/self/fdinfo/N and /proc/self/fd/N.
+	 * NB: f_pos belongs to the open-file-description, so dup()ed / inherited
+	 * fds share one offset -- pos is a property of the OFD, not strictly the fd.
+	 * NB: /proc/self/fdinfo prints "flags:" in OCTAL. */
+	{
+		DIR *d = opendir("/proc/self/fd");
+		lua_pushstring(L, "fds");
+		lua_newtable(L);			/* fds = { [fd] = { path, pos, flags, mnt_id } } */
+		if (d) {
+			struct dirent *e;
+			while ((e = readdir(d))) {
+				int fd;
+				char lpath[64], fdipath[64], target[256];
+				ssize_t tn;
+				FILE *fi;
+
+				if (e->d_name[0] == '.') { continue; }
+				fd = atoi(e->d_name);
+
+				lua_pushinteger(L, fd);
+				lua_newtable(L);	/* one record */
+
+				/* what it points at */
+				snprintf(lpath, sizeof(lpath), "/proc/self/fd/%d", fd);
+				tn = readlink(lpath, target, sizeof(target) - 1);
+				if (tn > 0) {
+					target[tn] = 0;
+					lua_pushstring(L, "path");
+					lua_pushstring(L, target);
+					lua_settable(L, -3);
+				}
+
+				/* offset + flags + mnt_id */
+				snprintf(fdipath, sizeof(fdipath), "/proc/self/fdinfo/%d", fd);
+				fi = fopen(fdipath, "r");
+				if (fi) {
+					char line[128];
+					while (fgets(line, sizeof(line), fi)) {
+						unsigned long long v;
+						if (sscanf(line, "pos:\t%llu", &v) == 1) {
+							lua_pushstring(L, "pos");
+							lua_pushinteger(L, (lua_Integer) v);
+							lua_settable(L, -3);
+						} else if (sscanf(line, "flags:\t%llo", &v) == 1) {
+							/* flags printed in octal by the kernel */
+							lua_pushstring(L, "flags");
+							lua_pushinteger(L, (lua_Integer) v);
+							lua_settable(L, -3);
+						} else if (sscanf(line, "mnt_id:\t%llu", &v) == 1) {
+							lua_pushstring(L, "mnt_id");
+							lua_pushinteger(L, (lua_Integer) v);
+							lua_settable(L, -3);
+						}
+					}
+					fclose(fi);
+				}
+
+				lua_settable(L, -3);	/* fds[fd] = record */
+			}
+			closedir(d);
+		}
+		lua_settable(L, -3);		/* ctx.fds = fds */
+	}
+
+	/* --- nsproxy: namespace identities, via /proc/self/ns/ symlinks.
+	 * Each symlink target is like "net:[4026531840]"; the inode in brackets
+	 * identifies the namespace. net ns changes what connect() reaches (ties
+	 * to c4); mnt ns changes what paths resolve to. --- */
+	{
+		static const char *ns[] = {
+			"pid", "net", "mnt", "uts", "ipc", "user", "cgroup", "time", 0
+		};
+		int i;
+		lua_pushstring(L, "ns");
+		lua_newtable(L);
+		for (i = 0; ns[i]; i++) {
+			char path[64];
+			ssize_t nn;
+			snprintf(path, sizeof(path), "/proc/self/ns/%s", ns[i]);
+			nn = readlink(path, buf, sizeof(buf) - 1);
+			if (nn > 0) {
+				buf[nn] = 0;
+				lua_pushstring(L, ns[i]);
+				lua_pushstring(L, buf);
+				lua_settable(L, -3);
+			}
+		}
+		lua_settable(L, -3);
+	}
+
+	return 1;	/* the table */
+}

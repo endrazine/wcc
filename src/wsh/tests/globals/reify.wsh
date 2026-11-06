@@ -1,0 +1,21 @@
+--
+-- Regression driver for globals_reify(): live read/write of globals by name.
+-- Uses the same libglobals_target.so with known initial values
+-- (g_counter=100, g_initialized=7).
+--
+-- Copyright 2016-2026 Jonathan Brossard. MIT License.
+--
+
+loadbin("./libglobals_target.so")
+
+g = globals_reify("libglobals_target")
+
+print("R g_counter "..tostring(g.g_counter))          -- 100
+print("R g_initialized "..tostring(g.g_initialized))  -- 7
+
+g.g_counter = 777                                      -- live write
+print("W g_counter "..tostring(g.g_counter))          -- 777
+
+print("R missing "..tostring(g.no_such_global))        -- nil
+
+exit(0)

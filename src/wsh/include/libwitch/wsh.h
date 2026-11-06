@@ -270,6 +270,46 @@
 #define SIGSTKFLT 16
 
 /**
+* Globals tracing parameters
+*/
+#define GLOBALS_LOG_MAX 65536	// Max number of global accesses to log
+
+// Scope: which loaded objects have their data sections traced
+#define GLOBALS_SCOPE_TARGET	0	// Only the binary last loaded via loadbin() (default)
+#define GLOBALS_SCOPE_ALL	1	// Every loaded object except wsh itself and its runtime deps
+#define GLOBALS_SCOPE_NAMED	2	// Only the object whose libname matches globals_filter_lib
+
+/**
+* A single logged global variable access
+*/
+typedef struct global_access_t {
+	unsigned long int addr;		// Address of the global accessed
+	unsigned long int rip;		// Instruction pointer that accessed it
+	unsigned int fault;		// FAULT_READ, FAULT_WRITE, or FAULT_EXEC
+	char *section_name;		// Section name (.data, .bss, .rodata, etc)
+	char *libname;			// Library/binary name
+	unsigned long int offset;	// Offset within the section
+	char *var_name;			// Resolved global variable name, or NULL if stripped/unknown
+	unsigned long int var_offset;	// Offset within the resolved variable
+} global_access_t;
+
+/**
+* A protected section tracked for globals tracing
+*/
+typedef struct globals_prot_t {
+	unsigned long int addr;		// Page-aligned start address
+	unsigned long int size;		// Page-aligned size
+	unsigned long int orig_addr;	// Original section address
+	unsigned long int orig_size;	// Original section size
+	char *name;			// Section name
+	char *libname;			// Library/binary name
+	int orig_prot;			// Original protection flags (for restore)
+
+	struct globals_prot_t *prev;	// utlist.h
+	struct globals_prot_t *next;	// utlist.h
+} globals_prot_t;
+
+/**
 * Backtrace parameters
 */
 #ifdef DEBUG
@@ -333,6 +373,21 @@ static void rtrace(lua_State * L);
 static void unsystrace(lua_State * L);
 static void unrtrace(lua_State * L);
 
+static int globalstrace(lua_State * L);
+static int unglobalstrace(lua_State * L);
+static int globalspoison(lua_State * L);
+static int unglobalspoison(lua_State * L);
+static int globals_show(lua_State * L);
+static int globals_reify(lua_State * L);
+static int globals_addr(lua_State * L);
+
+// Globals tracing internal helpers (called from libcall(), defined later).
+// globals_is_self()/globals_section_in_scope() need no prototype: they are
+// defined ahead of their only callers.
+static void globals_protect_sections(void);
+static void globals_unprotect_sections(void);
+static void globals_poison_sections(void);
+
 
 static int add_symbol(char *symbol, char *libname, char *htype, char *hbind, unsigned long value, unsigned int size, unsigned long int addr);
 static void segment_add(unsigned long int addr, unsigned long int size, char *perms, char *fname, char *ptype, int flags);
@@ -375,10 +430,20 @@ int arch_set(lua_State * L);
 int arch_info(lua_State * L);
 int arch_list(lua_State * L);
 static int load_struct_def(lua_State *L);
+static int load_symtab(lua_State *L);
 static int ptr2struct(lua_State * L);
 static int headers(lua_State * L);
 static int prototypes(lua_State * L);
+static int prototypes_c(lua_State * L);
+static int lsyscall(lua_State * L);
 static int bsspolute(lua_State * L);
+
+static int eflags_get(lua_State * L);
+static int eflags_set(lua_State * L);
+static int fsbase_get(lua_State * L);
+static int gsbase_get(lua_State * L);
+
+static int kcontext(lua_State * L);
 
 static unsigned int ltrace(void);
 static int procmap_lua(void);
@@ -561,6 +626,7 @@ typedef struct wsh_t {
 	unsigned int firstsignal;
 	unsigned int totsignals;	// Per libcall
 	unsigned int globalsignals;	// Never reset
+	unsigned int in_fault;		// Re-entrancy guard: set while handling a crash signal
 	unsigned long int faultaddr;
 
 	unsigned int userland_loaded;
@@ -597,6 +663,10 @@ typedef struct wsh_t {
 	unsigned int trace_rtrace;
 	unsigned int trace_strace;
 
+	unsigned int trace_globals;		// Globals tracing active
+	unsigned int globals_poison;		// Poison data sections before call
+	unsigned int globals_scope;		// GLOBALS_SCOPE_* : which objects to trace
+
 	unsigned int singlestep_count;
 	unsigned int singlebranch_count;
 	unsigned int sigbus_count;
@@ -604,6 +674,14 @@ typedef struct wsh_t {
 	unsigned long long int singlestep_hash;
 	unsigned long long int singlebranch_hash;
 	unsigned long long int sigbus_hash;
+
+	// Globals tracing state
+	global_access_t *globals_log;		// Ring buffer of global accesses
+	unsigned int globals_log_count;		// Number of entries logged
+	unsigned long long int globals_hash;	// Rolling hash of accesses
+	struct globals_prot_t *globals_prot;	// Protected sections list
+	char *globals_filter_lib;		// Optional: only trace this library (GLOBALS_SCOPE_NAMED)
+	char *globals_target_lib;		// libname of last binary loaded via loadbin() (GLOBALS_SCOPE_TARGET)
 
 	jmp_buf longjmp_ptr_high;
 	jmp_buf longjmp_ptr;

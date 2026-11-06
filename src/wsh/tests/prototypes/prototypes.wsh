@@ -1,0 +1,14 @@
+--
+-- Example + regression driver for prototypes_c() SAL header generation.
+--
+-- Reads the crafted ./learnwitch.log (functions in testlibproto.so, which is
+-- NOT loaded, so they come through the learn-only path) and emits annotated
+-- C prototypes. Filtering to "testlibproto" keeps the output deterministic
+-- (no libc symbols). run_test.sh checks the SAL annotations.
+--
+-- Copyright 2016-2026 Jonathan Brossard. MIT License.
+--
+
+prototypes_c("", "testlibproto")
+
+exit(0)

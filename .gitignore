@@ -14,6 +14,16 @@ doc/html/
 src/wsh/lua/src/liblua.a
 src/wsh/lua/src/lua
 src/wsh/lua/src/luac
+
+# wsh build outputs
+src/wsh/wsh
+src/wsh/wsh-static-*
+src/wsh/wsh-*
+src/wsh/libwitch.a
+
+# librustdemangle (cargo) build outputs
+src/wsh/librustdemangle/Cargo.lock
+src/wsh/librustdemangle/target/
 NEW.txt
 doc/latex/
 elf64_header.json
