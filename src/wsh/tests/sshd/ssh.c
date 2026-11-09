@@ -1,7 +1,7 @@
 /**
 * Test code for the Witchcraft Compiler Collection
 *
-* Copyright 2016-2022 Jonathan Brossard.
+* Copyright 2016-2026 Jonathan Brossard.
 *
 * This file is licensed under the MIT License.
 *
@@ -16,12 +16,16 @@
 
 #include "ssh.h"
 
-int main (int argc, char **argv, char **envp){
-	int ret;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-	printf("calling get_hostkey_index()\n");
-	ret = get_hostkey_index(0x41414141, 0x42424242, 0x43434343, 0x444444444, 0x45454545, 0x46464646);
-	printf("returned: %d\n", ret);
+int main (int argc, char **argv, char **envp){
+	int ret = 0;
+
+	printf("calling setlogin()\n");
+	ret = setlogin(0x41414141);
+	printf("returned successfully: %d\n", ret);
 	return 0;
 }
 

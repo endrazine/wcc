@@ -8,13 +8,15 @@
 #
 
 all::
-#	cd apache2 && make
-#	cd  sshd && make
+	cd apache2 && make
+	cd  sshd && make
 #	cd  sshd2 && make
 	cd  globals && make
 
 # Self-checking regression tests
 test:
+	cd apache2 && make test
+	cd sshd && make test
 	cd globals && make test
 	cd syscall && make test
 	cd prototypes && make test

@@ -286,6 +286,7 @@ typedef struct global_access_t {
 	unsigned long int addr;		// Address of the global accessed
 	unsigned long int rip;		// Instruction pointer that accessed it
 	unsigned int fault;		// FAULT_READ, FAULT_WRITE, or FAULT_EXEC
+	unsigned int is_atomic;		// 1 if instruction uses atomic/locked access (LOCK prefix, XCHG, LDXR/STXR, etc.)
 	char *section_name;		// Section name (.data, .bss, .rodata, etc)
 	char *libname;			// Library/binary name
 	unsigned long int offset;	// Offset within the section
@@ -620,6 +621,9 @@ typedef struct wsh_t {
 	unsigned int opt_pagination;
 
 	unsigned int opt_userland_load;	// Force use of userland loader
+	unsigned int opt_seed;		// PRNG seed for deterministic fuzzing (0 = not set)
+	unsigned int opt_seed_set;	// 1 if -s was passed (seed=0 is valid)
+	char *opt_exec;			// -e "lua code": evaluate string after scripts
 
 	unsigned int firsterrno;
 	unsigned int firstsicode;

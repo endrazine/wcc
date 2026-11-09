@@ -1155,6 +1155,37 @@ symbols_t *symbol_from_name(char *fname)
 	return NULL;
 }
 
+/**
+* Return the "public" symbol at an exact address.
+*
+* When multiple symbols share the same address (common with IFUNC-resolved
+* functions: e.g. memcpy and __memmove_evex_unaligned_erms both point to the
+* same entry), prefer the user-facing name: Global binding, no leading
+* double-underscore prefix, shorter name.
+*/
+static symbols_t *public_symbol_from_addr(unsigned long int addr)
+{
+	symbols_t *s = 0, *stmp = 0, *res = 0;
+
+	DL_FOREACH_SAFE(wsh->symbols, s, stmp) {
+		if (s->addr != addr) { continue; }
+		if (!res) { res = s; continue; }
+
+		int s_global = (s->hbind && !strncmp(s->hbind, "Global", 6));
+		int r_global = (res->hbind && !strncmp(res->hbind, "Global", 6));
+		if (s_global && !r_global) { res = s; continue; }
+		if (!s_global && r_global) { continue; }
+
+		int s_internal = (s->symbol && s->symbol[0] == '_' && s->symbol[1] == '_');
+		int r_internal = (res->symbol && res->symbol[0] == '_' && res->symbol[1] == '_');
+		if (!s_internal && r_internal) { res = s; continue; }
+		if (s_internal && !r_internal) { continue; }
+
+		if (strlen(s->symbol) < strlen(res->symbol)) { res = s; }
+	}
+	return res;
+}
+
 
 /**
 * Generate headers
@@ -3418,11 +3449,47 @@ skipmsync:
         lua_settable(L, -3);
 
 	/**
+	* Push globals execution hash to lua table
+	*/
+	lua_pushstring(L, "ghash");		/* push key */
+	if (wsh->trace_globals && wsh->globals_hash) {
+		char hashbuf[32];
+		snprintf(hashbuf, sizeof(hashbuf), "g:%016llx", wsh->globals_hash);
+		lua_pushstring(L, hashbuf);
+	} else {
+		lua_pushnil(L);
+	}
+        lua_settable(L, -3);
+
+	/**
 	* Push first signal
 	*/
 //	lua_pushstring(L, "fsig");		/* push key */
 //	lua_pushinteger(L, wsh->firstsignal);
 //        lua_settable(L, -3);
+
+	/**
+	* Push counts of atomic and write accesses for thread-safety analysis.
+	* - atomics: accesses using LOCK prefix / LDXR / LDREX (mutex ops)
+	* - writes:  non-atomic write accesses to globals
+	*/
+	if (wsh->trace_globals && wsh->globals_log) {
+		unsigned int _g_atomics = 0, _g_writes = 0;
+		unsigned int _gi;
+		for (_gi = 0; _gi < wsh->globals_log_count; _gi++) {
+			if (wsh->globals_log[_gi].is_atomic)
+				_g_atomics++;
+			else if (wsh->globals_log[_gi].fault == FAULT_WRITE)
+				_g_writes++;
+		}
+		lua_pushstring(L, "atomics");
+		lua_pushinteger(L, _g_atomics);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "writes");
+		lua_pushinteger(L, _g_writes);
+		lua_settable(L, -3);
+	}
 
 	/**
 	* Push first signal name
@@ -3602,7 +3669,9 @@ skipmsync:
 //	lua_pushinteger(L, arg[0]);
 //	lua_settable(L, -3);
 
-	symbols_t *symlib = symbol_from_addr(arg[0]);
+	symbols_t *symlib = public_symbol_from_addr(arg[0]);
+	if (!symlib) { symlib = symbol_from_addr(arg[0]); }
+	symbols_t *symimpl = symbol_from_addr(arg[0]);
 	if(symlib){
 		lua_pushstring(L,"alibcall");		/* key */
 		lua_pushstring(L, symlib->symbol);
@@ -3610,6 +3679,11 @@ skipmsync:
 
 		lua_pushstring(L,"alibname");		/* key */
 		lua_pushstring(L, symlib->libname);
+		lua_settable(L, -3);
+	}
+	if(symimpl){
+		lua_pushstring(L,"alibimpl");		/* key */
+		lua_pushstring(L, symimpl->symbol);
 		lua_settable(L, -3);
 	}
 
@@ -4890,6 +4964,10 @@ int printarg(unsigned long int val)
 	return 0;
 }
 
+// Cached page size for signal handlers — they cannot call sysconf()
+// when libc .data is PROT_NONE.  Set once in globals_protect_sections().
+static unsigned long globals_cached_pagesize = 0;
+
 void traphandler(int signal, siginfo_t * s, void *ptr)
 {
 	unsigned int i = 0;
@@ -4989,10 +5067,11 @@ void traphandler(int signal, siginfo_t * s, void *ptr)
 			// We re-protect all pages in protected regions
 			// (the SIGSEGV handler only unprotected one page at a time)
 			unsigned long int pg;
-			for (pg = gp->addr; pg < gp->addr + gp->size; pg += sysconf(_SC_PAGE_SIZE)) {
+			unsigned long int pgsz = globals_cached_pagesize;
+			for (pg = gp->addr; pg < gp->addr + gp->size; pg += pgsz) {
 				// Don't protect the page we're currently executing on
 				if (pg != rip_page) {
-					mprotect((void*)pg, sysconf(_SC_PAGE_SIZE), PROT_NONE);
+					mprotect((void*)pg, pgsz, PROT_NONE);
 				}
 			}
 		}
@@ -5192,6 +5271,141 @@ char *sicode_strerror(int signal, siginfo_t * s)
 	return sicode;
 }
 
+/**
+* Async-signal-safe formatting helpers for the globals SIGSEGV handler.
+* These use ONLY stack memory and basic arithmetic — no libc globals are
+* touched, so they remain safe when libc .data/.bss is PROT_NONE.
+*/
+
+static inline int _ha_str(char *b, int rem, const char *s)
+{
+	int i = 0;
+	if (!s) { const char *n = "(null)"; while (n[i] && i < rem) { b[i] = n[i]; i++; } return i; }
+	while (s[i] && i < rem) { b[i] = s[i]; i++; }
+	return i;
+}
+
+static inline int _ha_pad(char *b, int rem, const char *s, int width)
+{
+	int i = _ha_str(b, rem < width ? rem : width, s);
+	while (i < width && i < rem) b[i++] = ' ';
+	return i;
+}
+
+static inline int _ha_hex(char *b, int rem, unsigned long long val)
+{
+	const char hx[] = "0123456789abcdef";
+	if (val == 0 && rem > 0) { b[0] = '0'; return 1; }
+	char t[16]; int n = 0;
+	while (val && n < 16) { t[n++] = hx[val & 0xf]; val >>= 4; }
+	int l = n < rem ? n : rem;
+	for (int j = 0; j < l; j++) b[j] = t[n - 1 - j];
+	return l;
+}
+
+static inline int _ha_dec(char *b, int rem, unsigned long long val)
+{
+	if (val == 0 && rem > 0) { b[0] = '0'; return 1; }
+	char t[20]; int n = 0;
+	while (val && n < 20) { t[n++] = '0' + (val % 10); val /= 10; }
+	int l = n < rem ? n : rem;
+	for (int j = 0; j < l; j++) b[j] = t[n - 1 - j];
+	return l;
+}
+
+static inline int _ha_dec3(char *b, int rem, unsigned int val)
+{
+	if (rem < 3) return 0;
+	b[0] = '0' + (val / 100) % 10;
+	b[1] = '0' + (val / 10) % 10;
+	b[2] = '0' + val % 10;
+	return 3;
+}
+
+/**
+* Classify whether the instruction at 'rip' uses an atomic (locked) memory
+* access.  Architecture-specific, async-signal-safe (reads only .text bytes).
+*
+* Returns 1 for atomic accesses:
+*   x86_64/i386 : LOCK prefix (0xF0), or XCHG with memory operand
+*   AArch64     : Load/Store-exclusive (LDXR/STXR family), LSE atomics (CAS, SWP, LDADD...)
+*   ARMv7       : LDREX/STREX family
+*
+* This lets the globals tracer distinguish mutex operations from plain
+* data accesses — a function that brackets its global writes with atomic
+* acquire/release is synchronized and likely thread-safe, while one with
+* unguarded writes is a candidate race condition.
+*/
+#if defined(__x86_64__) || defined(__i386__)
+static inline int classify_atomic(void *rip_ptr)
+{
+	unsigned char *b = (unsigned char *)rip_ptr;
+	int i;
+	for (i = 0; i < 15; i++) {		// x86 insn max 15 bytes
+		switch (b[i]) {
+		case 0xF0:			// LOCK prefix
+			return 1;
+		case 0x86: case 0x87:		// XCHG r,r/m — implicit lock when mem operand
+			if ((b[i+1] & 0xC0) != 0xC0)	// modrm mod != 11 → memory operand
+				return 1;
+			return 0;
+		/* Skip legacy prefixes — keep scanning for LOCK */
+		case 0xF2: case 0xF3:		// REPNE / REP
+		case 0x2E: case 0x3E:		// CS / DS segment override
+		case 0x26: case 0x36:		// ES / SS segment override
+		case 0x64: case 0x65:		// FS / GS segment override
+		case 0x66: case 0x67:		// operand-size / address-size override
+			continue;
+		default:
+			if ((b[i] & 0xF0) == 0x40)	// REX prefix (0x40–0x4F)
+				continue;
+			return 0;		// reached an opcode — not atomic
+		}
+	}
+	return 0;
+}
+#elif defined(__aarch64__)
+static inline int classify_atomic(void *rip_ptr)
+{
+	uint32_t insn = *(uint32_t *)rip_ptr;
+
+	/* Load/Store-exclusive: size-001000-o2-L-1-Rs-o1-Rt2-Rn-Rt
+	 * Top bits [31:30] = size, [29:21] = 001000-0x-x
+	 * Mask 0x3F000000, expect 0x08000000 */
+	if ((insn & 0x3F000000) == 0x08000000)
+		return 1;
+
+	/* LSE atomics (ARMv8.1+): size-111000-A-R-1-Rs-o3-opc-00-Rn-Rt
+	 * Covers CAS, CASP, SWP, LDADD, LDCLR, LDEOR, LDSET, SMAX, SMIN, UMAX, UMIN
+	 * Mask 0x3B200C00, expect 0x38200000 */
+	if ((insn & 0x3B200C00) == 0x38200000)
+		return 1;
+
+	return 0;
+}
+#elif defined(__arm__)
+static inline int classify_atomic(void *rip_ptr)
+{
+	uint32_t insn = *(uint32_t *)rip_ptr;
+
+	/* LDREX variants: cond-00011-0-01-Rn-Rt-1111-1001-1111
+	 * STREX variants: cond-00011-0-00-Rn-Rd-1111-1001-Rt
+	 * Common mask on bits [27:20] and [7:4] */
+	if ((insn & 0x0F800FF0) == 0x01800F90)		// STREX family
+		return 1;
+	if ((insn & 0x0F900FFF) == 0x01900F9F)		// LDREX family
+		return 1;
+
+	return 0;
+}
+#else
+static inline int classify_atomic(void *rip_ptr)
+{
+	(void)rip_ptr;
+	return 0;	// unknown arch — conservatively say not atomic
+}
+#endif
+
 void sighandler(int signal, siginfo_t * s, void *ptr)
 {
 	ucontext_t *u = (ucontext_t *) ptr;
@@ -5211,6 +5425,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 	* log the access, mprotect the page +rwx, set TF, and return.
 	*/
 	if (wsh->trace_globals && signal == SIGSEGV && s->si_addr) {
+		static volatile int in_globals_handler = 0;
 		unsigned long int gaddr = (unsigned long int)s->si_addr;
 		globals_prot_t *gp = NULL, *gtmp = NULL, *match = NULL;
 
@@ -5237,6 +5452,18 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 
 		if (match) {
 			gp = match;
+
+			if (in_globals_handler) {
+				// Re-entrant fault (e.g. handler code touched a libc global):
+				// just unprotect the page and return — do NOT set TF, because
+				// the SIGTRAP handler would re-protect the page while we are
+				// still inside the main handler, causing an infinite loop.
+				// The page stays unprotected until the next protect_sections().
+				unsigned long int page = (unsigned long int)s->si_addr & ~(globals_cached_pagesize - 1);
+				mprotect((void*)page, globals_cached_pagesize, PROT_READ | PROT_WRITE | PROT_EXEC);
+				return;
+			}
+			in_globals_handler = 1;
 			{
 
 				// Determine access type from error code
@@ -5253,12 +5480,18 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 				// name (NULL when stripped / not an exported object).
 				symbols_t *gvar = object_from_addr(gaddr);
 
+				// Classify whether the instruction uses an atomic/locked
+				// access (LOCK prefix on x86, LDXR/STXR on ARM, etc.).
+				// Reads instruction bytes from .text — always r-x, safe here.
+				int gatomic = classify_atomic((void *)u->uc_mcontext.gregs[REG_RIP]);
+
 				// Log the access
 				if (wsh->globals_log && wsh->globals_log_count < GLOBALS_LOG_MAX) {
 					global_access_t *entry = &wsh->globals_log[wsh->globals_log_count];
 					entry->addr = gaddr;
 					entry->rip = u->uc_mcontext.gregs[REG_RIP];
 					entry->fault = gfault;
+					entry->is_atomic = gatomic;
 					entry->section_name = gp->name;
 					entry->libname = gp->libname;
 					entry->offset = gaddr - gp->orig_addr;
@@ -5270,42 +5503,64 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 				// Rolling hash
 				wsh->globals_hash = (wsh->globals_hash >> 2) ^ (~(unsigned long long int)s->si_addr);
 
-				// Print if verbose
+				// Print if verbose — fully async-signal-safe: only
+				// stack buffers, _ha_* helpers, and write(2).
 				if (wsh->opt_verbosetrace) {
-					char *gmode = (gfault == FAULT_WRITE) ? "W" : (gfault == FAULT_READ) ? "R" : "X";
+					char *gmode = gatomic ? "A" : (gfault == FAULT_WRITE) ? "W" : (gfault == FAULT_READ) ? "R" : "X";
 					symbols_t *sym = symbol_from_addr(u->uc_mcontext.gregs[REG_RIP]);
 
 					// Name the variable if we resolved one, else section+offset.
 					char gwhat[256];
+					int wp = 0;
 					if (gvar) {
+						wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, gvar->symbol);
 						if (gaddr - gvar->addr) {
-							snprintf(gwhat, sizeof(gwhat), "%s+0x%lx", gvar->symbol, gaddr - gvar->addr);
-						} else {
-							snprintf(gwhat, sizeof(gwhat), "%s", gvar->symbol);
+							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "+0x");
+							wp += _ha_hex(gwhat + wp, sizeof(gwhat) - wp, gaddr - gvar->addr);
 						}
 					} else {
-						snprintf(gwhat, sizeof(gwhat), "%s+0x%lx", gp->name, gaddr - gp->orig_addr);
+						wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, gp->name);
+						wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "+0x");
+						wp += _ha_hex(gwhat + wp, sizeof(gwhat) - wp, gaddr - gp->orig_addr);
 					}
+					if (wp < (int)sizeof(gwhat)) gwhat[wp] = '\0'; else gwhat[sizeof(gwhat)-1] = '\0';
 
+					// Format: " -- Global[NNN] M 0x ADDR\tVARIABLE\tFUNC()+OFF\tLIB\n"
+					char gbuf[512];
+					int p = 0;
+					#define R (int)(sizeof(gbuf) - p)
+					p += _ha_str(gbuf+p, R, " -- Global[");
+					p += _ha_dec(gbuf+p, R, wsh->globals_log_count);
+					p += _ha_str(gbuf+p, R, "] ");
+					p += _ha_str(gbuf+p, R, gmode);
+					p += _ha_str(gbuf+p, R, " 0x");
+					p += _ha_hex(gbuf+p, R, gaddr);
+					p += _ha_str(gbuf+p, R, "\t");
+					p += _ha_pad(gbuf+p, R, gwhat, 24);
+					p += _ha_str(gbuf+p, R, "\t");
 					if (sym) {
-						fprintf(stderr, " -- Global[%03u] %s 0x%lx\t%-24s\t%s()+%llu\t%s\n",
-							wsh->globals_log_count, gmode, gaddr, gwhat,
-							sym->symbol, u->uc_mcontext.gregs[REG_RIP] - sym->addr,
-							sym->libname);
+						p += _ha_str(gbuf+p, R, sym->symbol);
+						p += _ha_str(gbuf+p, R, "()+");
+						p += _ha_dec(gbuf+p, R, (unsigned long long)(u->uc_mcontext.gregs[REG_RIP] - sym->addr));
+						p += _ha_str(gbuf+p, R, "\t");
+						p += _ha_str(gbuf+p, R, sym->libname);
 					} else {
-						fprintf(stderr, " -- Global[%03u] %s 0x%lx\t%-24s\trip:0x%llx\n",
-							wsh->globals_log_count, gmode, gaddr, gwhat,
-							u->uc_mcontext.gregs[REG_RIP]);
+						p += _ha_str(gbuf+p, R, "rip:0x");
+						p += _ha_hex(gbuf+p, R, (unsigned long long)u->uc_mcontext.gregs[REG_RIP]);
 					}
+					p += _ha_str(gbuf+p, R, "\n");
+					#undef R
+					if (p > 0) write(STDERR_FILENO, gbuf, p);
 				}
 
 				// Unprotect the faulting page so the instruction can re-execute
-				unsigned long int page = (unsigned long int)s->si_addr & ~0xfff;
-				mprotect((void*)page, sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE | PROT_EXEC);
+				unsigned long int page = (unsigned long int)s->si_addr & ~(globals_cached_pagesize - 1);
+				mprotect((void*)page, globals_cached_pagesize, PROT_READ | PROT_WRITE | PROT_EXEC);
 
 				// Set Trace Flag so we trap after one instruction
 				u->uc_mcontext.gregs[REG_EFL] |= 0x100;
 
+				in_globals_handler = 0;
 				return; // Return to re-execute the faulting instruction
 			}
 		}
@@ -5324,6 +5579,26 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 		longjmp(wsh->longjmp_ptr, 1);
 	}
 	wsh->in_fault = 1;
+
+	/**
+	* When globals tracing is active, restore all tracked pages BEFORE
+	* any libc calls (fprintf, snprintf, print_backtrace, getpagesize…).
+	* Uses only mprotect syscalls — no libc dependency.  Does NOT free
+	* the tracking structs: libcall still needs them for
+	* globals_unprotect_sections() after the longjmp recovery.
+	*/
+	if (wsh->trace_globals && wsh->globals_prot) {
+		globals_prot_t *_gp;
+		unsigned long _pgsz = globals_cached_pagesize;
+		if (_pgsz) {
+			DL_FOREACH(wsh->globals_prot, _gp) {
+				unsigned long _pg;
+				for (_pg = _gp->addr; _pg < _gp->addr + _gp->size; _pg += _pgsz) {
+					mprotect((void*)_pg, _pgsz, PROT_READ | PROT_WRITE | PROT_EXEC);
+				}
+			}
+		}
+	}
 
 	/**
 	* Get access type
@@ -5499,7 +5774,7 @@ int set_sighandlers(void)
 {
 	struct sigaction sa;
 
-	sa.sa_flags = SA_SIGINFO | SA_RESTART;
+	sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_sigaction = sighandler;
 
@@ -5718,8 +5993,10 @@ static int globals_is_self(char *libname)
 		"libwitch",      // the witch library
 		"liblua", "lua5",// Lua runtime
 		"libreadline", "libhistory", "libncurses", "libtinfo",
-		"libc.", "libc-", "libdl", "libpthread", "libm.", "libm-",
-		"librt", "libgcc", "ld-linux", "ld-musl", "libcapstone",
+		// libc, libdl, libpthread, libm, librt are no longer excluded:
+		// the signal handler uses write(2) instead of fprintf, so it
+		// never touches libc globals and tracing libc is now safe.
+		"libgcc", "ld-linux", "ld-musl", "libcapstone",
 		"linux-vdso", "libstdc++",
 		NULL
 	};
@@ -5782,6 +6059,10 @@ static void globals_protect_sections(void)
 	sections_t *s = 0, *stmp = 0;
 	unsigned long int pagesize = sysconf(_SC_PAGE_SIZE);
 
+	// Cache page size for the signal handlers (they cannot call sysconf
+	// when libc .data is PROT_NONE).
+	if (!globals_cached_pagesize) globals_cached_pagesize = pagesize;
+
 	// Free any previous protection list
 	globals_prot_t *gp = NULL, *gtmp = NULL;
 	DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
@@ -5790,6 +6071,9 @@ static void globals_protect_sections(void)
 	}
 	wsh->globals_prot = NULL;
 
+	// Phase 1: build the tracking list with all allocations BEFORE any
+	// mprotect.  When tracing libc, protecting a .data page that holds
+	// malloc's arena metadata would make subsequent calloc() calls fault.
 	DL_FOREACH_SAFE(wsh->shdrs, s, stmp) {
 		if (!s->name || !s->addr || !s->size) {
 			continue;
@@ -5840,15 +6124,26 @@ static void globals_protect_sections(void)
 		}
 
 		DL_APPEND(wsh->globals_prot, prot);
+	}
 
-		if (wsh->opt_verbose) {
+	// Phase 2a: print verbose output while libc is still writable.
+	if (wsh->opt_verbose) {
+		globals_prot_t *gp2 = NULL;
+		DL_FOREACH(wsh->globals_prot, gp2) {
 			printf(" -- Protecting %s\t0x%012lx-0x%012lx (%lu bytes, %lu pages)\t%s\n",
-				s->name, aligned_addr, aligned_end, aligned_size,
-				aligned_size / pagesize, s->libname);
+				gp2->name, gp2->addr, gp2->addr + gp2->size, gp2->size,
+				gp2->size / pagesize, gp2->libname);
 		}
+	}
 
-		// Apply the protection: PROT_NONE traps all accesses
-		mprotect((void*)aligned_addr, aligned_size, PROT_NONE);
+	// Phase 2b: apply mprotect on every recorded section.  All heap
+	// allocations and I/O are done, so it is safe to remove permissions
+	// from libc's malloc arena and stdio pages.
+	{
+		globals_prot_t *gp2 = NULL;
+		DL_FOREACH(wsh->globals_prot, gp2) {
+			mprotect((void*)gp2->addr, gp2->size, PROT_NONE);
+		}
 	}
 }
 
@@ -5859,8 +6154,16 @@ static void globals_unprotect_sections(void)
 {
 	globals_prot_t *gp = NULL, *gtmp = NULL;
 
-	DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
+	// Phase 1: restore all page permissions BEFORE any free().
+	// free() needs the malloc arena in libc .data to be writable;
+	// if we interleave mprotect+free, a free() may hit a still-
+	// protected arena page.
+	DL_FOREACH(wsh->globals_prot, gp) {
 		mprotect((void*)gp->addr, gp->size, gp->orig_prot);
+	}
+
+	// Phase 2: free the tracking structs now that all pages are writable.
+	DL_FOREACH_SAFE(wsh->globals_prot, gp, gtmp) {
 		DL_DELETE(wsh->globals_prot, gp);
 		free(gp);
 	}
@@ -5918,7 +6221,7 @@ static int globalstrace(lua_State * L)
 
 		if (!strcmp(arg, "all") || !strcmp(arg, "*")) {
 			wsh->globals_scope = GLOBALS_SCOPE_ALL;
-			printf(" -- Globals tracing enabled (scope: all objects, excluding wsh + deps)\n");
+			printf(" -- Globals tracing enabled (scope: all objects, including libc)\n");
 		} else {
 			wsh->globals_scope = GLOBALS_SCOPE_NAMED;
 			wsh->globals_filter_lib = strdup(arg);
@@ -6014,7 +6317,7 @@ static int globals_show(lua_State * L)
 
 	for (i = 0; i < wsh->globals_log_count; i++) {
 		global_access_t *e = &wsh->globals_log[i];
-		char *mode = (e->fault == FAULT_WRITE) ? "W" : (e->fault == FAULT_READ) ? "R" : "X";
+		char *mode = e->is_atomic ? "A" : (e->fault == FAULT_WRITE) ? "W" : (e->fault == FAULT_READ) ? "R" : "X";
 
 		symbols_t *sym = symbol_from_addr(e->rip);
 		char syminfo[256];
@@ -6066,6 +6369,10 @@ static int globals_show(lua_State * L)
 
 		lua_pushstring(L, "mode");
 		lua_pushstring(L, mode);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "atomic");
+		lua_pushboolean(L, e->is_atomic);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "section");
@@ -6847,6 +7154,14 @@ void declare_internals(void)
 	declare_num(wsh->bp_points, "bp_points");
 
 	/**
+	* Expose PRNG seed to Lua: wsh_seed is the value from -s,
+	* wsh_seed_set is 1 if -s was passed (so scripts can distinguish
+	* "no seed" from "seed=0").
+	*/
+	declare_num(wsh->opt_seed, "wsh_seed");
+	declare_num(wsh->opt_seed_set, "wsh_seed_set");
+
+	/**
 	* Create a wrapper functions for other internal functions
 	*/
 	char *luacmd = calloc(1, 1024);
@@ -7226,6 +7541,23 @@ int wsh_run(void)
 	}
 
 	/**
+	* Execute -e "code" string if provided
+	*/
+	if (wsh->opt_exec) {
+		if (wsh->opt_verbose) {
+			printf(" -- Executing: %s\n", wsh->opt_exec);
+		}
+		int estatus = luaL_dostring(wsh->L, wsh->opt_exec);
+		if (estatus != LUA_OK) {
+			fprintf(stderr, "Error in -e: %s\n", lua_tostring(wsh->L, -1));
+			lua_pop(wsh->L, 1);
+		}
+		free(wsh->opt_exec);
+		wsh->opt_exec = NULL;
+		_Exit(estatus == LUA_OK ? 0 : 1);
+	}
+
+	/**
 	* Run a lua shell
 	*/
 	if (!sigsetjmp(wsh->longjmp_ptr_high, 1)){ // This is executed only the first time // save stack context + signals
@@ -7492,7 +7824,7 @@ int wsh_loadlibs(void)
 */
 int wsh_getopt(int argc, char **argv)
 {
-	const char *short_opt = "hqvVxgup";
+	const char *short_opt = "hqvVxgups:e:";
 	int count = 0;
 	struct stat sb;
 	int c = 0, i = 0;
@@ -7506,6 +7838,8 @@ int wsh_getopt(int argc, char **argv)
 		{"version", no_argument, NULL, 'V'},
 		{"userland", no_argument, NULL, 'u'},
 		{"pagination", no_argument, NULL, 'p'},
+		{"seed", required_argument, NULL, 's'},
+		{"exec", required_argument, NULL, 'e'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -7548,6 +7882,15 @@ int wsh_getopt(int argc, char **argv)
 
 		case 'u':
 			wsh->opt_userland_load = 1;
+			break;
+
+		case 's':
+			wsh->opt_seed = (unsigned int)strtoul(optarg, NULL, 0);
+			wsh->opt_seed_set = 1;
+			break;
+
+		case 'e':
+			wsh->opt_exec = strdup(optarg);
 			break;
 
 		case 'x':
@@ -7603,6 +7946,15 @@ nomoreargs:
 	// Load user profile
 	load_profile();
 
+	// Export seed to Lua AFTER getopt (declare_internals runs before getopt,
+	// so the initial declare_num values are 0).
+	if (wsh->opt_seed_set) {
+		lua_pushinteger(wsh->L, wsh->opt_seed);
+		lua_setglobal(wsh->L, "wsh_seed");
+		lua_pushinteger(wsh->L, 1);
+		lua_setglobal(wsh->L, "wsh_seed_set");
+	}
+
 	return 0;
 }
 
@@ -7620,7 +7972,7 @@ int wsh_print_version(void)
 */
 int wsh_usage(char *name)
 {
-	printf("Usage: %s [script] [-h|-q|-v|-V|-g] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]\n", name);
+	printf("Usage: %s [script] [-h|-q|-v|-V|-g|-s seed|-e code] [binary1] [binary2] ... [-x [script_arg1] [script_arg2] ...]\n", name);
 	printf("\n");
 	printf("Options:\n\n");
 	printf("    -x, --args                Optional script argument separator\n");
@@ -7628,7 +7980,9 @@ int wsh_usage(char *name)
 	printf("    -p, --pagination          Use pagination in outputs\n");
 	printf("    -v, --verbose             Display more output\n");
 	printf("    -g, --global              Bind symbols globally\n");
-	printf("    -u, --userland-load       Force use userland loader\n");	
+	printf("    -s, --seed <N>            PRNG seed for deterministic fuzzing\n");
+	printf("    -e, --exec \"code\"          Evaluate Lua code after scripts, then exit\n");
+	printf("    -u, --userland-load       Force use userland loader\n");
 	printf("    -V, --version             Display version and build, then exit\n");
 	printf("\n");
 	printf("Script:\n\n");

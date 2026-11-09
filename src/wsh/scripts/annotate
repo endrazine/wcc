@@ -8,14 +8,24 @@
 	arg6rec = xalloc(1024, 0, 1)
 
 	arg1r = ralloc(100,0x41);
-	arg2r = ralloc(100,0x42); 
-	arg3r = ralloc(100,0x43); 
-	arg4r = ralloc(100,0x44); 
-	arg5r = ralloc(100,0x45); 
+	arg2r = ralloc(100,0x42);
+	arg3r = ralloc(100,0x43);
+	arg4r = ralloc(100,0x44);
+	arg5r = ralloc(100,0x45);
 	arg6r = ralloc(100,0x46);
 
 	bargs = {string.rep("Z", 1025), string.rep("Y", 1025), string.rep("X", 1025), string.rep("W", 1025), string.rep("V", 1025), string.rep("U", 1025), string.rep("T", 1025), string.rep("S", 1025), string.rep("R", 1025)}
 	bargv = lua2c(bargs, "char*")
+
+	-- Fuzz pool resources — NO libc calls (fopen/open/malloc).
+	-- fuzz_fd  : valid mapped pointer, probes FILE*-taking functions
+	-- fuzz_fd2 : valid fd integer (stdout), probes fd-taking functions
+	-- fuzz_heap: valid mapped buffer, replaces malloc(100)
+	-- All use xalloc (mmap-based) or constants — safe at load time
+	-- AND safe during globals tracing (never touches libc .data/.bss).
+	fuzz_fd = xalloc(1024, 0, 1)
+	fuzz_fd2 = 1
+	fuzz_heap = xalloc(100, 0, 1)
 
 
 function swap(array, index1, index2)
@@ -35,34 +45,120 @@ function fuzzargs(a,b,c,d,e,f, seed, rate)
 --	math.randomseed(seed)
 --	math.randomseed(os.time())
 
-	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, 2, 5, 13, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv }
+	-- fd, fd2, heap buffer pre-computed at load time (see top of script)
+	-- No libc calls here -- safe to call with globals tracing active.
+
+	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, fuzz_fd, fuzz_fd2, fuzz_heap, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv, 0x424242 }
 
 	aout,bout,cout,dout,eout,fout = a,b,c,d,e,f
 
-	if math.random(100) < rate then aout = rargs[math.random(41)]; end
-	if math.random(100) < rate then bout = rargs[math.random(41)]; end
-	if math.random(100) < rate then cout = rargs[math.random(41)]; end
-	if math.random(100) < rate then dout = rargs[math.random(41)]; end
-	if math.random(100) < rate then eout = rargs[math.random(41)]; end
-	if math.random(100) < rate then fout = rargs[math.random(41)]; end
+	if math.random(100) < rate then aout = rargs[math.random(42)]; end
+	if math.random(100) < rate then bout = rargs[math.random(42)]; end
+	if math.random(100) < rate then cout = rargs[math.random(42)]; end
+	if math.random(100) < rate then dout = rargs[math.random(42)]; end
+	if math.random(100) < rate then eout = rargs[math.random(42)]; end
+	if math.random(100) < rate then fout = rargs[math.random(42)]; end
 
 	return aout,bout,cout,dout,eout,fout
 end
 
-function annotate(fun,a,b,c,d,e,f, seed, rate)
-
-	-- prepare fuzzed arguments if needed
-        if seed ~= 0 then a,b,c,d,e,f = fuzzargs(a,b,c,d,e,f, seed, rate); end
-
-	-- Make the call, with a max timeout
-	ret,ctx=fun(a,b,c,d,e,f)
-
---	dtt(ctx)
---	storerun(ctx)
---	alarm(0);
+local function ismapped(addr)
+    if addr == nil or addr == 0 then return false end
+    return msync(addr & ~0xfff, 4096, 0) == 0
 end
 
-function testfunc(f, num)
+local function trystr(addr)
+    if not ismapped(addr) then return nil end
+    local buf = {}
+    for i = 0, 99 do
+        -- check the page of each byte (only needed at page crossings,
+        -- but cheap enough for <=100 bytes)
+        if i > 0 and ((addr + i) & 0xfff) == 0 then
+            if not ismapped(addr + i) then return nil end
+        end
+        local b = rawmemread(addr + i, 1)       -- adjust if WSH uses a different name
+        local c = string.byte(b)
+        if c == 0 then
+            if #buf == 0 then return nil end      -- empty string, not interesting
+            return table.concat(buf)
+        end
+        if c < 0x20 or c > 0x7e then return nil end  -- non-printable
+        buf[#buf + 1] = string.char(c)
+    end
+    return nil  -- no null terminator within 100 bytes
+end
+
+local function h(v)
+    if v == nil then return "0x0" end
+    local s = trystr(v)
+    if s then
+        return '"' .. s .. '"'
+    end
+    return string.format("0x%x", v)
+end
+
+function annotate(fun, a, b, c, d, e, f, seed, rate)
+
+    local poclogs = io.open("/tmp/witchcraft-pocs.log", "a")  -- "a" = append, "w" = overwrite
+
+    -- prepare fuzzed arguments if needed
+    if seed ~= 0 then a, b, c, d, e, f = fuzzargs(a, b, c, d, e, f, seed, rate) end
+
+    -- Make the call, with a max timeout
+    ret, ctx = fun(a, b, c, d, e, f)
+
+    local callsig = ctx.alibcall .. "("
+        .. h(ctx.arg.arg1) .. ", "
+        .. h(ctx.arg.arg2) .. ", "
+        .. h(ctx.arg.arg3) .. ", "
+        .. h(ctx.arg.arg4) .. ", "
+        .. h(ctx.arg.arg5) .. ", "
+        .. h(ctx.arg.arg6) .. ")"
+
+    if ctx.signal == "SIGSEGV"
+       and ctx.mode ~= "READ"
+       and ctx.faultaddr ~= nil
+       and ctx.faultaddr > 0x1000 then
+        poclogs:write(callsig
+            .. " -- " .. ctx.signal
+            .. " invalid " .. ctx.mode
+            .. " at address " .. h(ctx.faultaddr) .. "\n")
+        poclogs:flush()
+    end
+
+    -- Log globals accesses with thread-safety classification
+    if ctx.globals ~= nil and ctx.globals > 0 then
+        local glog = io.open("/tmp/witchcraft-globals.log", "a")
+
+        -- Thread-safety classification:
+        --   PURE      = no writes to globals at all (read-only)
+        --   MT-SAFE   = writes exist, but atomic ops bracket them (mutex)
+        --   UNSAFE    = writes exist with no atomic synchronization
+        local tsafe = "PURE"
+        local writes = ctx.writes or 0
+        local atomics = ctx.atomics or 0
+        if writes > 0 then
+            if atomics > 0 then
+                tsafe = "MT-SAFE"
+            else
+                tsafe = "UNSAFE"
+            end
+        end
+
+        glog:write(callsig
+            .. " -- " .. ctx.globals .. " globals"
+            .. " (" .. writes .. "W " .. atomics .. "A " .. tsafe .. ")"
+            .. (ctx.ghash and (" " .. ctx.ghash) or "")
+            .. ((ctx.signal and ctx.signal ~= "") and (" [" .. ctx.signal .. "]") or " [OK]")
+            .. "\n")
+        glog:flush()
+        glog:close()
+    end
+
+	poclogs:close()
+end
+
+function testfunc(f, num, seed)
 
 	local n, maxnum
 
@@ -90,25 +186,47 @@ function testfunc(f, num)
 		    annotate(f, testarg.arg1[n], testarg.arg2[n], testarg.arg3[n], testarg.arg4[n], testarg.arg5[n], testarg.arg6[n], 0, 0)
 	end
 
+	-- Seed PRNG: explicit seed = deterministic replay, nil = time-based.
+	-- seed == false means "already seeded, don't touch" (used by testlib).
+	-- Priority: explicit arg > wsh -s flag > os.time()
+	if seed ~= false then
+		if seed == nil and wsh_seed_set ~= nil and wsh_seed_set == 1 then
+			seed = wsh_seed
+		end
+		seed = seed or os.time()
+		math.randomseed(seed)
+		print(" [*] seed: " .. seed)
+	end
+
 	-- Run random test cases
-        math.randomseed(os.time())
 	maxnum = 0
 	if num ~= nil then maxnum = num end
 	for n=0,maxnum do
 		    annotate(f, testarg.arg1[math.random(6)], testarg.arg2[math.random(6)], testarg.arg3[math.random(6)], testarg.arg4[math.random(6)], testarg.arg5[math.random(6)], testarg.arg6[math.random(6)], math.random(1000), 50)
 	end
 
-	print(" [*] all tests done (" .. maxnum + 5 .. " calls)")
+	print(" [*] all tests done (" .. maxnum + 5 .. " calls)" .. (seed ~= false and (", seed: " .. seed) or ""))
 --	alarm(0);
 end
 
-function testlib(name, num)
+function testlib(name, num, seed)
+	-- Seed PRNG once for the entire library sweep: controls both
+	-- the function order (shuffle) and every fuzzargs() choice.
+	-- Priority: explicit arg > wsh -s flag > os.time()
+	if seed == nil and wsh_seed_set ~= nil and wsh_seed_set == 1 then
+		seed = wsh_seed
+	end
+	seed = seed or os.time()
+	math.randomseed(seed)
+	print(" [*] testlib seed: " .. seed)
+
 	local world = functions("",name,1)
-	math.randomseed(os.time())
 	shuffle(world)
 	for x,v in pairs(world) do
 		print(" [*] Testing", x, v)
-		testfunc(v, num)
+		-- Pass false as seed: PRNG is already seeded, don't re-seed
+		-- per function — the sequence must be continuous.
+		testfunc(v, num, false)
 	end
 end
 

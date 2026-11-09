@@ -1,6 +1,6 @@
 #
 # This file is part of the Witchcraft Compiler Collection
-# Copyright 2016-2022 Jonathan Brossard
+# Copyright 2016-2026 Jonathan Brossard
 #
 # Homepage: https://github.com/endrazine/wcc/
 #
@@ -8,11 +8,15 @@
 #
 
 CC := gcc
-CFLAGS := -W -Wall -Wextra -Wno-int-conversion
-LDFLAGS := /usr/sbin/sshd
+CFLAGS := -W -Wall -Wextra -Wno-int-conversion -std=gnu17
+LDFLAGS := -lc -lcrypto -lssl -Wl,-rpath=`pwd`
 
 all::
-	$(CC) $(CFLAGS) $(LDFLAGS) ssh.c -o ssh
+	wcc -c -o sshd.o /usr/sbin/sshd
+	$(CC) $(CFLAGS) sshd.o ssh.c -o ssh $(LDFLAGS)
 
+test::
+	./ssh
+	
 clean:
-	rm -rf ssh
+	rm -rf ssh sshd.o

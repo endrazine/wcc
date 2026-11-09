@@ -2506,12 +2506,19 @@ static unsigned int write_shdrs(ctx_t *ctx)
 
 	// Append all Section headers
 	tmpm &= ~0xf;
-	tmpm += sizeof(Elf_Shdr);	// Prepend a NULL section
 
-	// truncate
+	// truncate to aligned boundary
 	ftruncate(ctx->fdout, tmpm);
+	lseek(ctx->fdout, tmpm, SEEK_SET);
 
-	ctx->start_shdrs = lseek(ctx->fdout, 0x00, SEEK_END) - sizeof(Elf_Shdr);	// New start of SHDRs
+	// Write a zeroed NULL section header (index 0, required by ELF spec)
+	{
+		Elf_Shdr null_shdr;
+		memset(&null_shdr, 0, sizeof(Elf_Shdr));
+		write(ctx->fdout, &null_shdr, sizeof(Elf_Shdr));
+	}
+
+	ctx->start_shdrs = tmpm;	// New start of SHDRs
 	ctx->strndx[0] = 0;
 	ctx->strndx_len = 1;
 
