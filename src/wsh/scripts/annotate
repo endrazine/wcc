@@ -48,7 +48,7 @@ function fuzzargs(a,b,c,d,e,f, seed, rate)
 	-- fd, fd2, heap buffer pre-computed at load time (see top of script)
 	-- No libc calls here -- safe to call with globals tracing active.
 
-	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, fuzz_fd, fuzz_fd2, fuzz_heap, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv, 0x424242 }
+	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, fuzz_fd, fuzz_fd2, fuzz_heap, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv, 0x424242 }
 
 	aout,bout,cout,dout,eout,fout = a,b,c,d,e,f
 

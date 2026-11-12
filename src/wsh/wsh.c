@@ -5468,7 +5468,26 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 
 				// Determine access type from error code
 				unsigned int gfault;
-				if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
+				int is_got_access = (!strncmp(gp->name, ".got", 4));
+				char *got_target_name = NULL;
+				unsigned long int got_target_addr = 0;
+
+				if (is_got_access) {
+					// GOT/PLT access = inter-function call.
+					// Temporarily unprotect to read the GOT slot value,
+					// then re-protect (we'll unprotect again below for re-exec).
+					unsigned long int page = gaddr & ~(globals_cached_pagesize - 1);
+					mprotect((void*)page, globals_cached_pagesize, PROT_READ);
+					got_target_addr = *(unsigned long int *)gaddr;
+					mprotect((void*)page, globals_cached_pagesize, PROT_NONE);
+
+					// Resolve the GOT slot's target function
+					if (got_target_addr) {
+						symbols_t *target_sym = symbol_from_addr(got_target_addr);
+						if (target_sym) got_target_name = target_sym->symbol;
+					}
+					gfault = FAULT_CALL;
+				} else if (u->uc_mcontext.gregs[REG_ERR] & 0x2) {
 					gfault = FAULT_WRITE;
 				} else if (s->si_addr == (void*)u->uc_mcontext.gregs[REG_RIP]) {
 					gfault = FAULT_EXEC;
@@ -5478,12 +5497,12 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 
 				// Resolve the faulting data address to a global variable
 				// name (NULL when stripped / not an exported object).
-				symbols_t *gvar = object_from_addr(gaddr);
+				symbols_t *gvar = is_got_access ? NULL : object_from_addr(gaddr);
 
 				// Classify whether the instruction uses an atomic/locked
 				// access (LOCK prefix on x86, LDXR/STXR on ARM, etc.).
 				// Reads instruction bytes from .text — always r-x, safe here.
-				int gatomic = classify_atomic((void *)u->uc_mcontext.gregs[REG_RIP]);
+				int gatomic = is_got_access ? 0 : classify_atomic((void *)u->uc_mcontext.gregs[REG_RIP]);
 
 				// Log the access
 				if (wsh->globals_log && wsh->globals_log_count < GLOBALS_LOG_MAX) {
@@ -5497,6 +5516,8 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 					entry->offset = gaddr - gp->orig_addr;
 					entry->var_name = gvar ? gvar->symbol : NULL;
 					entry->var_offset = gvar ? (gaddr - gvar->addr) : 0;
+					entry->call_target = got_target_name;
+					entry->call_target_addr = got_target_addr;
 					wsh->globals_log_count++;
 				}
 
@@ -5506,13 +5527,24 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 				// Print if verbose — fully async-signal-safe: only
 				// stack buffers, _ha_* helpers, and write(2).
 				if (wsh->opt_verbosetrace) {
-					char *gmode = gatomic ? "A" : (gfault == FAULT_WRITE) ? "W" : (gfault == FAULT_READ) ? "R" : "X";
+					char *gmode = is_got_access ? "C" : gatomic ? "A" : (gfault == FAULT_WRITE) ? "W" : (gfault == FAULT_READ) ? "R" : "X";
 					symbols_t *sym = symbol_from_addr(u->uc_mcontext.gregs[REG_RIP]);
 
-					// Name the variable if we resolved one, else section+offset.
+					// Name the variable/call target
 					char gwhat[256];
 					int wp = 0;
-					if (gvar) {
+					if (is_got_access) {
+						// GOT call: show "CALLER -> TARGET"
+						if (got_target_name) {
+							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "-> ");
+							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, got_target_name);
+						} else if (got_target_addr) {
+							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "-> 0x");
+							wp += _ha_hex(gwhat + wp, sizeof(gwhat) - wp, got_target_addr);
+						} else {
+							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "-> (unresolved)");
+						}
+					} else if (gvar) {
 						wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, gvar->symbol);
 						if (gaddr - gvar->addr) {
 							wp += _ha_str(gwhat + wp, sizeof(gwhat) - wp, "+0x");
@@ -5526,6 +5558,7 @@ void sighandler(int signal, siginfo_t * s, void *ptr)
 					if (wp < (int)sizeof(gwhat)) gwhat[wp] = '\0'; else gwhat[sizeof(gwhat)-1] = '\0';
 
 					// Format: " -- Global[NNN] M 0x ADDR\tVARIABLE\tFUNC()+OFF\tLIB\n"
+					// For GOT: " -- Global[NNN] C 0x ADDR\t-> TARGET\tCALLER()+OFF\tLIB\n"
 					char gbuf[512];
 					int p = 0;
 					#define R (int)(sizeof(gbuf) - p)
@@ -6085,9 +6118,14 @@ static void globals_protect_sections(void)
 		}
 
 		// Only trace data sections: .data, .bss, .rodata
-		if (strncmp(s->name, ".data", 5) &&
-		    strncmp(s->name, ".bss", 4) &&
-		    strncmp(s->name, ".rodata", 7)) {
+		// When GOT tracing is enabled, also include .got and .got.plt
+		int is_data = (!strncmp(s->name, ".data", 5) ||
+		               !strncmp(s->name, ".bss", 4) ||
+		               !strncmp(s->name, ".rodata", 7));
+		int is_got  = (wsh->trace_got &&
+		               (!strncmp(s->name, ".got.plt", 8) ||
+		                !strcmp(s->name, ".got")));
+		if (!is_data && !is_got) {
 			continue;
 		}
 
@@ -6255,6 +6293,37 @@ static int unglobalstrace(lua_State * L)
 {
 	wsh->trace_globals = 0;
 	printf(" -- Globals tracing disabled\n");
+	return 0;
+}
+
+/**
+* Enable GOT/PLT tracing: detect inter-function calls via mprotect on .got/.got.plt.
+*
+* Must be combined with globals_trace() — the GOT sections are protected/unprotected
+* by the same globals_protect_sections()/globals_unprotect_sections() machinery.
+*
+* Usage:
+*   globals_trace("all")   -- enable globals tracing first
+*   got_trace()            -- then enable GOT call detection
+*
+* In verbose mode, GOT accesses appear as mode "C" (Call):
+*   -- Global[NNN] C 0xADDR  -> target_func  caller()+OFF  libname
+*/
+static int gottrace(lua_State * L)
+{
+	wsh->trace_got = 1;
+	printf(" -- GOT/PLT call tracing enabled\n");
+	printf(" -- NOTE: requires globals_trace() to be active for mprotect to be applied\n");
+	return 0;
+}
+
+/**
+* Disable GOT/PLT call tracing
+*/
+static int ungottrace(lua_State * L)
+{
+	wsh->trace_got = 0;
+	printf(" -- GOT/PLT call tracing disabled\n");
 	return 0;
 }
 
@@ -7920,6 +7989,11 @@ nomoreargs:
 			// Every remaining argument is a script argument
 			add_script_arguments(argc, argv, i + 1);
 			break;
+		} else if (!strncmp(argv[i], "-e", 2) && i + 1 < argc) {
+			// -e "code" after -x: store for post-script execution
+			wsh->opt_exec = strdup(argv[i + 1]);
+			i++;	// skip the code argument
+			continue;
 		} else if (!stat(argv[i], &sb)) {	// file exists. Determine if this is a binary or a script
 			if (read_elf_sig(argv[i], &sb)) {		// Process as ELF file
 				if (wsh->opt_verbose) {

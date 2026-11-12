@@ -398,6 +398,8 @@ tuple_t exposed[] = {
 {bsspolute,"bsspolute"},
 {globalstrace,"globals_trace"},
 {unglobalstrace,"globals_untrace"},
+{gottrace,"got_trace"},
+{ungottrace,"got_untrace"},
 {globalspoison,"globals_poison"},
 {unglobalspoison,"globals_unpoison"},
 {globals_show,"globals_show"},

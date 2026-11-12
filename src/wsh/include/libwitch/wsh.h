@@ -264,6 +264,7 @@
 #define FAULT_WRITE	2
 #define FAULT_EXEC	4
 #define FAULT_UNKNOWN	8
+#define FAULT_CALL	16	// GOT read = inter-function call via PLT
 
 #define default_poison 0x61
 
@@ -292,6 +293,8 @@ typedef struct global_access_t {
 	unsigned long int offset;	// Offset within the section
 	char *var_name;			// Resolved global variable name, or NULL if stripped/unknown
 	unsigned long int var_offset;	// Offset within the resolved variable
+	char *call_target;		// For FAULT_CALL: resolved target function name, or NULL
+	unsigned long int call_target_addr;	// For FAULT_CALL: target function address from GOT slot
 } global_access_t;
 
 /**
@@ -376,6 +379,8 @@ static void unrtrace(lua_State * L);
 
 static int globalstrace(lua_State * L);
 static int unglobalstrace(lua_State * L);
+static int gottrace(lua_State * L);
+static int ungottrace(lua_State * L);
 static int globalspoison(lua_State * L);
 static int unglobalspoison(lua_State * L);
 static int globals_show(lua_State * L);
@@ -668,6 +673,7 @@ typedef struct wsh_t {
 	unsigned int trace_strace;
 
 	unsigned int trace_globals;		// Globals tracing active
+	unsigned int trace_got;			// GOT/PLT tracing: detect inter-function calls
 	unsigned int globals_poison;		// Poison data sections before call
 	unsigned int globals_scope;		// GLOBALS_SCOPE_* : which objects to trace
 
