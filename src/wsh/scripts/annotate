@@ -1,4 +1,5 @@
-	-- prepapre test context
+	-- prepare test context
+
 
 	arg1rec = xalloc(1024, 0, 1)
 	arg2rec = xalloc(1024, 0, 1)
@@ -17,6 +18,8 @@
 	bargs = {string.rep("Z", 1025), string.rep("Y", 1025), string.rep("X", 1025), string.rep("W", 1025), string.rep("V", 1025), string.rep("U", 1025), string.rep("T", 1025), string.rep("S", 1025), string.rep("R", 1025)}
 	bargv = lua2c(bargs, "char*")
 
+	inet_src_str = "192.168.1.1"		-- plain string, always available
+
 	-- Fuzz pool resources — NO libc calls (fopen/open/malloc).
 	-- fuzz_fd  : valid mapped pointer, probes FILE*-taking functions
 	-- fuzz_fd2 : valid fd integer (stdout), probes fd-taking functions
@@ -26,6 +29,39 @@
 	fuzz_fd = xalloc(1024, 0, 1)
 	fuzz_fd2 = 1
 	fuzz_heap = xalloc(100, 0, 1)
+
+	-- Set of test argument addresses, used to exclude from shared-state detection
+	test_arg_addrs = {}
+	local function register_test_addr(addr)
+		if addr ~= nil and type(addr) == "number" and addr > 0x1000 then
+			test_arg_addrs[addr] = true
+		end
+	end
+
+
+	-- ============================================================
+	-- Global state: cross-call fault correlation & globals tracking
+	-- ============================================================
+
+	-- Track fault addresses across all calls within a testfunc() run.
+	-- If the same address faults from different functions and it's not
+	-- one of our injected test arguments, it's shared state.
+	fault_history = {}		-- faultaddr -> { func_name1, func_name2, ... }
+	global_writers = {}		-- global addr -> { func_name1, func_name2, ... }
+
+	-- Register base test argument addresses
+	register_test_addr(arg1rec)
+	register_test_addr(arg2rec)
+	register_test_addr(arg3rec)
+	register_test_addr(arg4rec)
+	register_test_addr(arg5rec)
+	register_test_addr(arg6rec)
+	register_test_addr(arg1r)
+	register_test_addr(arg2r)
+	register_test_addr(arg3r)
+	register_test_addr(arg4r)
+	register_test_addr(arg5r)
+	register_test_addr(arg6r)
 
 
 function swap(array, index1, index2)
@@ -48,16 +84,18 @@ function fuzzargs(a,b,c,d,e,f, seed, rate)
 	-- fd, fd2, heap buffer pre-computed at load time (see top of script)
 	-- No libc calls here -- safe to call with globals tracing active.
 
-	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, fuzz_fd, fuzz_fd2, fuzz_heap, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv, 0x424242 }
+	rargs = { -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767, -2147483648, -100663046, -32769, 32768, 65535, 65536, 100663045, 2147483647, fuzz_fd, fuzz_fd2, fuzz_heap, "/etc/passwd", "/invalid/nonexistent", "/tmp/out.txt", "/bin/ls", "/bin/sh", "/tmp/", "/etc/shadow", "/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "%n%n%n%n%n%n%n%n", "%h%h%h%h%h%h%h%s%s%s%s", bargv, 0x424242, inet_src_str }
+
+	local nrargs = #rargs
 
 	aout,bout,cout,dout,eout,fout = a,b,c,d,e,f
 
-	if math.random(100) < rate then aout = rargs[math.random(42)]; end
-	if math.random(100) < rate then bout = rargs[math.random(42)]; end
-	if math.random(100) < rate then cout = rargs[math.random(42)]; end
-	if math.random(100) < rate then dout = rargs[math.random(42)]; end
-	if math.random(100) < rate then eout = rargs[math.random(42)]; end
-	if math.random(100) < rate then fout = rargs[math.random(42)]; end
+	if math.random(100) < rate then aout = rargs[math.random(nrargs)]; end
+	if math.random(100) < rate then bout = rargs[math.random(nrargs)]; end
+	if math.random(100) < rate then cout = rargs[math.random(nrargs)]; end
+	if math.random(100) < rate then dout = rargs[math.random(nrargs)]; end
+	if math.random(100) < rate then eout = rargs[math.random(nrargs)]; end
+	if math.random(100) < rate then fout = rargs[math.random(nrargs)]; end
 
 	return aout,bout,cout,dout,eout,fout
 end
@@ -97,68 +135,337 @@ local function h(v)
     return string.format("0x%x", v)
 end
 
+-- ============================================================
+-- Check if faultaddr is "near" one of the call arguments
+-- (strong indicator that the crash target is user-controlled)
+-- ============================================================
+local function is_controlled(faddr, ctx)
+	if faddr == nil or faddr == 0 then return false end
+	local args = { ctx.arg.arg1, ctx.arg.arg2, ctx.arg.arg3,
+	               ctx.arg.arg4, ctx.arg.arg5, ctx.arg.arg6 }
+	for _, v in ipairs(args) do
+		if v ~= nil and v > 0x1000 then
+			local delta = faddr - v
+			if delta < 0 then delta = -delta end
+			-- Within 64KB: same page neighborhood, strongly controlled
+			if delta < 0x10000 then return true end
+		end
+	end
+	return false
+end
+
+-- ============================================================
+-- Format a call string from ctx (shared by all log paths)
+-- ============================================================
+local function format_call(ctx)
+	return ctx.alibcall .. "("
+		.. h(ctx.arg.arg1) .. ", "
+		.. h(ctx.arg.arg2) .. ", "
+		.. h(ctx.arg.arg3) .. ", "
+		.. h(ctx.arg.arg4) .. ", "
+		.. h(ctx.arg.arg5) .. ", "
+		.. h(ctx.arg.arg6) .. ")"
+end
+
+-- ============================================================
+-- Track cross-call fault address correlation
+-- ============================================================
+local function track_fault(faddr, funcname)
+	if faddr == nil or faddr == 0 or faddr <= 0x1000 then return end
+	if test_arg_addrs[faddr] then return end	-- skip our own test buffers
+
+	local key = faddr
+	if not fault_history[key] then
+		fault_history[key] = {}
+	end
+	-- Avoid duplicate function names at same address
+	local dominated_already = false
+	for _, fn in ipairs(fault_history[key]) do
+		if fn == funcname then dominated_already = true; break end
+	end
+	if not dominated_already then
+		fault_history[key][#fault_history[key] + 1] = funcname
+	end
+
+	-- If multiple functions fault at the same non-test-arg address -> shared state
+	if #fault_history[key] > 1 then
+		local glogs = io.open("/tmp/witchcraft-globals.log", "a")
+		if glogs then
+			glogs:write(string.format(
+				"[SHARED FAULT] address 0x%x hit by %d functions: %s\n",
+				key, #fault_history[key], table.concat(fault_history[key], ", ")))
+			glogs:flush()
+			glogs:close()
+		end
+	end
+end
+
+-- ============================================================
+-- Log global variable writes detected by wsh's globals tracing
+-- (call globals_show() after each non-crashing call when
+-- trace_globals is enabled, parse the returned Lua table)
+-- ============================================================
+local function log_global_writes(ctx, fh)
+	-- ctx.globals contains the count of global accesses
+	if ctx.globals == nil or ctx.globals == 0 then return end
+
+	local funcname = ctx.alibcall or "?"
+	local entries = globals_show()
+	if entries == nil then return end
+
+	-- Use pre-opened handle if available, else try io.open (may fail post-crash)
+	local dominated_log = fh or io.open("/tmp/witchcraft-globals.log", "a")
+	if not dominated_log then return end
+
+	for i, entry in ipairs(entries) do
+		if entry.mode == "W" then
+			local addr = entry.addr or 0
+			local varname = entry.var or string.format("<0x%x>", addr)
+			local section = entry.section or "?"
+
+			-- Track which functions write to this address
+			if not global_writers[addr] then
+				global_writers[addr] = {}
+			end
+			global_writers[addr][funcname] = true
+
+			-- Count distinct writers
+			local nwriters = 0
+			local writers = {}
+			for fn, _ in pairs(global_writers[addr]) do
+				nwriters = nwriters + 1
+				writers[#writers + 1] = fn
+			end
+
+			-- Log: function writes to global, flag if multiple writers (race condition)
+			local tag = ""
+			if nwriters > 1 then
+				tag = " [RACE: " .. nwriters .. " writers: " .. table.concat(writers, ", ") .. "]"
+			end
+			dominated_log:write(string.format(
+				"%s() writes global %s in %s at 0x%x%s\n",
+				funcname, varname, section, addr, tag))
+		end
+	end
+
+	dominated_log:flush()
+	if not fh then dominated_log:close() end
+end
+
+
+-- ============================================================
+-- Log every signal to learnwitch.log as a SIG record.
+-- Complements the C-level TAG records (prototype learning).
+-- Format: SIG <function> <signal> <mode> <faultaddr> [CONTROLLED]
+-- The existing C parsers (prototypes/prototypes_c) skip non-TAG
+-- lines, so this is safe.
+-- ============================================================
+local function log_signal_to_learnwitch(ctx, fh)
+	local funcname = ctx.alibcall or "?"
+	local signal = ctx.signal or "?"
+	local mode = ctx.mode or "-"
+	local faddr = "0x0"
+	if ctx.faultaddr ~= nil and ctx.faultaddr > 0 then
+		faddr = string.format("0x%x", ctx.faultaddr)
+	end
+	local controlled = ""
+	if is_controlled(ctx.faultaddr, ctx) then controlled = " CONTROLLED" end
+
+	-- Use pre-opened handle if available, else try io.open (may fail post-crash)
+	local lf = fh or io.open("./learnwitch.log", "a")
+	if lf then
+		lf:write(string.format("SIG %s %s %s %s%s\n",
+			funcname, signal, mode, faddr, controlled))
+		lf:flush()
+		if not fh then lf:close() end
+	end
+end
+
+
+-- ============================================================
+-- annotate() -- the core fuzzing wrapper
+--
+-- Routes each crash to the appropriate log file:
+--   witchcraft-pocs.log   : SIGSEGV WRITE/EXEC (exploitable)
+--   witchcraft-abrt.log   : SIGABRT (fortify/heap/stack check)
+--   witchcraft-reads.log  : SIGSEGV READ (DoS / info leak)
+--   witchcraft-misc.log   : SIGBUS/SIGILL/SIGFPE (other crashes)
+--   witchcraft-globals.log: global variable writes (thread-safety)
+--   learnwitch.log        : SIG records (all signals, complements TAGs)
+-- ============================================================
 function annotate(fun, a, b, c, d, e, f, seed, rate)
 
-    local poclogs = io.open("/tmp/witchcraft-pocs.log", "a")  -- "a" = append, "w" = overwrite
+    -- Guard: skip if function reference is nil (heap corruption in child)
+    if fun == nil then return end
+
+    -- Pre-open ALL log files BEFORE calling the target function.
+    -- After a crash + longjmp recovery, glibc's malloc arena lock is
+    -- poisoned (ENOTRECOVERABLE on newer glibc).  io.open() needs
+    -- fopen() which needs malloc for the FILE struct, so it fails.
+    -- Pre-opened handles survive longjmp (annotate's stack frame is
+    -- above the setjmp point in libcall) and write/flush work because
+    -- they use the already-allocated FILE buffer + write() syscall.
+    local pre_poclogs   = io.open("/tmp/witchcraft-pocs.log", "a")
+    local pre_abrtlogs  = io.open("/tmp/witchcraft-abrt.log", "a")
+    local pre_readlogs  = io.open("/tmp/witchcraft-reads.log", "a")
+    local pre_misclogs  = io.open("/tmp/witchcraft-misc.log", "a")
+    local pre_aliaslogs = io.open("/tmp/witchcraft-pocs-aliases.log", "a")
+    local pre_learnlog  = io.open("./learnwitch.log", "a")
+    local pre_globlog   = io.open("/tmp/witchcraft-globals.log", "a")
 
     -- prepare fuzzed arguments if needed
     if seed ~= 0 then a, b, c, d, e, f = fuzzargs(a, b, c, d, e, f, seed, rate) end
 
-    -- Make the call, with a max timeout
+    -- Make the call
     ret, ctx = fun(a, b, c, d, e, f)
 
-    local callsig = ctx.alibcall .. "("
-        .. h(ctx.arg.arg1) .. ", "
-        .. h(ctx.arg.arg2) .. ", "
-        .. h(ctx.arg.arg3) .. ", "
-        .. h(ctx.arg.arg4) .. ", "
-        .. h(ctx.arg.arg5) .. ", "
-        .. h(ctx.arg.arg6) .. ")"
-
-    if ctx.signal == "SIGSEGV"
-       and ctx.mode ~= "READ"
-       and ctx.faultaddr ~= nil
-       and ctx.faultaddr > 0x1000 then
-        poclogs:write(callsig
-            .. " -- " .. ctx.signal
-            .. " invalid " .. ctx.mode
-            .. " at address " .. h(ctx.faultaddr) .. "\n")
-        poclogs:flush()
+    -- No signal: check for global writes on clean calls (thread-safety)
+    if ctx.signal == nil or ctx.signal == "" then
+        log_global_writes(ctx, pre_globlog)
+        -- Close pre-opened handles
+        if pre_poclogs then pre_poclogs:close() end
+        if pre_abrtlogs then pre_abrtlogs:close() end
+        if pre_readlogs then pre_readlogs:close() end
+        if pre_misclogs then pre_misclogs:close() end
+        if pre_aliaslogs then pre_aliaslogs:close() end
+        if pre_learnlog then pre_learnlog:close() end
+        if pre_globlog then pre_globlog:close() end
+        return
     end
 
-    -- Log globals accesses with thread-safety classification
-    if ctx.globals ~= nil and ctx.globals > 0 then
-        local glog = io.open("/tmp/witchcraft-globals.log", "a")
+    -- Log every signal to learnwitch.log (SIG records)
+    log_signal_to_learnwitch(ctx, pre_learnlog)
 
-        -- Thread-safety classification:
-        --   PURE      = no writes to globals at all (read-only)
-        --   MT-SAFE   = writes exist, but atomic ops bracket them (mutex)
-        --   UNSAFE    = writes exist with no atomic synchronization
-        local tsafe = "PURE"
-        local writes = ctx.writes or 0
-        local atomics = ctx.atomics or 0
-        if writes > 0 then
-            if atomics > 0 then
-                tsafe = "MT-SAFE"
-            else
-                tsafe = "UNSAFE"
+    -- Ignore null-deref (faultaddr <= 0x1000), not interesting
+    if ctx.faultaddr ~= nil and ctx.faultaddr ~= 0 and ctx.faultaddr <= 0x1000 then
+        if pre_poclogs then pre_poclogs:close() end
+        if pre_abrtlogs then pre_abrtlogs:close() end
+        if pre_readlogs then pre_readlogs:close() end
+        if pre_misclogs then pre_misclogs:close() end
+        if pre_aliaslogs then pre_aliaslogs:close() end
+        if pre_learnlog then pre_learnlog:close() end
+        if pre_globlog then pre_globlog:close() end
+        return
+    end
+
+    -- Format the call string once
+    local callstr = format_call(ctx)
+    local funcname = ctx.alibcall or "?"
+
+    -- Track cross-call fault correlation
+    track_fault(ctx.faultaddr, funcname)
+
+    -- ---- Tier 1: SIGSEGV WRITE or EXEC (the money shots) ----
+    -- Match original filter: ctx.mode ~= "READ" accepts WRITE, EXEC, nil, etc.
+    if ctx.signal == "SIGSEGV" and ctx.mode ~= "READ" then
+        if ctx.faultaddr ~= nil and ctx.faultaddr > 0x1000 then
+            local tag = ""
+            if is_controlled(ctx.faultaddr, ctx) then tag = " [CONTROLLED]" end
+            local mode_str = ctx.mode or "UNKNOWN"
+
+            if pre_poclogs then
+                pre_poclogs:write(callstr
+                    .. " -- " .. ctx.signal
+                    .. " invalid " .. mode_str
+                    .. " at address " .. h(ctx.faultaddr)
+                    .. tag .. "\n")
+                pre_poclogs:flush()
+            end
+
+            -- Log implementation alias if it differs from the called symbol
+            if ctx.alibimpl ~= nil and ctx.alibimpl ~= ctx.alibcall then
+                if pre_aliaslogs then
+                    local aliasstr = ctx.alibimpl .. "("
+                        .. h(ctx.arg.arg1) .. ", "
+                        .. h(ctx.arg.arg2) .. ", "
+                        .. h(ctx.arg.arg3) .. ", "
+                        .. h(ctx.arg.arg4) .. ", "
+                        .. h(ctx.arg.arg5) .. ", "
+                        .. h(ctx.arg.arg6) .. ")"
+                    pre_aliaslogs:write(aliasstr
+                        .. " -- " .. ctx.signal
+                        .. " invalid " .. mode_str
+                        .. " at address " .. h(ctx.faultaddr)
+                        .. tag .. "\n")
+                    pre_aliaslogs:flush()
+                end
             end
         end
 
-        glog:write(callsig
-            .. " -- " .. ctx.globals .. " globals"
-            .. " (" .. writes .. "W " .. atomics .. "A " .. tsafe .. ")"
-            .. (ctx.ghash and (" " .. ctx.ghash) or "")
-            .. ((ctx.signal and ctx.signal ~= "") and (" [" .. ctx.signal .. "]") or " [OK]")
-            .. "\n")
-        glog:flush()
-        glog:close()
+    -- ---- Tier 2: SIGABRT (fortify __chk_fail, heap corruption, stack canary) ----
+    elseif ctx.signal == "SIGABRT" then
+        if pre_abrtlogs then
+            local sicode_str = ""
+            if ctx.sicode ~= nil and ctx.sicode ~= "" then
+                sicode_str = " sicode:" .. ctx.sicode
+            end
+            pre_abrtlogs:write(callstr
+                .. " -- " .. ctx.signal
+                .. sicode_str .. "\n")
+            pre_abrtlogs:flush()
+        end
+
+    -- ---- Tier 3: SIGSEGV READ (DoS, potential info leak) ----
+    -- mode=nil now falls to Tier 1 (matching original behavior)
+    elseif ctx.signal == "SIGSEGV" and ctx.mode == "READ" then
+        if pre_readlogs then
+            local faddr_str = ""
+            if ctx.faultaddr ~= nil and ctx.faultaddr > 0x1000 then
+                faddr_str = " at address " .. h(ctx.faultaddr)
+            end
+            pre_readlogs:write(callstr
+                .. " -- " .. ctx.signal
+                .. " invalid " .. ctx.mode
+                .. faddr_str .. "\n")
+            pre_readlogs:flush()
+        end
+
+    -- ---- Tier 4: SIGBUS / SIGILL / SIGFPE / other (misc crashes) ----
+    else
+        if pre_misclogs then
+            local details = ""
+            if ctx.mode ~= nil and type(ctx.mode) == "string" then
+                details = " " .. ctx.mode
+            end
+            if ctx.faultaddr ~= nil and ctx.faultaddr > 0x1000 then
+                details = details .. " at address " .. h(ctx.faultaddr)
+            end
+            if ctx.sicode ~= nil and ctx.sicode ~= "" then
+                details = details .. " sicode:" .. ctx.sicode
+            end
+            pre_misclogs:write(callstr
+                .. " -- " .. ctx.signal
+                .. details .. "\n")
+            pre_misclogs:flush()
+        end
     end
 
-	poclogs:close()
+    -- Close all pre-opened handles (child will _exit soon anyway,
+    -- but explicit close ensures flush even if _exit is skipped)
+    if pre_poclogs then pre_poclogs:close() end
+    if pre_abrtlogs then pre_abrtlogs:close() end
+    if pre_readlogs then pre_readlogs:close() end
+    if pre_misclogs then pre_misclogs:close() end
+    if pre_aliaslogs then pre_aliaslogs:close() end
+    if pre_learnlog then pre_learnlog:close() end
+    if pre_globlog then pre_globlog:close() end
 end
 
-function testfunc(f, num, seed)
+-- ============================================================
+-- testfunc() -- deterministic + random fuzzing of a single function
+--
+-- Each annotate() call runs in a fork()'d child process.
+-- The child crashes (WRITE/READ/SIGABRT), the signal handler logs it,
+-- and the child exits. The parent's address space stays pristine:
+-- no glibc state corruption, no cumulative damage across calls.
+--
+-- No wchar_t arguments needed: pre-init glibc, narrow strings like
+-- "aaaa" interpreted as wchar_t format produce values > 0x10FFFF,
+-- which swprintf blindly writes without validation -> SIGSEGV WRITE.
+-- Since we never call fprintf/glibc-init-triggering functions,
+-- glibc wide-char state stays uninitialized throughout.
+-- ============================================================
+function testfunc(f, num)
 
 	local n, maxnum
 
@@ -172,6 +479,12 @@ function testfunc(f, num, seed)
 	arg5s = "/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 	arg6s = "/ffffffffffffffffffffffffffffffff"
 
+	-- 5 deterministic rows (baseline):
+	-- Row 1: All unmapped pointers (baseline crash test)
+	-- Row 2: All mapped zero-filled buffers (no-crash baseline)
+	-- Row 3: All mapped path strings
+	-- Row 4: All mapped pattern-filled buffers
+	-- Row 5: Duplicate of row 3
 	testarg = {
 		arg1 = { 0x41414141, arg1rec, arg1s, arg1r, arg1s },
 		arg2 = { 0x42424242, arg2rec, arg2s, arg2r, arg2s },
@@ -181,52 +494,54 @@ function testfunc(f, num, seed)
 		arg6 = { 0x46464646, arg6rec, arg6s, arg6r, arg6s }
 	}
 
-	-- Run determinist test cases
-	for n=1,5 do
-		    annotate(f, testarg.arg1[n], testarg.arg2[n], testarg.arg3[n], testarg.arg4[n], testarg.arg5[n], testarg.arg6[n], 0, 0)
-	end
+	local num_deterministic = 5
 
-	-- Seed PRNG: explicit seed = deterministic replay, nil = time-based.
-	-- seed == false means "already seeded, don't touch" (used by testlib).
-	-- Priority: explicit arg > wsh -s flag > os.time()
-	if seed ~= false then
-		if seed == nil and wsh_seed_set ~= nil and wsh_seed_set == 1 then
-			seed = wsh_seed
+	-- Allocate status buffer once for waitpid()
+	local wstatus = malloc(4)
+
+	-- Run deterministic test cases (each in a forked child)
+	for n=1,num_deterministic do
+		local pid = fork()
+		if pid == 0 then
+			pcall(annotate, f, testarg.arg1[n], testarg.arg2[n], testarg.arg3[n], testarg.arg4[n], testarg.arg5[n], testarg.arg6[n], 0, 0)
+			_exit(0)
 		end
-		seed = seed or os.time()
-		math.randomseed(seed)
-		print(" [*] seed: " .. seed)
+		waitpid(pid, wstatus, 0)
 	end
 
-	-- Run random test cases
+	-- Run random test cases (each in a forked child)
+        math.randomseed(os.time())
 	maxnum = 0
 	if num ~= nil then maxnum = num end
 	for n=0,maxnum do
-		    annotate(f, testarg.arg1[math.random(6)], testarg.arg2[math.random(6)], testarg.arg3[math.random(6)], testarg.arg4[math.random(6)], testarg.arg5[math.random(6)], testarg.arg6[math.random(6)], math.random(1000), 50)
+		-- Pick args in parent to advance random state
+		local r1 = math.random(num_deterministic)
+		local r2 = math.random(num_deterministic)
+		local r3 = math.random(num_deterministic)
+		local r4 = math.random(num_deterministic)
+		local r5 = math.random(num_deterministic)
+		local r6 = math.random(num_deterministic)
+		local seed = math.random(1000)
+
+		local pid = fork()
+		if pid == 0 then
+			pcall(annotate, f, testarg.arg1[r1], testarg.arg2[r2], testarg.arg3[r3], testarg.arg4[r4], testarg.arg5[r5], testarg.arg6[r6], seed, 50)
+			_exit(0)
+		end
+		waitpid(pid, wstatus, 0)
 	end
 
-	print(" [*] all tests done (" .. maxnum + 5 .. " calls)" .. (seed ~= false and (", seed: " .. seed) or ""))
+	print(" [*] all tests done (" .. maxnum + num_deterministic .. " calls)")
 --	alarm(0);
 end
 
-function testlib(name, num, seed)
-	-- Seed PRNG once for the entire library sweep: controls both
-	-- the function order (shuffle) and every fuzzargs() choice.
-	-- Priority: explicit arg > wsh -s flag > os.time()
-	if seed == nil and wsh_seed_set ~= nil and wsh_seed_set == 1 then
-		seed = wsh_seed
-	end
-	seed = seed or os.time()
-	math.randomseed(seed)
-	print(" [*] testlib seed: " .. seed)
-
+function testlib(name, num)
 	local world = functions("",name,1)
+	math.randomseed(os.time())
 	shuffle(world)
 	for x,v in pairs(world) do
 		print(" [*] Testing", x, v)
-		-- Pass false as seed: PRNG is already seeded, don't re-seed
-		-- per function — the sequence must be continuous.
-		testfunc(v, num, false)
+		testfunc(v, num)
 	end
 end
 
